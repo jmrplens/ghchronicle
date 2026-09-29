@@ -51,6 +51,20 @@ table's columns, the columns a store lacks, the order of the two SQL stores'
 rows and every tile over nothing, and its list of excused differences went from
 29 entries to 25, each naming only the stores that draw its difference.
 
+The release also brings a store along after an upgrade, which is
+[#96](https://github.com/jmrplens/ghchronicle/issues/96). A point is keyed by
+its measurement, its tags and its time, so a release that takes a value out of
+the tags leaves every row already stored under the old key, beside the new rows
+for ever: 2.6.1 did it to `gh_discussion_comment`, and its notes left the
+operator to drop the measurement and read it back with a backfill by hand. The
+binary now carries the list of such changes, asks every configured store which
+of them it still holds, and brings each store along the way that store allows,
+on its own at start-up when nothing can be lost and on `-migrate -yes`
+otherwise. The first start after an upgrade from 2.6.1 sets aside and reads
+back the comments of a store that still holds `is_answer` as a tag, or names
+that store at every start with the two commands that do it, as the entries
+below say.
+
 - **Elasticsearch stat tiles keep their units.** Grafana applies a panel's
   field overrides in the order they are listed, and a `byName` override matches
   the name a field carries when its turn comes. The units of a stat group are
@@ -554,6 +568,214 @@ rows and every tile over nothing, and its list of excused differences went from
   the sentence that gives the reason. The 25 that remain are each words of
   the current descriptions, and the four Elasticsearch panels that leave a
   tile out over nothing are a list of their own, held the same way.
+- **`-migrate` says what an earlier release left in each store.** The binary
+  carries the list of every change that can leave a 2.x store holding rows of
+  another shape, each under an ID that names the release and the measurement:
+  `2.6.1/gh_discussion_comment/is_answer`; the `state` tag of both alert item
+  measurements, and the `reason` tag of the code scanning one, which only
+  builds before 1.0.0 wrote, under `1.0.0/gh_code_scanning_alert_item/state`
+  and `1.0.0/gh_dependabot_alert_item/state`; and
+  `2.6.0/gh_actions_cache_entry/sum`, a note, since its rows dated before 2.6.0
+  hold one entry of each cache and ref rather than their sum and no API lists a
+  past day's caches. `ghchronicle -migrate` prints, per store and per change,
+  what it found and the evidence, what bringing the store along would do there,
+  which families would read the measurement again and from when, what would
+  not come back, and whether applying it needs anybody's word. It changes
+  nothing: the stores are only asked questions, GitHub is asked for the
+  repository list alone, the state file is read and never written, and it
+  exits 0 whatever it finds. A store that can be asked decides for itself:
+  InfluxDB 3 by whether the old tag is a tag column of the live table,
+  InfluxDB 2 by whether any row carries it, PostgreSQL by whether any row
+  holds a value in its column, and Elasticsearch by a count of the documents
+  that carry it. A SQL file, a Graphite and whatever is behind a Telegraf
+  cannot be asked, and are decided by a new `stores` key of the state file,
+  which records per sink where it points and the release that first wrote it,
+  so a fresh install, and every run of the Action on a new state file, has
+  nothing to migrate. The renaming of 2.0.0, which added `owner` and
+  `full_name` to thirteen measurements, is not on the list: two of them are
+  windows GitHub forgets, so a 1.x store is still recreated or cleaned by
+  hand. The
+  [upgrading page](https://jmrp.io/docs/ghchronicle/install/upgrading/#migrations)
+  says what each line of the plan means.
+- **A start applies what loses nothing, and names the rest at every start.**
+  Every run that writes to the stores, the service, `-once`, `-backfill` and a
+  card drawn beside them, checks them before its first sweep. Under `auto`,
+  the default of the new
+  [`migrate`](https://jmrp.io/docs/ghchronicle/configuration/#migrate)
+  setting, it applies a pending change on its own only when all three hold:
+  GitHub still serves the whole history, so reading it again brings back every
+  row the store holds; the old rows are set aside rather than deleted, which
+  InfluxDB 3, PostgreSQL and Elasticsearch do; and every row in the store is
+  this configuration's, which the store is asked, as it is asked for rows of
+  repositories the configuration no longer covers or of families it switches
+  off, which a refill would not bring back. It says so at `WARN`, as
+  `applying a migration before the first sweep`, with what it found, why the
+  change exists and where the old rows go, reads the measurement back, and
+  only then sweeps. A one-shot run on a new state file, which is every run of
+  the Action that does not restore one, applies nothing on its own, since the
+  record that a refill is still owed would go with its runner. Any other
+  pending change, and every one under `migrate: warn`, is a `WARN`
+  `migration pending` at every start, naming the store, the reason it was left
+  and the two commands, `-migrate` and `-migrate -yes`, with the service to be
+  stopped first. No value applies the rest on its own. A store that does not
+  answer within 30 seconds is a `WARN` and the sweep goes on, and once every
+  change is settled for a store, a start asks that store nothing.
+- **`-migrate -yes` applies the rest.** It prints the same plan and applies
+  every pending change, the ones that need somebody's word too, recording each
+  in the state file as it goes, so a rerun after a failure does nothing twice,
+  and says under the plan what was applied, what failed, what was held back or
+  not reached, what was read back and what was reconciled. A store holding
+  rows of accounts this configuration does not collect, or whose rows could
+  not be compared with it, is held back unless `-migrate-others` is given as
+  well: set aside, those rows come back only when whoever collects them reads
+  them again. It refuses before changing anything without a token or a
+  repository list, and while another process holds the state file. It exits 0
+  when everything pending was applied and read back, 1 when anything was left,
+  with the sentence that says how to go on, and 2 for `-migrate-others`
+  without `-migrate`. With the SQL sink on standard output the plan and the
+  report go to standard error, so the pipe into psql carries the SQL alone.
+  The [systemd](https://jmrp.io/docs/ghchronicle/install/systemd/#after-an-upgrade)
+  and [Docker](https://jmrp.io/docs/ghchronicle/install/docker/#after-an-upgrade)
+  pages run it as the service's own user with its environment, since a state
+  file saved by root is one the service can no longer read. The Action gains
+  `mode: migrate`, which runs it, and in every mode turns each line that says a
+  change is pending, was applied at the start, failed or left its history
+  owed into a warning annotation on the run, as the line is written.
+- **Each store is brought along the way it allows, in that one measurement.**
+  Measured in throwaway containers of the versions the containerised suite
+  runs, with the same measurement in a second namespace, another table beside
+  it and a name that only starts like it, none of which was touched. InfluxDB 3
+  deletes the one table, which is InfluxDB's own set-aside: the table is
+  renamed `<measurement>-<instant>` and stays queryable, the old name takes the
+  new shape at once, and the server purges the copy 72 hours later by default,
+  a time read back from its `_internal` database (measured on Core 3.11.2 and
+  3.11.5); `hard_delete_at` is never sent, and a server before 3.4.0 keeps the
+  copy for good, which the plan says. InfluxDB 2 deletes every row of the
+  measurement in the bucket, which is final, so no start does it on its own.
+  PostgreSQL renames the table `<measurement>-<instant>` in the sink's schema,
+  under a 5 second `lock_timeout` tried three times, and Elasticsearch blocks
+  writes to the index, clones it to `<index>-<instant>`, checks that the clone
+  holds every document and deletes the index; ghchronicle purges those two
+  copies once they have been kept 24 hours, after a sweep of the service, at
+  the start of any run or at `-migrate -yes`. The SQL file gets
+  `DROP TABLE IF EXISTS` in its stream, and declares the table again after it;
+  Graphite, whose paths nothing but its host can delete, gets the exact
+  `find ... -delete` of the old paths, one node deeper than the new ones,
+  printed for whoever runs that host; a Telegraf gets what to do in the store
+  behind it. No start applies those three on its own. Loki, the Prometheus
+  exporter, OTLP, the file sink and stdout keep nothing a release could
+  reshape, and have nothing to do. The
+  [upgrading page](https://jmrp.io/docs/ghchronicle/install/upgrading/#what-applying-does-in-each-store)
+  has the table, and each store's page says how to undo the change while its
+  copy is there.
+- **What was cleared is read back, and only that.** Right after applying, the
+  same run reads the history back with a backfill of its own, the refill: the
+  families that write the measurement, `discussions` and `outbound` for the
+  comments and `security` for the alert items, and no other; writing that
+  measurement alone; into the stores that were cleared and no other, never
+  Loki, the exporter, OTLP, the file sink, stdout or a Telegraf, which would
+  keep every row a second time. It reads as far back as the day of the oldest
+  row the store held, read before the store was cleared, and with no bound
+  where the store cannot say, the SQL file and Graphite. It has a GitHub
+  client of its own that waits for a spent rate limit, as a backfill does, and
+  `-backfill-retry` goes back for what it leaves. The state file records the
+  refill as owed before a store is touched, since a store cleared and not read
+  back looks exactly like one that never held the old shape, and a refill cut
+  short keeps a checkpoint of its own, `<state>-refill.json`, which
+  `-migrate -yes` run again, or any start under `migrate: auto`, resumes, and
+  which `-backfill-status` prints. The write ledger forgets the measurement in
+  the cleared store alone, through a salt in its identity that leaves every
+  other identity the number it was, and the cache file forgets what it claims
+  about the families that write it. When the refill ends, each copy of the old
+  rows is compared item by item with the table read back, and the report names
+  what GitHub no longer serves, a repository deleted or no longer covered or a
+  comment deleted, whose rows are then only in the copy until it is purged.
+  Read-only against production's InfluxDB 3.11.5 Enterprise on 2026-09-29, the
+  copy InfluxDB kept of the table dropped by hand for 2.6.1 held 114 comments,
+  every one of them among the 121 the table read back holds, one row each. See
+  [reading the history back](https://jmrp.io/docs/ghchronicle/install/upgrading/#reading-the-history-back).
+- **What the first start after 2.6.1 does.** `gh_discussion_comment` is
+  pending in every store written before 2.6.1 and not dropped since. In an
+  InfluxDB 3, a PostgreSQL or an Elasticsearch holding this configuration's
+  rows alone, the first run that writes to it under the default
+  `migrate: auto` sets the table aside, reads `discussions` and `outbound`
+  back into it and then sweeps, saying all of it at `WARN`: the containerised
+  suite's whole `-migrate -yes` against those three took 2.6 seconds on the
+  run for these notes, and on the author's account the `outbound` walk it
+  needs took 33 seconds when 2.6.1's comments were read back by hand. An
+  InfluxDB 2, a store shared with
+  another collector or holding rows a refill would not bring back, an
+  InfluxDB 3 Core whose table is past its query file limit and so cannot say
+  whose rows it holds, and the SQL file, Graphite and Telegraf, which cannot
+  be asked and so are taken to hold the old shape until `-migrate -yes` has
+  run, are named at every start with the commands. Until a store is brought
+  along, an answer accepted and taken back since still reads accepted on both
+  comment panels, as it did in 2.6.1, and the dashboards still read both
+  shapes, one row per comment. A store
+  already dropped and read back by hand holds no `is_answer` and is left
+  alone. A store holding `gh_actions_cache_entry` gets its note once at
+  `INFO`. The alert items need nothing in any store a release wrote: only a
+  store a build before 1.0.0 wrote can hold their old tags, and there they
+  would be set aside and read back from `security` as the comments are.
+  Production's InfluxDB, the one store builds before 1.0.0 could have
+  written, read from its catalog on 2026-09-29, holds neither tag in either
+  table, no `is_answer` in the comments and 4,888 cache entry rows from
+  2026-09-17, so its start records the three as not needed, says the note and
+  applies nothing.
+- **`-backfill -families` walks the families named, and no other.** A store
+  that lost one family's history had no way back but a whole backfill or a
+  configuration written for the occasion, which is how production read 2.6.1's
+  comments back. `-backfill -families discussions,outbound` walks those two
+  into every configured store. A name that is not a family, or the flag
+  without `-backfill`, exits 2, and a family the configuration switches off
+  exits 1 before anything is asked. Its checkpoint records the families, so a
+  backfill of others refuses it and names the difference, and
+  `-backfill-status` prints the resume line with them. See
+  [some families only](https://jmrp.io/docs/ghchronicle/how/backfill/#some-families-only).
+- **The PostgreSQL sink writes on across a table dropped behind it.** The
+  connecting sink declared each table once per process, so a table another
+  connection dropped or renamed made every later write of that measurement
+  fail with 42P01, and the rest of its batch with it, until the collector
+  restarted, which is why the pages that told the reader to drop
+  `gh_discussion_comment` by hand after 2.6.1 had to say to restart it. On
+  42P01 the sink now declares the batch's tables again from the catalog, which
+  creates the one that went, and sends the batch once more; a table still
+  missing after that, and any other refusal, is reported as before. Measured
+  for these notes against PostgreSQL 18.6, three writes of a comment and a
+  discussion after another connection dropped the comment table: 2.6.1's sink
+  wrote no row of the three batches and left the table missing, and this
+  release's wrote both rows each time into a table made again, keyed by time,
+  comment and full name.
+- **`-uninstall data` no longer says it removed what InfluxDB 3 keeps.**
+  InfluxDB 3 lists a table it has deleted, under `<name>-<instant>`, until it
+  purges it, and answers a delete of it with a 409 the uninstall took as done,
+  so it said "removed" of a table that was still there, at every run. Such a
+  table is now left out, and said once to be the server's to purge; a
+  migration makes those names common.
+- **A lock beside the state file.** The service holds an advisory lock on
+  `<state>-lock` for as long as it runs, `flock` on Linux, macOS and the BSDs
+  and `LockFileEx` on Windows, which the operating system lets go of however
+  the process ends. `-migrate -yes`, and `-uninstall -yes` of the data or the
+  state, refuse while another process holds it and name that process; a
+  service started while `-migrate -yes` runs waits for it, a second service on
+  the same state file is refused, and a one-shot run takes it only while it
+  applies. A save of the state file keeps what another process recorded of
+  the stores since the file was read, and a state file that cannot be read or
+  parsed stops a run that writes to the stores, rather than being taken for a
+  new one that forgets a refill still owed.
+- **A change to a measurement's tags owes an entry on the list.**
+  `internal/migrate/identity.json` holds the tag keys of every measurement one
+  sweep of the fake GitHub writes, and its test fails on any difference;
+  `-update` refuses to rewrite it while a tag that went away has no entry,
+  which is the review that would have caught `is_answer` in 2.6.1. A second
+  test sweeps the fake one family at a time and fails on an entry whose
+  families are not exactly the ones that write its measurement:
+  `gh_discussion_comment` is written by `discussions` as well as `outbound`,
+  and the fake's discussion threads now carry their comments so that the
+  second writer shows. Every shipped entry is pinned in
+  `internal/migrate/testdata/registry.json`. CLAUDE.md and
+  [CONTRIBUTING](https://github.com/jmrplens/ghchronicle/blob/main/CONTRIBUTING.md)
+  say what such a change, a new sink and a step that deletes data owe.
 
 Each change in behaviour carries a test shown to fail against the code before
 it, run there again for these notes, in each change's own tree with everything
@@ -601,11 +823,42 @@ containerised suite passed on this release against InfluxDB 3.11.2, PostgreSQL
 Prometheus 3.14.0, through Grafana 13.2.1, and the values this release reads,
 given above, were read off its Grafana once the suite had filled the stores.
 
+The migration is new, and every step of it that deletes or sets aside data is
+held three ways: that it touches only what it must, the same measurement in a
+second namespace, a table beside it and a name that only starts like it left
+as they were; that the dry run changes nothing, the stores sent nothing but
+questions, GitHub asked for the repository list alone and no file beside the
+configuration changed; and a run against the real store. End to end against
+the fake GitHub, 2.6.0's comments are written through the InfluxDB, SQL and
+file sinks themselves, `is_answer` put back as the tag it was and each
+accepted comment written a second time as read before its acceptance, into an
+InfluxDB held in memory that answers each query as a throwaway InfluxDB 3.11.2
+Core answered the same writes, and `-migrate`, `-migrate -yes`, a start under
+`migrate: auto` and one under `migrate: warn` are run against them. The
+containerised suite writes the same shape into InfluxDB 3.11.2, PostgreSQL
+18.6, Elasticsearch 9.5.3, Graphite 1.1.10-5 and a SQL file replayed into
+PostgreSQL, each in a namespace of its own with Grafana datasources that read
+it, has the fake GitHub take back an accepted answer, and asks both comment
+panels through `/api/ds/query` and each panel's own transformations.
+`-migrate` finds all five pending and changes nothing. Before the upgrade all
+five read the answer accepted, one row for the comment; after a start under
+`migrate: auto` the three stores that set rows aside read it not accepted,
+still one row, while Graphite and the SQL file, which no start touches, still
+read it accepted and are warned about; after `-migrate -yes`, with the
+Graphite commands it printed run in the container and the file replayed from
+where it was, all five read it not accepted. Every other measurement of the
+namespace holds what it held, and a third namespace holding the same rows,
+which no configuration names, is untouched. Of the two changes of behaviour
+that came with it, the PostgreSQL sink across a dropped table was measured
+against 2.6.1's code for these notes, as above, and the test of
+`-uninstall data` over a table InfluxDB 3 has deleted was run there and fails,
+with the renamed table reported removed.
+
 Not verified, and worth saying plainly:
 
-- None of it has run in production. Every measurement above was taken on the
-  containerised stack, whose fixture is one account with one repository of its
-  own, through Grafana 13.2.1.
+- None of it has run in production. Every measurement of the review above was
+  taken on the containerised stack, whose fixture is one account with one
+  repository of its own, through Grafana 13.2.1.
 - `grafana.Draw` is a reimplementation, from Grafana 13's frontend, of the
   steps these dashboards use. It was not run beside the browser on every
   panel, and a Grafana that changes one of those steps can draw what the
@@ -646,6 +899,35 @@ Not verified, and worth saying plainly:
 - In InfluxDB "Workflows that keep failing" asks for `gh_workflow.url`, which
   the fixture does not write, so there the panel is an error on the stack, as
   the suite lists, and its threshold is held by the query test alone.
+- No migration has been applied outside the test suites and throwaway
+  containers. Production's comments were dropped and read back by hand before
+  this release, so its start will find nothing to apply; what was checked
+  there was read-only: its catalog, the copy InfluxDB kept and the counts
+  above.
+- The InfluxDB 3 table delete was measured on Core, 3.0.0 to 3.11.5, and the
+  72 hours before the purge on Core 3.11.2 and 3.11.5. Production runs
+  Enterprise 3.11.5, where only reads were made, so the delete has not been
+  sent to an Enterprise server. Which release between 3.0.0 and 3.4.0 began
+  purging was not measured.
+- InfluxDB 2's delete was measured by hand against 2.7.12 in a throwaway
+  container and is held by a test of its request; the containerised suite runs
+  no InfluxDB 2.
+- The alert items' change has never been applied to a real store: no store at
+  hand holds what a build before 1.0.0 wrote. Its plan, its set-aside and its
+  refill of `security` are held by unit tests, and the containerised suite
+  keeps today's alert rows beside the comments only to show they are not
+  touched.
+- The refill has run only against the fake GitHub. On a real account the
+  `outbound` walk it needs took 33 seconds when 2.6.1's comments were read back
+  by hand; a refill long enough to meet a spent rate limit, and one resumed
+  from its checkpoint after a real stop, were not run there.
+- The lock was run on Linux, under the systemd unit's sandbox and across two
+  containers on one named volume. `LockFileEx` on Windows and `flock` on macOS
+  are held by the lock tests of the CI legs for those platforms, which have not
+  run this release yet.
+- The Action's `mode: migrate` and its annotations are held by tests that run
+  its Run step's script in bash with a stand-in for the binary. They were not
+  run on a runner, and GitHub was not seen drawing the annotations.
 
 ## 2.6.1 - 2026-09-28
 
