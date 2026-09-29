@@ -638,8 +638,8 @@ func (rd *Reducer) countDistinct(key string, p Point) int {
 		rd.seen[key] = map[string]int{}
 	}
 	weight := 1
-	if n, ok := numeric(p.Fields["events"]); ok && n > 0 {
-		weight = int(n)
+	if n, ok := IntField(p.Fields["events"]); ok && n > 0 {
+		weight = n
 	}
 	rd.totals[key] += weight - rd.seen[key][ident]
 	rd.seen[key][ident] = weight

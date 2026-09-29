@@ -17,14 +17,19 @@ import (
 type Accumulator struct {
 	Login string
 
-	account map[string]float64
+	// Every number the card draws is a count, so each is kept whole, read
+	// by sink.IntField or sink.Int64Field, which refuse what no int holds.
+	account map[string]int
 	// repos and languages are keyed by repoKey, never by the short name.
 	repos   map[string]*repoRow
-	traffic map[string]float64
+	traffic map[string]int
 	days    map[time.Time]int
 	// languages holds bytes per language per repository, newest snapshot
-	// per pair, summed at render time.
-	languages map[string]map[string]int
+	// per pair, summed at render time. It is an int64 from the field to the
+	// card's Language, so no narrowing stands between them: torvalds/linux
+	// alone reports 1,452,105,738 bytes of C (read on 2026-09-29), and two
+	// repositories like it add up past what a 32-bit int holds.
+	languages map[string]map[string]int64
 	// newest remembers the most recent timestamp seen per repository field, so
 	// a sweep that writes the same repository twice keeps the later value.
 	seen map[string]time.Time
@@ -42,11 +47,11 @@ type repoRow struct {
 func NewAccumulator(login string) *Accumulator {
 	return &Accumulator{
 		Login:     login,
-		account:   map[string]float64{},
+		account:   map[string]int{},
 		repos:     map[string]*repoRow{},
-		traffic:   map[string]float64{},
+		traffic:   map[string]int{},
 		days:      map[time.Time]int{},
-		languages: map[string]map[string]int{},
+		languages: map[string]map[string]int64{},
 		seen:      map[string]time.Time{},
 	}
 }
@@ -75,10 +80,10 @@ func (a *Accumulator) Write(_ context.Context, points []sink.Point) (int, error)
 			// The whole window summed, which is what the card shows: GitHub
 			// gives fourteen days and a card has room for one number.
 			kind := p.Tags["kind"]
-			if v, ok := numberOf(p.Fields["count"]); ok {
+			if v, ok := sink.IntField(p.Fields["count"]); ok {
 				a.traffic[kind+"_count"] += v
 			}
-			if v, ok := numberOf(p.Fields["uniques"]); ok {
+			if v, ok := sink.IntField(p.Fields["uniques"]); ok {
 				a.traffic[kind+"_uniques"] += v
 			}
 		case "gh_repo_language":
@@ -87,19 +92,19 @@ func (a *Accumulator) Write(_ context.Context, points []sink.Point) (int, error)
 			if repo == "" || lang == "" {
 				break
 			}
-			if v, ok := numberOf(p.Fields["bytes"]); ok {
+			if v, ok := sink.Int64Field(p.Fields["bytes"]); ok {
 				if a.languages[repo] == nil {
-					a.languages[repo] = map[string]int{}
+					a.languages[repo] = map[string]int64{}
 				}
-				a.languages[repo][lang] = int(v)
+				a.languages[repo][lang] = v
 			}
 		case "gh_contribution_day":
 			taken++
-			if v, ok := numberOf(p.Fields["contributions"]); ok {
+			if v, ok := sink.IntField(p.Fields["contributions"]); ok {
 				day := p.Time.UTC().Truncate(24 * time.Hour)
 				// Later wins rather than adding: the same day arriving twice
 				// is a re-read of the calendar, not two days of work.
-				a.days[day] = int(v)
+				a.days[day] = v
 			}
 		}
 	}
@@ -112,7 +117,7 @@ func (a *Accumulator) takeLatest(prefix string, p sink.Point) {
 	}
 	a.seen[prefix] = p.Time
 	for k, v := range p.Fields {
-		if n, ok := numberOf(v); ok {
+		if n, ok := sink.IntField(v); ok {
 			a.account[prefix+"."+k] = n
 		}
 	}
@@ -150,11 +155,11 @@ func (a *Accumulator) takeRepo(p sink.Point) {
 		a.repos[id] = r
 	}
 	r.language = p.Tags["language"]
-	if v, ok := numberOf(p.Fields["stars"]); ok {
-		r.stars = int(v)
+	if v, ok := sink.IntField(p.Fields["stars"]); ok {
+		r.stars = v
 	}
-	if v, ok := numberOf(p.Fields["forks"]); ok {
-		r.forks = int(v)
+	if v, ok := sink.IntField(p.Fields["forks"]); ok {
+		r.forks = v
 	}
 }
 
@@ -163,27 +168,27 @@ func (a *Accumulator) takeRepo(p sink.Point) {
 // sweep filtered out.
 func (a *Accumulator) Card() Card {
 	c := Card{Login: a.Login}
-	c.Followers = int(a.account["account.followers"])
-	c.Repos = int(a.account["account.public_repos"])
-	c.Contributions = int(a.account["contributions.calendar_total"])
-	c.Commits = int(a.account["contributions.commits"])
-	c.PullRequests = int(a.account["contributions.pull_requests"])
-	c.Reviews = int(a.account["contributions.reviews"])
-	c.Issues = int(a.account["contributions.issues"])
-	c.Views = int(a.traffic["views_count"])
-	c.UniqueVisitors = int(a.traffic["views_uniques"])
-	c.Clones = int(a.traffic["clones_count"])
+	c.Followers = a.account["account.followers"]
+	c.Repos = a.account["account.public_repos"]
+	c.Contributions = a.account["contributions.calendar_total"]
+	c.Commits = a.account["contributions.commits"]
+	c.PullRequests = a.account["contributions.pull_requests"]
+	c.Reviews = a.account["contributions.reviews"]
+	c.Issues = a.account["contributions.issues"]
+	c.Views = a.traffic["views_count"]
+	c.UniqueVisitors = a.traffic["views_uniques"]
+	c.Clones = a.traffic["clones_count"]
 
 	// Languages summed across repositories. No color is set: the renderer
 	// carries Linguist's table, and GitHub's API does not return one.
-	total := map[string]int{}
+	total := map[string]int64{}
 	for _, langs := range a.languages {
 		for name, bytes := range langs {
 			total[name] += bytes
 		}
 	}
 	for name, bytes := range total {
-		c.Languages = append(c.Languages, Language{Name: name, Bytes: int64(bytes)})
+		c.Languages = append(c.Languages, Language{Name: name, Bytes: bytes})
 	}
 	sort.Slice(c.Languages, func(i, j int) bool {
 		if c.Languages[i].Bytes != c.Languages[j].Bytes {
@@ -240,23 +245,6 @@ func (a *Accumulator) Card() Card {
 		}
 	}
 	return c
-}
-
-func numberOf(v any) (float64, bool) {
-	switch n := v.(type) {
-	case int:
-		return float64(n), true
-	case int64:
-		return float64(n), true
-	case float64:
-		return n, true
-	case bool:
-		if n {
-			return 1, true
-		}
-		return 0, true
-	}
-	return 0, false
 }
 
 var _ sink.Sink = (*Accumulator)(nil)

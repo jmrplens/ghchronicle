@@ -1211,6 +1211,25 @@ func TestReducerCountsARowWithoutAPositiveEventCountAsOne(t *testing.T) {
 	}
 }
 
+// TestReducerCountsARowWhoseEventCountNoIntHoldsAsOne weighs a row whose
+// events is a number no int holds as one item, as it weighs a row that says
+// nothing. Converted as it was, 1e19 or an infinity came out as whatever the
+// platform makes of it, the most negative int on amd64, and the running total
+// carried that into every later reading of the series.
+func TestReducerCountsARowWhoseEventCountNoIntHoldsAsOne(t *testing.T) {
+	at := time.Date(2026, 9, 12, 7, 23, 54, 0, time.UTC)
+	for _, events := range []any{1e19, math.Inf(1), math.Inf(-1), math.NaN()} {
+		out, _ := NewReducer().Reduce([]Point{{
+			Measurement: "gh_repo_activity",
+			Tags:        map[string]string{"repo": "a", "activity": "push"},
+			Fields:      map[string]any{"events": events}, Time: at,
+		}})
+		if len(out) != 1 || out[0].Fields["total"] != 1 {
+			t.Errorf("events %v: %+v, want a total of one", events, out)
+		}
+	}
+}
+
 // TestSummarizeLeavesOutAWindowWithNothingToAdd publishes no gauge for a summed
 // measurement whose points carry no number.
 func TestSummarizeLeavesOutAWindowWithNothingToAdd(t *testing.T) {
