@@ -235,9 +235,16 @@ log:
 // refillExec runs -migrate -yes and returns what it printed on each stream.
 func refillExec(ctx context.Context, t *testing.T, binary, cfg string) (stdout, stderr string, err error) {
 	t.Helper()
+	return collectorExec(ctx, t, binary, "-config", cfg, "-migrate", "-yes")
+}
+
+// collectorExec runs the collector with the arguments given and returns what
+// it printed on each stream, failing the test on a race report in the log.
+func collectorExec(ctx context.Context, t *testing.T, binary string, args ...string) (stdout, stderr string, err error) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, binary, "-config", cfg, "-migrate", "-yes")
+	cmd := exec.CommandContext(ctx, binary, args...)
 	cmd.Env = collectorEnviron()
 	var out, log bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &log
