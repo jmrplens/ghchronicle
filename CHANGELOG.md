@@ -12,7 +12,7 @@ Versions follow [semantic versioning](https://semver.org/). The dates are the
 day the tag was pushed, with one exception: 2.5.2 has a section and no tag. It
 was never released on its own, and its changes shipped in 2.6.0.
 
-## 2.6.2 - 2026-09-28
+## 2.6.2 - 2026-09-29
 
 A visual and cross-store review of 2.6.1 on the containerised stack: the five
 dashboards imported into its Grafana 13.2.1, every panel of every store
