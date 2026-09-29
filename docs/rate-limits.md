@@ -209,10 +209,11 @@ What is not asked again:
 - **GitHub's GraphQL timeout.** A `502` or a `504` to a query that ran for
   ten seconds means a query too large to answer in them, which the same query
   would meet again. The pull request, commit and co-authored pull request walks
-  ask again on the same cursor at half the page, down to ten, and a query about
-  several repositories at once is asked again with half of them, down to one.
-  What still times out there, and every other walk or single query, is a
-  failure the collector reports with the rows it read before it, never the end
+  ask again on the same cursor at half the page while it is larger than ten, so
+  a page of fifty is asked again at twenty-five, twelve and six, and a query
+  about several repositories at once is asked again with half of them, down to
+  one. What still times out at the smallest, and every other walk or single
+  query, is a failure the collector reports with the rows it read before it, never the end
   of what there is to read: a backfill does not record that repository as
   walked, and the next sweep reads it again. Up to 2.6.3 a walk with no smaller
   page to ask took the timeout for the end of its data and reported success,

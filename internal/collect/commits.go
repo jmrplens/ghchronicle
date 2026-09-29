@@ -177,9 +177,10 @@ func (cm Commits) Collect(ctx context.Context, c *ghapi.Client, repo Repo, _ tim
 		}
 		if err := c.GraphQL(ctx, commitsQuery, vars, &res); err != nil {
 			if _, tooLarge := errors.AsType[*ghapi.TooLargeError](err); tooLarge && first > 10 {
-				// Same cursor, half the page, down to ten as the pull request
-				// walk does. The contexts of a busy repository's checks are
-				// what outlast the gateway: the production proxy's log from
+				// Same cursor, half the page, while it is larger than ten, as
+				// the pull request walk does: fifty is asked again at 25, 12
+				// and 6. The contexts of a busy repository's checks are what
+				// outlast the gateway: the production proxy's log from
 				// 2026-09-11 to 2026-09-29 holds twelve of this query's pages
 				// answered with GitHub's timeout, all of fifty commits, in six
 				// repositories, and each ended its walk as though the history
@@ -191,10 +192,11 @@ func (cm Commits) Collect(ctx context.Context, c *ghapi.Client, repo Repo, _ tim
 				continue
 			}
 			// An empty repository has no default branch, which is not a
-			// failure. A page the gateway still gives up on at ten is, and so
-			// are a spent budget and a canceled sweep: each is handed up with
-			// the pages walked so far, which the runner writes, reports and
-			// keeps out of a backfill's checkpoint.
+			// failure. A page the gateway still gives up on at the smallest
+			// size the halving reaches, six from fifty, is, and so are a
+			// spent budget and a canceled sweep: each is handed up with the
+			// pages walked so far, which the runner writes, reports and keeps
+			// out of a backfill's checkpoint.
 			if isSkippableGraphQL(err) {
 				return points, nil
 			}

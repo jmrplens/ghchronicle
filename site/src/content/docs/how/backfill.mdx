@@ -349,14 +349,16 @@ commits of a busy repository with the checks each one carries: twelve pages of
 the author's own commit walks met it, in six repositories. Both walks halve
 their page size and retry on the same cursor, silently: neither collector
 carries a logger, so a backfill of a busy repository shows this only as a
-slower family, never as a line. A page the gateway still gives up on at ten,
-and a timeout in any walk with no smaller page to ask, is a failure: the rows
-read before it are written, the `collector failed` line says the query is too
-large for one request, and the repository is not recorded in the checkpoint,
-so a resume walks it again. Up to 2.6.3 the commit walk took the timeout for
-the end of the history and recorded the repository as walked. Only that answer
-is halved for: a `503`, or a `502` that comes back sooner than ten seconds, is
-not a query the gateway ran out of time on, and [the client asks it once
+slower family, never as a line. The page is halved while it is larger than
+ten, so fifty is asked again at twenty-five, twelve and six. A page the gateway
+still gives up on at that smallest size, and a timeout in any walk with no
+smaller page to ask, is a failure: the rows read before it are written, the
+`collector failed` line says the query is too large for one request, and the
+repository is not recorded in the checkpoint, so a resume walks it again. Up
+to 2.6.3 the commit walk took the timeout for the end of the history and
+recorded the repository as walked. Only that answer is halved for: a `503`, or
+a `502` that comes back sooner than ten seconds, is not a query the gateway ran
+out of time on, and [the client asks it once
 more](/ghchronicle/api/#an-answer-github-could-not-finish-is-asked-once-more)
 at the same size.
 

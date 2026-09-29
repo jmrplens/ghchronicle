@@ -223,10 +223,12 @@ Lo que no se vuelve a preguntar:
   consulta que estuvo diez segundos en marcha significa una consulta demasiado
   grande para responderla en ellos, con la que la misma consulta volvería a
   toparse. Los recorridos de pull requests, de commits y de pull requests en
-  coautoría vuelven a preguntar sobre el mismo cursor con media página, hasta
-  diez, y una consulta sobre varios repositorios a la vez se vuelve a preguntar
-  con la mitad de ellos, hasta uno. Lo que aún agota el tiempo ahí, y cualquier
-  otro recorrido o consulta suelta, es un fallo que el colector informa junto
+  coautoría vuelven a preguntar sobre el mismo cursor con media página mientras
+  sea mayor que diez, así que una página de cincuenta se vuelve a pedir con
+  veinticinco, doce y seis, y una consulta sobre varios repositorios a la vez se
+  vuelve a preguntar con la mitad de ellos, hasta uno. Lo que aún agota el
+  tiempo con lo más pequeño, y cualquier otro recorrido o consulta suelta, es un
+  fallo que el colector informa junto
   con las filas que leyó antes, nunca el final de lo que hay que leer: un
   relleno no anota ese repositorio como recorrido, y la pasada siguiente lo
   vuelve a leer. Hasta 2.6.3 un recorrido sin página más pequeña que pedir

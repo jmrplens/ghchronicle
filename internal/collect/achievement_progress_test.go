@@ -310,7 +310,8 @@ func TestCoauthoredWalkStopsAtTheCapOnOneDay(t *testing.T) {
 }
 
 // TestCoauthoredWalkHalvesAPageTheGatewayRefuses pins the answer to the
-// gateway's HTML 502: the same cursor, half the page, down to ten.
+// gateway's HTML 502: the same cursor, half the page, while it is larger than
+// ten.
 func TestCoauthoredWalkHalvesAPageTheGatewayRefuses(t *testing.T) {
 	t.Parallel()
 	f := newFixtureServer(t)

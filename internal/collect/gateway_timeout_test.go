@@ -115,8 +115,8 @@ func TestASweepReadsTheSpanItWasGivenAtAHalvedPage(t *testing.T) {
 }
 
 // TestCommitsHandUpATimeoutTheyCannotHalvePast: a page the gateway gives up on
-// at every size is halved down to ten, as the pull request walk's is, and then
-// it is a failure, handed up with the commits the walk read before it, which
+// at every size is halved while it is larger than ten, as the pull request
+// walk's is, so fifty goes to 25, 12 and 6, and then it is a failure, handed up with the commits the walk read before it, which
 // the runner writes, reports and does not record as walked.
 func TestCommitsHandUpATimeoutTheyCannotHalvePast(t *testing.T) {
 	t.Parallel()
