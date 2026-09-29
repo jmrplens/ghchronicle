@@ -153,3 +153,20 @@ func TestEveryListedFieldIsOneAPanelSortsBy(t *testing.T) {
 		}
 	}
 }
+
+// TestTheCollationProbesAreTheKeysLeftAlone keeps CollationProbes, which the
+// containerised suite runs against PostgreSQL, to a probe for each sort key
+// and extreme without the collation, and to none for a key that has it or a
+// macro.
+func TestTheCollationProbesAreTheKeysLeftAlone(t *testing.T) {
+	t.Parallel()
+	sql := `SELECT $__timeGroupAlias(time, $__interval), author COLLATE "C" AS "Author", COUNT(*) AS n, MIN(rn) AS o ` +
+		`FROM gh_x GROUP BY 1, 2 ORDER BY 1, 3 DESC, 2`
+	want := []CollationProbe{
+		{Key: "COUNT(*)", SQL: strings.Replace(sql, "COUNT(*)", `COUNT(*) COLLATE "C"`, 1)},
+		{Key: "rn", SQL: strings.Replace(sql, "MIN(rn)", `MIN(rn COLLATE "C")`, 1)},
+	}
+	if got := CollationProbes(sql); !slices.Equal(got, want) {
+		t.Errorf("got %+v\nwant %+v", got, want)
+	}
+}

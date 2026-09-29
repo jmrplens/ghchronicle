@@ -60,6 +60,38 @@ func collateAt(s string, ends []int) string {
 	return out.String()
 }
 
+// CollationProbe is one PostgreSQL statement of these dashboards with one of
+// the expressions it sorts by, which byteOrder left to the database's
+// collation, given COLLATE "C".
+type CollationProbe struct {
+	// Key is the expression, as the statement writes it.
+	Key string
+	SQL string
+}
+
+// CollationProbes is a probe for every expression a PostgreSQL statement of
+// these dashboards sorts by, or takes the least or the greatest of, without
+// COLLATE "C". It types nothing, which is its point: PostgreSQL refuses a
+// collation on anything but text, so a probe it accepts is a text key
+// byteOrder read as a number, and the containerised suite runs every probe
+// to hold byteOrder to that whatever the rows. A Grafana macro is left out,
+// being a time and expanding to more than one expression.
+func CollationProbes(sql string) []CollationProbe {
+	st := scanSQL(sql)
+	var out []CollationProbe
+	for _, site := range st.sites() {
+		key := sql[site[0]:site[1]]
+		if strings.HasSuffix(key, collateC) || strings.HasPrefix(key, "$__") {
+			continue
+		}
+		probe := CollationProbe{Key: key, SQL: collateAt(sql, []int{site[1]})}
+		if !slices.ContainsFunc(out, func(p CollationProbe) bool { return p.SQL == probe.SQL }) {
+			out = append(out, probe)
+		}
+	}
+	return out
+}
+
 const collateC = ` COLLATE "C"`
 
 // textFields are the fields that hold text which a panel sorts by or takes the
