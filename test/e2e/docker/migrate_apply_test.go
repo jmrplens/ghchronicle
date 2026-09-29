@@ -90,7 +90,7 @@ func clearStores(t *testing.T) *cleared {
 		seedPostgresAsWritten(c.ctx, t, c.s, ns)
 		seedElasticsearch(c.ctx, t, c.s, ns)
 	}
-	c.cfg = &config.Config{Targets: config.Targets{User: "octocat"}, Sinks: config.Sinks{
+	c.cfg = &config.Config{GitHub: config.GitHub{Token: "test-token"}, Targets: config.Targets{User: "octocat"}, Sinks: config.Sinks{
 		Influx:        &config.InfluxSink{URL: c.s.InfluxURL, Token: c.s.InfluxToken, Bucket: applyNamespace},
 		Postgres:      &config.PostgresSink{DSN: pgSinkDSN(c.s) + "&search_path=" + applyNamespace},
 		Elasticsearch: &config.ElasticsearchSink{URL: c.s.ElasticsearchURL, Prefix: applyNamespace},
@@ -409,7 +409,7 @@ func depths(files []string) []int {
 // store whose first writer is not known.
 func graphiteCommands(t *testing.T, addr, prefix string) []string {
 	t.Helper()
-	cfg := &config.Config{Targets: config.Targets{User: "octocat"}, Sinks: config.Sinks{
+	cfg := &config.Config{GitHub: config.GitHub{Token: "test-token"}, Targets: config.Targets{User: "octocat"}, Sinks: config.Sinks{
 		Graphite: &config.GraphiteSink{Addr: addr, Prefix: prefix},
 	}}
 	if err := cfg.Validate(); err != nil {
