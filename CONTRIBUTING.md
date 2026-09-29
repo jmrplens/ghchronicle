@@ -30,6 +30,10 @@ internal/render     the SVG card
 internal/config     YAML with ${VAR} expansion (and ~ in paths), per-family cadences
 internal/run        the sweep scheduler, its state file, the cache file beside
                     it, and the turns the slow families take
+internal/teardown   what -uninstall and a migration do to each store, found by
+                    asking the store
+internal/migrate    every change to what a stored row is keyed by, and what
+                    -migrate and a start do about it
 internal/dashboards the dashboard specification, shared by the generators
                     and by the binary that publishes it
 test/e2e            the binary against a fake GitHub, and against real stores
@@ -162,7 +166,24 @@ its exact wire format, a struct in `config.Sinks` with a validation message
 that says what is required, a branch in `buildSinks`, a commented block in
 `config.example.yaml`, a page under `site/src/content/docs/sinks/` with its
 Spanish twin, and a store in `internal/dashboards/stores.go` if Grafana can
-query it.
+query it. It also means its place in `storesOf` (`internal/migrate/stores.go`):
+whether `-migrate` asks the store, follows the state file's record of it, or
+has nothing to do there and says why, and the destination, never a
+credential, a record of it is kept against. `TestEverySinkIsAStoreThePlannerKnows`
+fails on a sink left out. A sink whose store keeps rows needs a way to be
+brought along, a `teardown.Clearer` or an entry in `storeWays`
+(`cmd/ghchronicle/migrate.go`), and its page a section saying what a migration
+does there.
+
+**A step that deletes or sets aside data**, in a migration or in `-uninstall`,
+means three tests: one that it touches only what it must, with the same
+measurement in another database, schema or prefix, another measurement beside
+it and a name that only starts like it, all left as they were; one that the
+dry run, `-migrate` without `-yes` or `-uninstall` without it, sends the store
+nothing but reads and changes no file; and a run against the real store in
+the containerised suite (`test/e2e/docker`), at the version its compose file
+pins. The name it acts on is exact, the measurement or the copy it made, and
+never a pattern.
 
 **A new setting or Action input** means `config.example.yaml` and the
 configuration pages, or `action.yml` and the inputs table of
