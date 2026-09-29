@@ -375,6 +375,34 @@ func TestAPointReadTwiceIsOneRow(t *testing.T) {
 	}
 }
 
+// TestAPointReadTwiceKeepsTheFieldsOfBoth: the row a repeated point makes
+// takes a field both carry from the later one and keeps a field only one of
+// them carried, whichever it was, into a map of its own, so the batch the
+// caller still holds is not changed under it.
+func TestAPointReadTwiceKeepsTheFieldsOfBoth(t *testing.T) {
+	day := time.Date(2026, 9, 18, 0, 0, 0, 0, time.UTC)
+	tags := map[string]string{"user": "octocat", "product": "Actions", "sku": "Actions Linux", "unit": "Minutes"}
+	first := Point{
+		Measurement: "gh_billing_usage", Tags: tags, Time: day,
+		Fields: map[string]any{"quantity": 200.0, "gross": 1.6},
+	}
+	later := Point{
+		Measurement: "gh_billing_usage", Tags: tags, Time: day,
+		Fields: map[string]any{"quantity": 214.0, "net": 0.0},
+	}
+	out, taken := rows([]Point{first, later})
+	if taken != 2 || len(out) != 1 {
+		t.Fatalf("two readings of one row made %d rows of %d taken, want 1 of 2", len(out), taken)
+	}
+	want := map[string]any{"quantity": 214.0, "gross": 1.6, "net": 0.0}
+	if !maps.Equal(out[0].Fields, want) {
+		t.Errorf("the row holds %v, want %v", out[0].Fields, want)
+	}
+	if len(first.Fields) != 2 || first.Fields["quantity"] != 200.0 {
+		t.Errorf("the first reading was changed under its caller: %v", first.Fields)
+	}
+}
+
 // TestAnUpstreamRepositoryIsItsNewestReading: the repositories the account
 // contributed to are read on every outbound sweep, and the exporter serves
 // each one's newest star count, visibility and forks, one series per
