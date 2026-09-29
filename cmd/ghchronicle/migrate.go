@@ -158,7 +158,7 @@ func migrateOnStart(ctx context.Context, m migration, service bool) {
 		},
 	}
 	start := migrate.Start{
-		Plan: migrate.Make(ctx, in), Auto: m.cfg.MigratesOnItsOwn(),
+		Plan: migrate.Make(ctx, in), Auto: m.cfg.MigratesOnItsOwn(), Hold: holdOnItsOwn(m, service),
 		// A store cleared with no way to read its history again holds
 		// nothing of it until somebody runs a backfill, which is a loss a
 		// start may never cause on its own, however safe the set-aside.
@@ -213,6 +213,25 @@ func migrateOnStart(ctx context.Context, m migration, service bool) {
 	purge.Run(ctx)
 }
 
+// holdOnItsOwn is why this start applies nothing on its own under
+// migrate: auto, or nothing when it may.
+//
+// A one-shot run on a new state file is the Action's, whose state file is
+// thrown away with its runner, or the first run of one on a host. Only the
+// state file says a store a migration cleared still owes its history, since
+// the store cleared looks like one that never held the old shape; a record
+// thrown away with the run leaves a refill that failed, or a job stopped
+// half way, owed to nobody, and the history is never read again. A first run
+// on a host loses nothing by waiting: the next start has a state file, and
+// -migrate -yes can be run at once.
+func holdOnItsOwn(m migration, service bool) string {
+	if service || !m.fresh {
+		return ""
+	}
+	return "a one-shot run on a new state file applies nothing on its own: that is every run of the Action, " +
+		"whose state file goes with its runner, and with it the record that a refill is still owed"
+}
+
 // holdStateFile takes the state file for the service's whole life.
 //
 // A migration applied by -migrate -yes, or by a one-shot run before its
@@ -261,23 +280,25 @@ func holdStateFile(ctx context.Context, cfg *config.Config, logger *slog.Logger)
 // for no reason the reader could see.
 func migratePlan(ctx context.Context, cfg *config.Config, api *ghapi.Client, configPath string,
 	stdout io.Writer, now time.Time,
-) {
-	in := migrate.Input{
-		Config: cfg, State: run.LoadState(cfg.StateFile), Release: version, Now: now,
+) error {
+	state, err := run.OpenState(cfg.StateFile)
+	if err != nil {
+		return err
 	}
+	in := migrate.Input{Config: cfg, State: state, Release: version, Now: now}
 	in.Repos, in.ReposWhy = coveredRepos(ctx, api, cfg)
 	in.ReposKnown = in.ReposWhy == ""
 	plan := migrate.Make(ctx, in)
 	plan.Print(stdout)
 	apply, held := plan.Pending(false)
 	if len(apply)+len(held) == 0 {
-		return
+		return nil
 	}
 	fmt.Fprintf(stdout, "\nTo apply every pending one, with the service stopped:\n  %s\n",
 		commandLine(configPath, "-migrate", "-yes"))
 	if len(held) > 0 {
-		fmt.Fprintf(stdout, "A store holding rows of accounts this configuration does not collect is left "+
-			"alone unless %s is added too.\n", flagOthers)
+		fmt.Fprintf(stdout, "A store holding rows of accounts this configuration does not collect, or one whose "+
+			"rows could not be compared with it, is left alone unless %s is added too.\n", flagOthers)
 	}
 	fmt.Fprintf(stdout, "Under migrate: %s, the setting this configuration has, ", cfg.Migrate)
 	if cfg.MigratesOnItsOwn() {
@@ -286,6 +307,7 @@ func migratePlan(ctx context.Context, cfg *config.Config, api *ghapi.Client, con
 	} else {
 		fmt.Fprintln(stdout, "a start applies none of them and warns about each.")
 	}
+	return nil
 }
 
 // migrateApply is -migrate -yes: the plan, and then every pending migration
@@ -316,12 +338,17 @@ func migrateApply(ctx context.Context, cfg *config.Config, api *ghapi.Client, o 
 			"half way through; nothing was changed", err)
 	}
 	defer func() { _ = lock.Release() }()
+	// Read under the lock, so that what it holds is what the last holder
+	// left.
+	state, err := run.OpenState(cfg.StateFile)
+	if err != nil {
+		return fmt.Errorf("%w; nothing was changed", err)
+	}
 	repos, why := coveredRepos(ctx, api, cfg)
 	if why != "" {
 		return fmt.Errorf("the repository list could not be read (%s), and bringing a store along needs it to "+
 			"read the history again and to know whose rows the store holds; nothing was changed", why)
 	}
-	state := run.LoadState(cfg.StateFile)
 	for _, w := range migrate.Stamp(state, cfg, version) {
 		logger.Warn(w)
 	}
@@ -365,9 +392,19 @@ func migrateApply(ctx context.Context, cfg *config.Config, api *ghapi.Client, o 
 // no ledger, so what is read again is written whole. The sinks are closed
 // before the exit, which fatal takes without the deferred closes: what was
 // read again has to have reached the stores by then.
+//
+// With the SQL sink writing to standard output, the plan and the report go
+// to standard error, so that standard output is the SQL alone, the DROP and
+// the rows read again, for the same pipe into psql as -once. Measured before
+// with psql against 18.6: the plan's first line was read as the start of a
+// statement, the DROP went with it, and the target kept its old table while
+// the state file recorded the migration as applied.
 func migrateAndClose(ctx context.Context, cfg *config.Config, api *ghapi.Client, o options, sinks []sink.Sink,
 	stdout, stderr io.Writer, logger *slog.Logger,
 ) {
+	if q := cfg.Sinks.SQL; q != nil && q.Path == "-" {
+		stdout = stderr
+	}
 	err := migrateApply(ctx, cfg, api, o, sinks, stdout, logger)
 	for _, s := range sinks {
 		_ = s.Close()

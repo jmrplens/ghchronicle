@@ -1,0 +1,6 @@
+[
+  {"id":"1.0.0/gh_code_scanning_alert_item/state","release":"1.0.0","measurement":"gh_code_scanning_alert_item","kind":1,"old_tags":["state","reason"]},
+  {"id":"1.0.0/gh_dependabot_alert_item/state","release":"1.0.0","measurement":"gh_dependabot_alert_item","kind":1,"old_tags":["state"]},
+  {"id":"2.6.0/gh_actions_cache_entry/sum","release":"2.6.0","measurement":"gh_actions_cache_entry","kind":2,"old_tags":null},
+  {"id":"2.6.1/gh_discussion_comment/is_answer","release":"2.6.1","measurement":"gh_discussion_comment","kind":1,"old_tags":["is_answer"]}
+]

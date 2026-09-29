@@ -97,8 +97,8 @@ DELETE /api/v3/configure/table
 
 Esta es la causa habitual de `influx write: 400`. El borrado no destruye la
 tabla en el acto: InfluxDB la renombra `<nombre>-<instante>`, la deja
-consultable y la purga 24 horas después, y el nombre acepta escrituras nuevas
-enseguida. Para los cambios que el binario conoce, lo envía `-migrate -yes`:
+consultable y la purga 72 horas después por omisión, y el nombre acepta
+escrituras nuevas enseguida. Para los cambios que el binario conoce, lo envía `-migrate -yes`:
 mira más abajo.
 
 </Aside>
@@ -147,14 +147,27 @@ contra InfluxDB 3 Core de la 3.0.0 a la 3.11.5**: la tabla se renombra
 con ese nombre, y la siguiente escritura con el nombre antiguo crea la tabla de
 nuevo, con la forma nueva, aunque una columna pase de etiqueta a campo. El
 binario lee el nombre del catálogo, lo imprime y lo guarda en el fichero de
-estado. Desde la 3.4.0 el servidor purga la copia 24 horas después del borrado;
-la 3.0.0 no purga nada, y el plan lo dice para un servidor anterior a la
-3.4.0. Nada más puede purgarla: un borrado de la tabla renombrada recibe un
-409, con `hard_delete_at` o sin él, así que ghchronicle olvida la copia cuando
-termina su día y la deja al servidor. `hard_delete_at` no se envía nunca:
-medido en la 3.11.5, `now` no había quitado las filas once minutos después, y
-se lleva el día para deshacer el cambio. Hasta entonces las filas de la copia
-se pueden leer con SQL y escribir de vuelta a través del destino.
+estado, con cuándo ha programado el servidor su borrado definitivo, leído de la
+tabla de sistema de su base de datos `_internal`. Eso es 72 horas después del
+borrado (medido en 3.11.2 y 3.11.5), y el servidor guarda el nombre en su
+catálogo durante su `--delete-grace-period` después de eso, 24 horas por
+omisión; donde no se puede leer la hora, se suponen 72 horas. La 3.0.0 no purga
+nada, y el plan lo dice para un servidor anterior a la 3.4.0. Nada más puede
+purgarla: un borrado de la tabla renombrada recibe un 409, con `hard_delete_at`
+o sin él, así que ghchronicle olvida la copia cuando llega la hora del servidor
+y la deja al servidor. `hard_delete_at` no se envía nunca: medido en la 3.11.5,
+`now` no había quitado las filas once minutos después, y se lleva los días para
+deshacer el cambio. Hasta entonces las filas de la copia se pueden leer con SQL
+y escribir de vuelta a través del destino.
+
+InfluxDB 3 Core rechaza una consulta que abriría más ficheros Parquet que su
+`--query-file-limit`, 432 por omisión, que una tabla escrita cada diez minutos
+supera en días. La comprobación lee el catálogo, que no abre ninguno, y cuenta
+las filas solo de una tabla que guarda la etiqueta antigua; un recuento que
+Core rechaza deja la relectura sin límite, y una lectura rechazada de quién son
+las filas de la tabla deja el cambio necesitando tu palabra, con el rechazo
+citado en el plan. Ver [el límite de ficheros por
+consulta](/ghchronicle/es/install/upgrading/#el-límite-de-ficheros-por-consulta-de-influxdb-3-core).
 
 El token tiene que poder borrar una tabla. Un borrado rechazado deja el cambio
 pendiente, y el error nombra la misma petición para enviarla a mano.

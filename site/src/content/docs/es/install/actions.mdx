@@ -169,24 +169,34 @@ cadena de herramientas de Go: descarga un binario de release y lo llama.
     ```
 
     No admite tarjeta. Un almacén que guarda filas de cuentas que esta
-    configuración no recoge se deja sin aplicar y el paso falla, porque solo
-    `-migrate-others` lo despeja, y esa es una decisión para tomar en una
-    terminal, no en un workflow. Cada ejecución de la Action empieza con un
-    fichero de estado nuevo, así que un almacén al que no se le puede
-    preguntar, un fichero SQL, un Graphite o lo que haya detrás de un Telegraf,
-    no tiene historia aquí y nunca se da por necesitado de un cambio. Un job que
-    agotó su tiempo mientras volvía a leer la historia no deja nada que el
-    siguiente pueda retomar: ejecuta después `mode: backfill` con la misma
+    configuración no recoge, o cuyas filas no se pudieron comparar con ella, se
+    deja sin aplicar y el paso falla, porque solo `-migrate-others` lo despeja,
+    y esa es una decisión para tomar en una terminal, no en un workflow. Sin un
+    fichero de estado [restaurado entre ejecuciones](#dos-cosas-que-un-runner-alojado-no-conserva),
+    cada ejecución de la Action empieza con uno nuevo, así que un almacén al que
+    no se le puede preguntar, un fichero SQL, un Graphite o lo que haya detrás
+    de un Telegraf, no tiene historia aquí y nunca se da por necesitado de un
+    cambio; con uno restaurado, esos siguen su registro como en una máquina. Un
+    job que agotó su tiempo mientras volvía a leer la historia no deja nada que
+    el siguiente pueda retomar, porque `actions/cache` no guarda nada de un job
+    que no terminó bien: ejecuta después `mode: backfill` con la misma
     configuración.
 
   </TabItem>
 </Tabs>
 
-En `once` y `backfill`, un arranque comprueba los almacenes igual, aplica lo que
-es seguro aplicar sin supervisión con `migrate: auto` y avisa del resto. La
-Action convierte cada uno de esos avisos en una anotación de la ejecución, así
-que un cambio pendiente se ve en la página de resumen del workflow y no solo en
-su registro.
+En `once` y `backfill`, un arranque comprueba los almacenes igual y avisa de lo
+pendiente. Sobre un fichero de estado nuevo, que es cada ejecución sin uno
+restaurado, no aplica nada por su cuenta ni siquiera con `migrate: auto`: el
+fichero de estado se va con el runner, y con él el registro de que aún se debe
+una relectura, así que una relectura que falló o un job cancelado a medias
+dejaría un almacén despejado y nada que lo dijera. Con un fichero de estado
+restaurado aplica lo que es seguro aplicar sin supervisión, como una máquina.
+La Action convierte cada línea que dice que un cambio está pendiente, que se
+aplicó uno al arrancar, que uno falló o que se debe una relectura en una
+anotación de la ejecución en cuanto se escribe la línea, así que se ve en la
+página de resumen del workflow y no solo en su registro, también en un job
+cancelado a medias.
 
 ## Una tarjeta en el README de tu perfil
 

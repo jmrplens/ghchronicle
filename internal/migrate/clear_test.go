@@ -137,7 +137,7 @@ func TestThePlanSaysWhatIsKeptAsideAndUntilWhen(t *testing.T) {
 		"  kept aside  " + comments + ": gh_discussion_comment-20261001T091004, set aside 2026-10-01 09:10 UTC, " +
 			"purged by ghchronicle after 2026-10-02 09:10 UTC\n",
 		"  kept aside  " + comments + ": gh_discussion_comment-20261001T091005, set aside 2026-10-01 09:10 UTC, " +
-			"purged by the store itself after 2026-10-02 09:10 UTC\n",
+			"purged by the store itself after 2026-10-04 09:10 UTC\n",
 	} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("the plan does not say %q:\n%s", want, out.String())

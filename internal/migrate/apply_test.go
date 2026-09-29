@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"maps"
 	"slices"
@@ -12,18 +13,32 @@ import (
 	"time"
 
 	"github.com/jmrplens/ghchronicle/v2/internal/run"
+	"github.com/jmrplens/ghchronicle/v2/internal/teardown"
 )
 
 // fakeApplier sets aside what it is given, or fails with err, and keeps what
-// it was asked to do.
+// it was asked to do. With owed set, it also notes whether the refill of each
+// item it was handed had been saved as owed before it was: saves is the
+// count of saves, and owed the store's record as that count last left it.
 type fakeApplier struct {
 	err  error
+	kept *run.Aside
 	done []string
+	// owedFirst is, per item, whether its refill was saved as owed before
+	// the store was touched.
+	owedFirst map[string]bool
+	owed      func() bool
 }
 
 func (f *fakeApplier) Apply(_ context.Context, it Item) (Outcome, error) {
+	if f.owed != nil {
+		if f.owedFirst == nil {
+			f.owedFirst = map[string]bool{}
+		}
+		f.owedFirst[it.Migration.ID] = f.owed()
+	}
 	if f.err != nil {
-		return Outcome{}, f.err
+		return Outcome{Kept: f.kept}, f.err
 	}
 	f.done = append(f.done, it.Migration.ID)
 	return Outcome{Did: "set aside", Aside: it.Migration.Measurement + "-20261001T091004"}, nil
@@ -35,13 +50,14 @@ func (f *fakeApplier) Apply(_ context.Context, it Item) (Outcome, error) {
 // the refill is handed the items that cleared a store and nothing else.
 func TestApplyingRecordsEachItemAndRefillsOnlyWhatItCleared(t *testing.T) {
 	t.Parallel()
-	in := upgradeInput(t, oldShape(), oldShape("octocat", "hubot"), nil)
+	in := upgradeInput(t, oldShape(), oldShape(), nil, "octocat", "hubot")
 	Stamp(in.State, in.Config, in.Release)
 	chosen, held := Make(t.Context(), in).Pending(false)
 	if got := chosenIDs(held); !slices.Equal(got, []string{"postgres:" + comments}) {
 		t.Fatalf("held back %v, want the store holding hubot's comments alone", got)
 	}
-	influx, postgres := &fakeApplier{}, &fakeApplier{err: errors.New("lock timeout")}
+	influx := &fakeApplier{}
+	postgres := &fakeApplier{err: fmt.Errorf("lock timeout: %w", teardown.ErrUntouched)}
 	saves := 0
 	var refilled []RefillWalk
 	var owedAtRefill map[string]*run.Refill
@@ -82,11 +98,11 @@ func TestApplyingRecordsEachItemAndRefillsOnlyWhatItCleared(t *testing.T) {
 	if !slices.Equal(ok, wantOK) || !slices.Equal(failed, wantFailed) {
 		t.Errorf("applied %v and failed %v, want %v and %v", ok, failed, wantOK, wantFailed)
 	}
-	// Once per item applied, and once more when the refill ended and was
-	// no longer owed.
-	if saves != len(wantOK)+1 {
-		t.Errorf("the state file was saved %d times, want once per item applied (%d) and once after the refill",
-			saves, len(wantOK))
+	// Once per item tried, once more before each one that owes a refill,
+	// which is every one tried but Telegraf's, and once when the refill
+	// ended and was no longer owed.
+	if want := 2*(len(wantOK)+1) - 1 + 1; saves != want {
+		t.Errorf("the state file was saved %d times, want %d", saves, want)
 	}
 	for _, id := range wantOK {
 		store, mig, _ := strings.Cut(id, ":")
@@ -102,7 +118,8 @@ func TestApplyingRecordsEachItemAndRefillsOnlyWhatItCleared(t *testing.T) {
 	}
 	checkOneRefill(t, refilled, owedAtRefill, in.State)
 	for _, want := range []string{
-		`level=ERROR msg="migration failed" sink=postgres`, `err="lock timeout" resume="run the same command again"`,
+		`level=ERROR msg="migration failed" sink=postgres`,
+		`err="lock timeout: the store was left as it was" resume="run the same command again"`,
 		`sink=sql`, `this build has no way to bring sql along`,
 		`level=INFO msg="migration applied" sink=influxdb measurement=gh_discussion_comment`,
 		`aside=gh_discussion_comment-20261001T091004`,
@@ -110,6 +127,86 @@ func TestApplyingRecordsEachItemAndRefillsOnlyWhatItCleared(t *testing.T) {
 		if !strings.Contains(log.String(), want) {
 			t.Errorf("the log does not say %q:\n%s", want, log.String())
 		}
+	}
+}
+
+// TestTheRefillIsOwedBeforeTheStoreIsTouched: a clear that happened and
+// whose answer did not arrive is a store holding none of the history and a
+// state file saying nothing about it, so the refill is saved as owed before
+// the clear, stays owed when the store cannot say it was left as it was, and
+// is taken back only when it can. A copy the failed clear made is named, to
+// be purged in its turn.
+//
+// Before, a failure recorded nothing: the next start found the measurement
+// cleared, took it as never having held the old shape, and the history was
+// never read again.
+func TestTheRefillIsOwedBeforeTheStoreIsTouched(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name     string
+		err      error
+		stayOwed bool
+	}{
+		{"a clear whose answer did not arrive", errors.New("502 Bad Gateway"), true},
+		{"a clear the store turned down", fmt.Errorf("403 Forbidden: %w", teardown.ErrUntouched), false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			failAClear(t, c.err, c.stayOwed)
+		})
+	}
+}
+
+// failAClear applies the comments to an InfluxDB whose clear fails with err,
+// and holds what the state file keeps to the refill staying owed or not.
+func failAClear(t *testing.T, err error, stayOwed bool) {
+	t.Helper()
+	in := upgradeInput(t, oldShape(), nil, nil)
+	Stamp(in.State, in.Config, in.Release)
+	var saved []*run.Refill
+	var chosen []Chosen
+	apply, _ := Make(t.Context(), in).Pending(false)
+	for _, ch := range apply {
+		if ch.Store == "influxdb" && ch.Item.Migration.ID == comments {
+			chosen = append(chosen, ch)
+		}
+	}
+	rec := in.State.Stores["influxdb"]
+	copyKept := &run.Aside{
+		Name: "gh_discussion_comment-20261001T091004", Measurement: "gh_discussion_comment",
+		Migration: comments, At: time.Date(2026, 10, 1, 9, 10, 4, 0, time.UTC),
+	}
+	store := &fakeApplier{err: err, kept: copyKept, owed: func() bool { return saved[len(saved)-1] != nil }}
+	var forgot []string
+	a := Applying{
+		Config: in.Config, State: in.State,
+		Save:     func() error { saved = append(saved, rec.Refill.Clone()); return nil },
+		Appliers: map[string]Applier{"influxdb": store},
+		Refill:   func(context.Context, RefillWalk) error { return errors.New("not reached") },
+		Cleared:  func(c Chosen) { forgot = append(forgot, c.Store) },
+		Log:      slog.New(slog.DiscardHandler),
+	}
+	done, _ := a.Apply(t.Context(), chosen)
+	if len(done.Results) != 1 || done.Results[0].Err == nil {
+		t.Fatalf("results %+v", done.Results)
+	}
+	if !store.owedFirst[comments] {
+		t.Error("the store was touched before the refill it owes was saved")
+	}
+	if owed := rec.Refill != nil; owed != stayOwed {
+		t.Errorf("owed after the failure: %v, want %v", owed, stayOwed)
+	}
+	if _, applied := rec.Applied[comments]; applied {
+		t.Error("a failed clear is recorded as applied")
+	}
+	if len(rec.SetAside) != 1 || rec.SetAside[0].Name != copyKept.Name {
+		t.Errorf("the copy the clear made is not named: %v", rec.SetAside)
+	}
+	if forgotten := len(forgot) > 0; forgotten != stayOwed {
+		t.Errorf("what this process wrote there forgotten: %v, want %v", forgotten, stayOwed)
+	}
+	if salt := Salt(rec, "gh_discussion_comment"); (salt != "") != stayOwed {
+		t.Errorf("the ledger's salt is %q with the refill owed %v", salt, stayOwed)
 	}
 }
 

@@ -259,7 +259,8 @@ find the lock it holds beside the state file: with the service still running,
 `-migrate -yes` refuses, naming the process by the number the service's own
 container gives it, and changes nothing. Measured with two containers on one
 named volume: a `flock` one of them held was refused to the other, and granted
-once the first had gone.
+once the first had gone. A one-shot container a scheduler runs, below, holds
+no lock while it sweeps, so pause the scheduler for the length of the two runs.
 
 ## One sweep, then exit
 

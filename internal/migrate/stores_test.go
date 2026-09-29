@@ -1,6 +1,7 @@
 package migrate
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/jmrplens/ghchronicle/v2/internal/config"
 	"github.com/jmrplens/ghchronicle/v2/internal/run"
+	"github.com/jmrplens/ghchronicle/v2/internal/teardown"
 )
 
 // everySink is a configuration with every sink the type has switched on, each
@@ -182,5 +184,58 @@ func TestADowngradeIsSaidOnce(t *testing.T) {
 	}
 	if again := Stamp(state, cfg, "2.6.2"); len(again) > 0 {
 		t.Errorf("the same downgrade warned twice: %v", again)
+	}
+}
+
+// TestARefillOwedWhereASinkNoLongerPointsIsKept: the record of a store a
+// sink pointed at before is kept while it owes a refill or names a copy, is
+// said at every start, and is taken back when the sink points there again. A
+// URL written another way, with a trailing slash or a capital, is the same
+// store and changes nothing. Before, a new destination replaced the record,
+// and a trailing slash was enough to forget a refill for good.
+func TestARefillOwedWhereASinkNoLongerPointsIsKept(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	cfg := everySink(t, dir)
+	state := olderState(t, dir)
+	Stamp(state, cfg, "2.6.2")
+	when := time.Date(2026, 9, 29, 9, 0, 0, 0, time.UTC)
+	owed := state.Stores["influxdb"]
+	owed.MarkApplied(comments, when)
+	owed.OweRefill(comments, "gh_discussion_comment", []string{"discussions", "outbound"}, when)
+	home := owed.Destination
+
+	cfg.Sinks.Influx.URL = "HTTP://Influx:8181/"
+	if warnings := Stamp(state, cfg, "2.6.2"); len(warnings) > 0 || state.Stores["influxdb"].Refill == nil {
+		t.Errorf("the same server spelled another way is %+v, warned %v", state.Stores["influxdb"], warnings)
+	}
+
+	cfg.Sinks.Influx.URL = "http://elsewhere:8181"
+	warnings := Stamp(state, cfg, "2.6.2")
+	rec := state.Stores["influxdb"]
+	if rec.Refill != nil || rec.FirstWrittenBy != "" || len(rec.Former) != 1 || rec.Former[0].Refill == nil {
+		t.Errorf("pointed elsewhere, the record is %+v, want a new one keeping the old one owed", rec)
+	}
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "refill owed to influxdb at "+home) {
+		t.Errorf("a refill owed elsewhere warned %v", warnings)
+	}
+	if OwedIn(state, cfg) != nil {
+		t.Error("a refill owed to the store the sink left is paid into the one it points at now")
+	}
+	var plan bytes.Buffer
+	Make(t.Context(), Input{Config: cfg, State: state, Release: "2.6.2", Inspectors: []teardown.Inspector{
+		&fakeStore{name: "influxdb"}, &fakeStore{name: "postgres"}, &fakeStore{name: "elasticsearch"},
+	}}).Print(&plan)
+	if !strings.Contains(plan.String(), "owed there  discussions and outbound, since 2026-09-29, writing "+
+		"gh_discussion_comment: cleared by "+comments+" at "+home+", where this sink no longer points") {
+		t.Errorf("the plan does not say the refill owed where the sink no longer points:\n%s", plan.String())
+	}
+
+	cfg.Sinks.Influx.URL = "http://influx:8181"
+	if warnings = Stamp(state, cfg, "2.6.2"); len(warnings) > 0 {
+		t.Errorf("pointed back, it warned %v", warnings)
+	}
+	if rec = state.Stores["influxdb"]; rec.Destination != home || rec.Refill == nil || len(rec.Applied) != 1 || len(rec.Former) != 0 {
+		t.Errorf("pointed back, the record is %+v, want the one it left, owed again", rec)
 	}
 }

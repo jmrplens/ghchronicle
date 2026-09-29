@@ -9,17 +9,24 @@ import (
 
 // Salt is what the write ledger mixes into the identity of a measurement's
 // points in the store a record is kept for: the migrations of it applied
-// there. Each one applied changes it once, which makes the ledger forget that
-// measurement in that store and nothing else, and it then stays the same at
-// every start. Empty for a measurement no migration was applied to, whose
-// identity is then the one it always had.
+// there, or whose refill is owed there. Each one changes it once, which makes
+// the ledger forget that measurement in that store and nothing else, and it
+// then stays the same at every start. Empty for a measurement no migration
+// was applied to, whose identity is then the one it always had.
+//
+// A refill owed is in it because it is recorded before the store is touched,
+// and a clear whose answer did not arrive may have emptied the store without
+// being recorded as applied: the refill that follows would otherwise be held
+// back from writing every row the ledger remembers writing before.
 func Salt(rec *run.StoreRecord, measurement string) string {
 	if rec == nil {
 		return ""
 	}
 	var ids []string
 	for _, m := range Registry {
-		if _, applied := rec.Applied[m.ID]; applied && m.Measurement == measurement {
+		_, applied := rec.Applied[m.ID]
+		owed := rec.Refill != nil && slices.Contains(rec.Refill.Migrations, m.ID)
+		if (applied || owed) && m.Measurement == measurement {
 			ids = append(ids, m.ID)
 		}
 	}

@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"fmt"
+	"net/url"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -51,7 +52,7 @@ func storesOf(cfg *config.Config) []store {
 	s := cfg.Sinks
 	var out []store
 	if i := s.Influx; i != nil {
-		dest := "url=" + i.URL
+		dest := "url=" + normalURL(i.URL)
 		if i.Org != "" {
 			dest += " org=" + i.Org
 		}
@@ -89,7 +90,7 @@ func storesOf(cfg *config.Config) []store {
 		out = append(out, store{name: "stdout", reach: untouched, quiet: "nothing printed is kept"})
 	}
 	if t := s.Telegraf; t != nil {
-		out = append(out, store{name: "telegraf", reach: recorded, destination: "url=" + t.URL})
+		out = append(out, store{name: "telegraf", reach: recorded, destination: "url=" + normalURL(t.URL)})
 	}
 	if g := s.Graphite; g != nil {
 		out = append(out, store{
@@ -109,10 +110,29 @@ func storesOf(cfg *config.Config) []store {
 	if e := s.Elasticsearch; e != nil {
 		out = append(out, store{
 			name: "elasticsearch", reach: asked,
-			destination: "url=" + e.URL + " prefix=" + e.Prefix,
+			destination: "url=" + normalURL(e.URL) + " prefix=" + strings.ToLower(e.Prefix),
 		})
 	}
 	return out
+}
+
+// normalURL is a URL as a destination names it, so that two spellings of one
+// server are one store: the scheme and host in lower case, the port a scheme
+// takes by default left out, and no slash at the end. A record kept against
+// one spelling was otherwise replaced by a record with nothing in it when the
+// other was written, a refill it still owed with it.
+func normalURL(raw string) string {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return strings.TrimRight(strings.TrimSpace(raw), "/")
+	}
+	u.Scheme, u.Host = strings.ToLower(u.Scheme), strings.ToLower(u.Host)
+	if port := u.Port(); u.Scheme == "http" && port == "80" || u.Scheme == "https" && port == "443" {
+		u.Host = u.Hostname()
+	}
+	u.Path = strings.TrimRight(u.Path, "/")
+	u.RawPath = ""
+	return u.String()
 }
 
 // postgresDestination names the database a DSN reaches without the DSN, which
@@ -161,6 +181,18 @@ func Stamp(state *run.State, cfg *config.Config, release string) []string {
 			continue
 		}
 		rec := state.Stores[s.name]
+		var former []*run.StoreRecord
+		if rec != nil {
+			former = rec.Former
+		}
+		if rec != nil && rec.Destination != s.destination {
+			if rec, former = retarget(rec, s.destination); rec == nil {
+				// Pointed at a store this file has no history of: whoever
+				// wrote it first is not known, and the planner reads that
+				// as older than anything.
+				rec = &run.StoreRecord{Destination: s.destination}
+			}
+		}
 		switch {
 		case rec != nil && rec.Destination == s.destination:
 		case rec == nil && (fresh || aware), s.fresh:
@@ -171,6 +203,16 @@ func Stamp(state *run.State, cfg *config.Config, release string) []string {
 			// not known, and the planner reads that as older than anything.
 			rec = &run.StoreRecord{Destination: s.destination}
 		}
+		rec.Former = former
+		for _, f := range former {
+			if f.Refill != nil {
+				warnings = append(warnings, fmt.Sprintf("the state file records a refill owed to %s at %s, where "+
+					"it no longer points: a migration cleared %s there and its history was not read back. Point "+
+					"the sink there again for a start or -migrate -yes to read it, or read it with "+
+					"-backfill -families %s from a configuration that writes there", s.name, f.Destination,
+					quoted(f.Refill.Measurements), strings.Join(f.Refill.Families, ",")))
+			}
+		}
 		if compareRelease(rec.WrittenBy, release) > 0 {
 			warnings = append(warnings, fmt.Sprintf("the state file says %s was last written by %s, "+
 				"newer than this %s; a release this old does not know every change a newer one made to "+
@@ -180,6 +222,26 @@ func Stamp(state *run.State, cfg *config.Config, release string) []string {
 		state.Stores[s.name] = rec
 	}
 	return warnings
+}
+
+// retarget is a store record for a sink now pointed at dest: the record kept
+// for dest among the former ones, taken back, or none; and the former
+// records, the one being left among them when it still owes something where
+// it pointed.
+func retarget(rec *run.StoreRecord, dest string) (back *run.StoreRecord, former []*run.StoreRecord) {
+	for _, f := range rec.Former {
+		if f.Destination == dest {
+			back = f
+			continue
+		}
+		former = append(former, f)
+	}
+	left := *rec
+	left.Former = nil
+	if left.Owes() {
+		former = append(former, &left)
+	}
+	return back, former
 }
 
 // quoted names a list the way a sentence does.

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -62,16 +63,29 @@ func influx3Catalog(t *testing.T, a *asked) *config.InfluxSink {
 			_, _ = io.WriteString(w, `{"product_name":"InfluxDB 3 Core","version":"3.11.2"}`)
 		case strings.Contains(q, "information_schema.columns") && strings.Contains(q, "'gh_discussion_comment'"):
 			_, _ = io.WriteString(w, `[{"column_name":"answers","data_type":"Int64"},`+
+				`{"column_name":"author","data_type":"Dictionary(Int32, Utf8)"},`+
 				`{"column_name":"comment","data_type":"Dictionary(Int32, Utf8)"},`+
+				`{"column_name":"full_name","data_type":"Dictionary(Int32, Utf8)"},`+
 				`{"column_name":"is_answer","data_type":"Dictionary(Int32, Utf8)"},`+
 				`{"column_name":"reason","data_type":"Utf8"},`+
 				`{"column_name":"user","data_type":"Dictionary(Int32, Utf8)"}]`)
+		case strings.Contains(q, "information_schema.columns") && strings.Contains(q, "'gh_actions_cache_entry'"):
+			_, _ = io.WriteString(w, `[{"column_name":"caches","data_type":"Int64"}]`)
 		case strings.Contains(q, "information_schema.columns"):
 			_, _ = io.WriteString(w, `[]`)
+		case strings.HasPrefix(q, "SELECT count(*)") && strings.Contains(q, `"gh_actions_cache_entry"`):
+			// What 3.11.2 answered for a table in more Parquet files than
+			// --query-file-limit allows (measured).
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = io.WriteString(w, "External error: Query would scan 433 Parquet files, exceeding the file limit.")
 		case strings.HasPrefix(q, "SELECT count(*)"):
 			_, _ = io.WriteString(w, `[{"n":3,"oldest":"2023-11-14T22:13:20"}]`)
 		case strings.HasPrefix(q, `SELECT DISTINCT "user"`):
-			_, _ = io.WriteString(w, `[{"v":"octocat"},{"v":"other"}]`)
+			// A row without the tag comes back as a row without the key.
+			_, _ = io.WriteString(w, `[{"v":"octocat"},{"v":"other"},{}]`)
+		case strings.HasPrefix(q, `SELECT DISTINCT "full_name"`) &&
+			strings.Contains(q, `WHERE "author" IS NULL OR lower("author") <> lower('octocat')`):
+			_, _ = io.WriteString(w, `[{"v":"octocat/hello-world"}]`)
 		default:
 			t.Errorf("an unexpected question: %s", q)
 		}
@@ -90,7 +104,7 @@ func TestInfluxDB3IsAskedItsCatalogForATagColumn(t *testing.T) {
 	if err != nil || name != "InfluxDB 3 Core 3.11.2" {
 		t.Fatalf("Describe = %q, %v", name, err)
 	}
-	shape, err := store.Shape(t.Context(), "gh_discussion_comment", []string{"is_answer", "reason"}, []string{"user", "owner"})
+	shape, err := store.Shape(t.Context(), "gh_discussion_comment", []string{"is_answer", "reason"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,17 +112,52 @@ func TestInfluxDB3IsAskedItsCatalogForATagColumn(t *testing.T) {
 	if !shape.Exists || !slices.Equal(shape.Old, []string{"is_answer"}) || shape.Rows != 3 || !shape.Oldest.Equal(want) {
 		t.Errorf("shape = %+v, want the table, is_answer alone as the old tag, 3 rows from %s", shape, want)
 	}
-	if got := shape.Values["user"]; !slices.Equal(got, []string{"octocat", "other"}) {
-		t.Errorf("users = %v", got)
+	spread, err := store.Spread(t.Context(), "gh_discussion_comment", []Distinct{
+		{Tag: "user"}, {Tag: "owner"}, {Tag: "full_name", ExceptTag: "author", Except: "octocat"},
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
-	if _, asked := shape.Values["owner"]; asked {
-		t.Error("owner is not a column of the table, yet its values were asked for")
+	if got := spread.Values["user"]; !slices.Equal(got, []string{"", "octocat", "other"}) {
+		t.Errorf("users = %v, want the row without one as the empty value", got)
 	}
-	absent, err := store.Shape(t.Context(), "gh_dependabot_alert_item", []string{"state"}, nil)
+	if got := spread.Values["owner"]; !slices.Equal(got, []string{""}) {
+		t.Errorf("owner, a column the table does not have, reads as %v, want every row lacking it", got)
+	}
+	if got := spread.Values["full_name"]; !slices.Equal(got, []string{"octocat/hello-world"}) {
+		t.Errorf("the repositories of the rows octocat did not write are %v", got)
+	}
+	absent, err := store.Shape(t.Context(), "gh_dependabot_alert_item", []string{"state"})
 	if err != nil || absent.Exists || len(absent.Old) > 0 {
 		t.Errorf("a table that is not there reads as %+v, %v", absent, err)
 	}
 	a.onlyRead(t)
+}
+
+// TestInfluxDB3CountsOnlyWhatItNeedsAndSurvivesTheFileLimit: a table with no
+// old tag is not counted, which on Core would open every Parquet file of it
+// for nothing, and a count Core refuses for its query file limit leaves the
+// rows unknown rather than the store unreachable.
+func TestInfluxDB3CountsOnlyWhatItNeedsAndSurvivesTheFileLimit(t *testing.T) {
+	t.Parallel()
+	a := &asked{}
+	store := &influx{sink: influx3Catalog(t, a)}
+	clean, err := store.Shape(t.Context(), "gh_discussion_comment", []string{"state"})
+	if err != nil || !clean.Exists || clean.Rows != -1 || clean.Uncounted != "" {
+		t.Errorf("a table with no old tag reads as %+v, %v", clean, err)
+	}
+	for _, q := range a.seen {
+		if strings.Contains(q, "count(*)") {
+			t.Errorf("a table with no old tag was counted: %s", q)
+		}
+	}
+	many, err := store.Shape(t.Context(), "gh_actions_cache_entry", nil)
+	if err != nil {
+		t.Fatalf("a count refused for the file limit made the store fail: %v", err)
+	}
+	if !many.Exists || many.Rows != -1 || !many.Oldest.IsZero() || !strings.Contains(many.Uncounted, "file limit") {
+		t.Errorf("a count refused for the file limit reads as %+v", many)
+	}
 }
 
 // TestInfluxDB2IsAskedForRowsNotKeys: 2.x keeps a tag key listed after the
@@ -139,6 +188,11 @@ func TestInfluxDB2IsAskedForRowsNotKeys(t *testing.T) {
 			_, _ = io.WriteString(w, ",result,table,_time\n,_result,0,2023-11-14T22:13:20Z\n\n")
 		case strings.Contains(q.Query, `distinct(column: "user")`):
 			_, _ = io.WriteString(w, ",result,table,_value\n,_result,0,other\n,_result,0,octocat\n\n")
+		case strings.Contains(q.Query, `not exists r["user"]`):
+			_, _ = io.WriteString(w, ",result,table,_time\n,_result,0,2023-11-14T22:13:20Z\n\n")
+		case strings.Contains(q.Query, `distinct(column: "full_name")`) && strings.HasPrefix(q.Query, "import \"strings\"\n") &&
+			strings.Contains(q.Query, `not (exists r["author"] and strings.toLower(v: r["author"]) == "octocat")`):
+			_, _ = io.WriteString(w, ",result,table,_value\n,_result,0,octocat/hello-world\n\n")
 		default:
 			_, _ = io.WriteString(w, "\n")
 		}
@@ -149,22 +203,33 @@ func TestInfluxDB2IsAskedForRowsNotKeys(t *testing.T) {
 	if err != nil || name != "InfluxDB 2 OSS 2.7.12" {
 		t.Fatalf("Describe = %q, %v", name, err)
 	}
-	shape, err := store.Shape(t.Context(), "gh_discussion_comment", []string{"is_answer", "state"}, []string{"user"})
+	shape, err := store.Shape(t.Context(), "gh_discussion_comment", []string{"is_answer", "state"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !shape.Exists || !slices.Equal(shape.Old, []string{"is_answer"}) || shape.Rows != -1 ||
-		!slices.Equal(shape.Values["user"], []string{"octocat", "other"}) {
+	if !shape.Exists || !slices.Equal(shape.Old, []string{"is_answer"}) || shape.Rows != -1 {
 		t.Errorf("shape = %+v", shape)
+	}
+	spread, err := store.Spread(t.Context(), "gh_discussion_comment", []Distinct{
+		{Tag: "user"}, {Tag: "full_name", ExceptTag: "author", Except: "OctoCat"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(spread.Values["user"], []string{"", "octocat", "other"}) ||
+		!slices.Equal(spread.Values["full_name"], []string{"octocat/hello-world"}) {
+		t.Errorf("spread = %+v", spread)
 	}
 	a.onlyRead(t)
 }
 
-// TestElasticsearchCountsDocumentsRatherThanReadingTheMapping: the mapping
-// keeps a field after its documents go, so only a count says one is left.
-func TestElasticsearchCountsDocumentsRatherThanReadingTheMapping(t *testing.T) {
-	t.Parallel()
-	a := &asked{}
+// elasticIndex is an Elasticsearch holding gh_discussion_comment in the shape
+// 2.6.0 wrote under the prefix GH, which the sink writes as gh, with user
+// mapped as keyword says: text with a keyword sub-field, as dynamic mapping
+// makes it, or a keyword, as an index template can. buckets is what a terms
+// aggregation on user answers, and has how many documents hold user.
+func elasticIndex(t *testing.T, a *asked, keyword, buckets string, has int) *config.ElasticsearchSink {
+	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		a.note(r, "")
@@ -174,36 +239,100 @@ func TestElasticsearchCountsDocumentsRatherThanReadingTheMapping(t *testing.T) {
 		case !strings.HasPrefix(r.URL.Path, "/gh-gh_discussion_comment/"):
 			w.WriteHeader(http.StatusNotFound)
 			_, _ = io.WriteString(w, `{"error":{"type":"index_not_found_exception"},"status":404}`)
+		case strings.Contains(r.URL.Path, "/_mapping/field/"):
+			user := `{"type":"text","fields":{"keyword":{"type":"keyword","ignore_above":256}}}`
+			if keyword == "user" {
+				user = `{"type":"keyword"}`
+			}
+			_, _ = io.WriteString(w, `{"gh-gh_discussion_comment":{"mappings":{`+
+				`"user":{"full_name":"user","mapping":{"user":`+user+`}},`+
+				`"author":{"full_name":"author","mapping":{"author":{"type":"text","fields":{"keyword":{"type":"keyword"}}}}},`+
+				`"full_name":{"full_name":"full_name","mapping":{"full_name":{"type":"text","fields":{"keyword":{"type":"keyword"}}}}}}}}`)
 		case strings.HasSuffix(r.URL.Path, "/_count") && strings.Contains(string(body), `"is_answer"`):
 			_, _ = io.WriteString(w, `{"count":2}`)
 		case strings.HasSuffix(r.URL.Path, "/_count") && len(body) > 0:
 			_, _ = io.WriteString(w, `{"count":0}`)
 		case strings.HasSuffix(r.URL.Path, "/_count"):
 			_, _ = io.WriteString(w, `{"count":3}`)
+		case strings.HasSuffix(r.URL.Path, "/_search") && strings.Contains(string(body), `"oldest"`):
+			_, _ = io.WriteString(w, `{"aggregations":{"oldest":{"value_as_string":"2023-11-14T22:13:20.000Z"}}}`)
 		case strings.HasSuffix(r.URL.Path, "/_search"):
-			if !strings.Contains(string(body), `"user.keyword"`) {
-				t.Errorf("the values were not asked of the keyword sub-field: %s", body)
+			if !strings.Contains(string(body), `"field":"`+keyword+`"`) {
+				t.Errorf("the values of user were not asked of %s: %s", keyword, body)
 			}
-			_, _ = io.WriteString(w, `{"aggregations":{"oldest":{"value_as_string":"2023-11-14T22:13:20.000Z"},`+
-				`"v0":{"buckets":[{"key":"other"},{"key":"octocat"}]}}}`)
+			if !strings.Contains(string(body), `"author.keyword":{"case_insensitive":true,"value":"octocat"}`) {
+				t.Errorf("the rows of octocat were not left out of full_name's: %s", body)
+			}
+			_, _ = io.WriteString(w, `{"aggregations":{`+
+				`"d0":{"doc_count":3,"has":{"doc_count":`+strconv.Itoa(has)+`},"v":{"sum_other_doc_count":0,"buckets":`+buckets+`}},`+
+				`"d1":{"doc_count":1,"has":{"doc_count":1},"v":{"sum_other_doc_count":0,"buckets":[{"key":"acme/x","doc_count":1}]}}}}`)
 		}
 	}))
 	t.Cleanup(srv.Close)
-	store := &elastic{sink: &config.ElasticsearchSink{URL: srv.URL, Prefix: "GH", APIKey: "k"}}
+	return &config.ElasticsearchSink{URL: srv.URL, Prefix: "GH", APIKey: "k"}
+}
+
+// TestElasticsearchCountsDocumentsRatherThanReadingTheMapping: the mapping
+// keeps a field after its documents go, so only a count says one is left.
+// The values are read from the field the mapping says can be aggregated, and
+// a document without the tag is the empty value.
+func TestElasticsearchCountsDocumentsRatherThanReadingTheMapping(t *testing.T) {
+	t.Parallel()
+	a := &asked{}
+	store := &elastic{sink: elasticIndex(t, a, "user.keyword",
+		`[{"key":"other","doc_count":1},{"key":"octocat","doc_count":1}]`, 2)}
 	if name, err := store.Describe(t.Context()); err != nil || name != "Elasticsearch 9.5.3" {
 		t.Fatalf("Describe = %q, %v", name, err)
 	}
-	shape, err := store.Shape(t.Context(), "gh_discussion_comment", []string{"is_answer", "state"}, []string{"user"})
+	shape, err := store.Shape(t.Context(), "gh_discussion_comment", []string{"is_answer", "state"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !shape.Exists || !slices.Equal(shape.Old, []string{"is_answer"}) || shape.Rows != 3 ||
-		shape.Oldest.IsZero() || !slices.Equal(shape.Values["user"], []string{"octocat", "other"}) {
+	if !shape.Exists || !slices.Equal(shape.Old, []string{"is_answer"}) || shape.Rows != 3 || shape.Oldest.IsZero() {
 		t.Errorf("shape = %+v", shape)
 	}
-	absent, err := store.Shape(t.Context(), "gh_dependabot_alert_item", []string{"state"}, nil)
+	spread, err := store.Spread(t.Context(), "gh_discussion_comment", []Distinct{
+		{Tag: "user"}, {Tag: "full_name", ExceptTag: "author", Except: "octocat"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(spread.Values["user"], []string{"", "octocat", "other"}) ||
+		!slices.Equal(spread.Values["full_name"], []string{"acme/x"}) || len(spread.Unread) > 0 {
+		t.Errorf("spread = %+v", spread)
+	}
+	absent, err := store.Shape(t.Context(), "gh_dependabot_alert_item", []string{"state"})
 	if err != nil || absent.Exists {
 		t.Errorf("an index that is not there reads as %+v, %v", absent, err)
+	}
+	a.onlyRead(t)
+}
+
+// TestElasticsearchReadsAKeywordMappingAndRefusesBucketsThatDoNotAddUp: an
+// index template that maps strings as keyword gives user no keyword
+// sub-field, so its values are read from user itself; and buckets that do not
+// account for every document holding the tag, which is what an aggregation
+// over a field that is not there answers (measured on 9.5.3: no buckets and
+// no error), make the tag unread rather than an index holding nobody's rows.
+func TestElasticsearchReadsAKeywordMappingAndRefusesBucketsThatDoNotAddUp(t *testing.T) {
+	t.Parallel()
+	a := &asked{}
+	keyword := &elastic{sink: elasticIndex(t, a, "user", `[{"key":"hubot","doc_count":1},{"key":"octocat","doc_count":2}]`, 3)}
+	spread, err := keyword.Spread(t.Context(), "gh_discussion_comment", []Distinct{
+		{Tag: "user"}, {Tag: "full_name", ExceptTag: "author", Except: "octocat"},
+	})
+	if err != nil || !slices.Equal(spread.Values["user"], []string{"hubot", "octocat"}) {
+		t.Errorf("a keyword mapping reads as %+v, %v", spread, err)
+	}
+	empty := &elastic{sink: elasticIndex(t, a, "user.keyword", `[]`, 3)}
+	spread, err = empty.Spread(t.Context(), "gh_discussion_comment", []Distinct{
+		{Tag: "user"}, {Tag: "full_name", ExceptTag: "author", Except: "octocat"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, read := spread.Values["user"]; read || !strings.Contains(spread.Unread["user"], "3 of the 3 rows that hold user") {
+		t.Errorf("buckets that hold none of the 3 documents read as %+v", spread)
 	}
 	a.onlyRead(t)
 }
@@ -222,7 +351,7 @@ func TestAStoreThatRefusesTheQuestionSaysWhy(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 	store := &influx{sink: &config.InfluxSink{URL: srv.URL, Bucket: "github"}}
-	if _, err := store.Shape(t.Context(), "gh_discussion_comment", []string{"is_answer"}, nil); err == nil ||
+	if _, err := store.Shape(t.Context(), "gh_discussion_comment", []string{"is_answer"}); err == nil ||
 		!strings.Contains(err.Error(), "403") {
 		t.Errorf("a refusal reads as %v, want the 403", err)
 	}

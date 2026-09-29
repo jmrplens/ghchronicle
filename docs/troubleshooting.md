@@ -134,6 +134,16 @@ volume under an image before 2.6.1, none of which that uid owns, or a state
 file mounted on its own, which cannot be renamed over; see [what has to be
 writable](https://jmrp.io/docs/ghchronicle/install/docker/#what-has-to-be-writable).
 
+**`the state file ... cannot be read` or `does not parse`, and the run stops.**
+The state file is there and this run could not read it, or it is not whole. A
+run that writes to the stores does not take it for a new one, which would
+forget the refills a migration still owes and put a new file in its place on
+its first save. A file root left behind, after `-migrate -yes` or a backfill
+run with `sudo`, is the usual cause: `chown` it back to the user the collector
+runs as. Moved aside instead, the next run starts from a new one, and what it
+recorded, a refill still owed among it, is gone; see [the state
+file](https://jmrp.io/docs/ghchronicle/configuration/#state_file).
+
 **`rate limit reserve reached, family skipped`.** Once is fine. Every sweep
 means the cadences are too fast for the number of repositories. If the bucket
 that runs short is `core`, lengthen `artifacts` and then `actions`; if it is
@@ -157,8 +167,9 @@ measurement back, ghchronicle compared the copy of the old rows with the table
 and found items GitHub no longer serves: a repository deleted or no longer
 covered, a comment deleted, an alert whose feature was switched off. `first`
 names a few, and `only_in` is the copy that still holds them, until it is
-purged 24 hours after the migration. Carrying them over is by hand, from that
-copy, while it is there.
+purged: a day after the migration for PostgreSQL's and Elasticsearch's, and
+when the server's schedule says for InfluxDB 3's, 72 hours by default. Carrying
+them over is by hand, from that copy, while it is there.
 
 **A number is a multiple of the sweep count.** Something that is a snapshot is
 being summed over time. Referrers, paths, labels and milestones are snapshots
@@ -256,12 +267,14 @@ log:
 
 A family that is not due yet simply does not appear.
 
-> **Deleting the state file costs quota, and one thing more**
+> **Deleting the state file costs quota, and two things more**
 >
-> It remembers eight things, and seven of them cost only quota when they go: what
+> It remembers nine things, and seven of them cost only quota when they go: what
 > is collected again is keyed by measurement, tags and timestamp and overwrites.
-> The eighth, `last_head`, is the commit each dependency diff started from, and
-> without it the next sweep has the photograph and no diff. See
+> `last_head` is the commit each dependency diff started from, and without it
+> the next sweep has the photograph and no diff. `stores` is what the file
+> records of each store, a refill a migration still owes among it, and without
+> it nothing reads that history back until a `-backfill -families` does. See
 > [the state file](https://jmrp.io/docs/ghchronicle/configuration/#state_file). The cache file
 > beside it costs quota and nothing more: see [the cache beside
 > it](https://jmrp.io/docs/ghchronicle/configuration/#the-cache-beside-it).
@@ -403,7 +416,8 @@ measurement's old rows aside under that name, the measurement, a dash and the
 instant in UTC: PostgreSQL's renamed table, Elasticsearch's clone, lower case
 there, and the name InfluxDB 3 gives a table it deleted. None of the shipped
 panels reads one. ghchronicle purges PostgreSQL's and Elasticsearch's once they
-have been kept 24 hours, and InfluxDB 3 purges its own; `-migrate` lists them
+have been kept 24 hours, and InfluxDB 3 purges its own on its own schedule, 72
+hours after the delete by default; `-migrate` lists them
 under their store as `kept aside`. `-uninstall data` removes PostgreSQL's and
 Elasticsearch's with everything else, and leaves out InfluxDB 3's with a note,
 since the server refuses a delete of a table it has already deleted.
@@ -415,10 +429,14 @@ a shape this release no longer writes, and this start did not bring it along.
 `not_applied` says why: `migrate: warn`, or a reason the change needs somebody's
 word, such as an InfluxDB 2, whose only way is a final delete, a SQL file, a
 Graphite or a Telegraf, where ghchronicle keeps nothing aside, rows of accounts
-this configuration does not collect, or rows reading it again would not bring
-back. `plan` and `apply` are the two commands, and `first`, on the service,
-says to stop it before the second. It is said at every start until the store
-is brought along: see [Migrations](https://jmrp.io/docs/ghchronicle/install/upgrading/#migrations).
+this configuration does not collect, rows reading it again would not bring
+back, or rows whose accounts or repositories could not be read, which an
+InfluxDB 3 Core past its query file limit refuses to say; or a one-shot run on
+a new state file, every run of the Action without one restored, which applies
+nothing on its own. `plan` and `apply` are the two commands, and `first`, on
+the service, says to stop it before the second. It is said at every start until
+the store is brought along: see
+[Migrations](https://jmrp.io/docs/ghchronicle/install/upgrading/#migrations).
 
 **`applying a migration before the first sweep`.** Not an error. Under
 `migrate: auto` the start found a change it can apply without losing anything,
@@ -455,6 +473,20 @@ stopped: the run was stopped, a store refused a write or GitHub did not answer.
 file, `<name>-refill.json`, and `refill owed`, under [things that are
 errors](https://jmrp.io/docs/ghchronicle/reference/troubleshooting/#things-that-are-errors), is what a later start says of it.
 
+**`the store may have been cleared, so the refill stays owed`.** Clearing the
+store failed in a way that does not say whether it was carried out: a proxy's
+502, a timeout, a connection that broke after the store did what it was asked.
+The refill was recorded as owed before the store was touched and stays owed,
+so the history is read back whether or not the clear happened; the change is
+asked about again at the next start. At worst that reads the history once for
+nothing.
+
+**`the state file records a refill owed to ... where it no longer points`.** A
+migration cleared a store, the refill did not finish, and the sink now points
+at another store. The record is kept, and the refill is read the next time the
+sink points there; until then nothing reads it. `-migrate` shows it under the
+store as `owed there`.
+
 **`not reconciled: the copy and the table could not be compared`.** The
 history was read back, and the copy of the old rows could not be read, or was
 already due to be purged. What came back is in the table; only the list of the
@@ -465,7 +497,7 @@ read by hand.
 migration set it aside, ghchronicle could not drop PostgreSQL's copy or delete
 Elasticsearch's clone, or could not ask the store which copies it holds. It
 tries again after every sweep and at every start; `aside` names the copy, which
-can also be removed by hand. InfluxDB 3 purges its own.
+can also be removed by hand. InfluxDB 3 purges its own on its own schedule.
 
 **`the cache file still claims what the cleared store held`.** A migration
 could not rewrite the cache file to forget the refusals, and the workflow runs

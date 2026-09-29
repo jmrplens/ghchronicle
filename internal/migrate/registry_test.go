@@ -7,6 +7,7 @@ import (
 
 	"github.com/jmrplens/ghchronicle/v2"
 	"github.com/jmrplens/ghchronicle/v2/internal/config"
+	"github.com/jmrplens/ghchronicle/v2/internal/run"
 )
 
 // TestTheRegistryHoldsTogether is every rule an entry has to keep that the
@@ -75,6 +76,7 @@ func checkEntry(t *testing.T, m Migration) {
 	if !slices.Contains(tags, m.Account) {
 		t.Errorf("%s: account tag %q is not a tag of %s", m.ID, m.Account, m.Measurement)
 	}
+	checkAuthor(t, m, tags)
 	if m.noteOnly() != (len(m.Item) == 0) {
 		t.Errorf("%s: item %v; a change that is read back names the tags of one item, and only such a change",
 			m.ID, m.Item)
@@ -84,6 +86,22 @@ func checkEntry(t *testing.T, m Migration) {
 			t.Errorf("%s: item tag %q is not a tag of %s, so the table read back cannot be asked for it",
 				m.ID, tag, m.Measurement)
 		}
+	}
+}
+
+// checkAuthor holds an entry's Author to its families: named exactly when an
+// account-wide family writes the measurement beside a per-repository one, and
+// a tag of the measurement.
+func checkAuthor(t *testing.T, m Migration, tags []string) {
+	t.Helper()
+	mixed := slices.ContainsFunc(m.Families, run.PerRepository) &&
+		slices.ContainsFunc(m.Families, func(f string) bool { return !run.PerRepository(f) })
+	if mixed != (m.Author != "") {
+		t.Errorf("%s: author %q; a measurement an account-wide family writes beside a per-repository one "+
+			"names the tag that says who wrote a row, and only such a measurement", m.ID, m.Author)
+	}
+	if m.Author != "" && !slices.Contains(tags, m.Author) {
+		t.Errorf("%s: author tag %q is not a tag of %s", m.ID, m.Author, m.Measurement)
 	}
 }
 

@@ -41,18 +41,28 @@ elif [ "$MODE" = card ]; then
   echo "mode card needs a card path" >&2; exit 2
 fi
 
-# The log goes to the step's output as it always has, and is kept as well, so
-# that a migration a start left pending becomes an annotation on the run: a
-# warning in a log nobody opens is how a store stays in two shapes for weeks.
-# Standard output and the log share the step's output either way; pipefail,
-# set above, makes the status the binary's own.
-log="$(mktemp "${RUNNER_TEMP:-/tmp}/ghchronicle-log.XXXXXX")"
+# The log goes to the step's output as it always has, and every line that
+# says a store was changed, or is left in two shapes, or owes its history,
+# becomes an annotation on the run as it is written: a warning in a log nobody
+# opens is how a store stays in two shapes for weeks, and a job cancelled or
+# timed out while a start read back what it cleared ends before any line
+# after it. Standard output and the log share the step's output either way;
+# pipefail, set above, makes the status the binary's own.
+annotate() {
+  local line title
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+    case $line in
+      *'migration pending'*) title='ghchronicle migration pending' ;;
+      *'applying a migration before the first sweep'*) title='ghchronicle migration applied at the start' ;;
+      *'migration failed'*) title='ghchronicle migration failed' ;;
+      *'refill owed'* | *'refill did not finish'* | *'refill stays owed'*) title='ghchronicle refill owed' ;;
+      *) continue ;;
+    esac
+    # A workflow command ends at a line break and reads % as an escape.
+    printf '::warning title=%s::%s\n' "$title" "${line//'%'/'%25'}"
+  done
+}
 status=0
-ghchronicle "${args[@]}" 2>&1 | tee "$log" || status=$?
-while IFS= read -r line; do
-  # A workflow command ends at a line break and reads % as an escape.
-  line=${line//'%'/'%25'}
-  printf '::warning title=ghchronicle migration pending::%s\n' "$line"
-done < <(grep -F 'migration pending' "$log" || true)
-rm -f "$log"
+ghchronicle "${args[@]}" 2>&1 | annotate || status=$?
 exit "$status"

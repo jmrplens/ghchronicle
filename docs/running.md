@@ -1421,8 +1421,13 @@ unit does, so it stays mode 600, and runs the binary as `ghchronicle`: measured
 on systemd 257, a command started that way saw the token of a file only root
 could read and ran as the user named. Run by root instead, `-migrate -yes`
 saves the files it rewrites beside the state file as root's, mode 600,
-`state.json` among them, and the service, which runs as `ghchronicle`, can no
-longer read what it remembers.
+`state.json` among them, and the service, which runs as `ghchronicle`, then
+stops at its start and names the file rather than start from a new one, which
+would forget a refill still owed: `chown ghchronicle:ghchronicle` it back.
+
+With `-once` run from cron rather than a service, comment the line out for the
+length of the two commands: a `-once` holds no lock while it sweeps, so nothing
+stops it running beside `-migrate -yes`.
 
 ### cron instead of a service
 
@@ -2080,7 +2085,8 @@ find the lock it holds beside the state file: with the service still running,
 `-migrate -yes` refuses, naming the process by the number the service's own
 container gives it, and changes nothing. Measured with two containers on one
 named volume: a `flock` one of them held was refused to the other, and granted
-once the first had gone.
+once the first had gone. A one-shot container a scheduler runs, below, holds
+no lock while it sweeps, so pause the scheduler for the length of the two runs.
 
 ### One sweep, then exit
 
@@ -2265,20 +2271,29 @@ it downloads a release binary and calls it.
   ```
 
   It takes no card. A store holding rows of accounts this configuration does
-  not collect is held back and the step fails, since only `-migrate-others`
-  clears it, and that is a decision to take at a terminal, not in a
-  workflow. Every run of the Action starts from a new state file, so a store
-  that cannot be asked, a SQL file, a Graphite or whatever is behind a
-  Telegraf, has no history here and is never taken to need a change. A job
-  that timed out while reading the history again leaves nothing the next
-  job can resume from: run `mode: backfill` for the same configuration after
-  it.
+  not collect, or whose rows could not be compared with it, is held back and
+  the step fails, since only `-migrate-others` clears it, and that is a
+  decision to take at a terminal, not in a workflow. Without a state file
+  [restored between runs](https://jmrp.io/docs/ghchronicle/install/actions/#two-things-a-hosted-runner-does-not-keep), every
+  run of the Action starts from a new one, so a store that cannot be asked, a
+  SQL file, a Graphite or whatever is behind a Telegraf, has no history here
+  and is never taken to need a change; with one restored, those follow its
+  record as they would on a host. A job that timed out while reading the
+  history again leaves nothing the next job can resume from, since
+  `actions/cache` saves nothing for a job that did not succeed: run
+  `mode: backfill` for the same configuration after it.
 
-In `once` and `backfill`, a start checks the stores the same way, applies what
-is safe to apply unattended under `migrate: auto`, and warns about the rest.
-The Action turns every one of those warnings into an annotation on the run, so
-a pending change shows on the workflow's summary page rather than only in its
-log.
+In `once` and `backfill`, a start checks the stores the same way and warns
+about what is pending. On a new state file, which is every run without one
+restored, it applies nothing on its own even under `migrate: auto`: the state
+file goes with the runner, and with it the record that a refill is still owed,
+so a refill that failed or a job cancelled half way would leave a store cleared
+and nothing saying so. With a state file restored it applies what is safe to
+apply unattended, as a host does. The Action turns every line that says a
+change is pending, one was applied at the start, one failed or a refill is
+owed into an annotation on the run as the line is written, so it shows on the
+workflow's summary page rather than only in its log, a job cancelled half way
+included.
 
 ### A card in your profile README
 
@@ -2487,14 +2502,19 @@ Each line starts with what the check found:
   hold it. The lines under it say why, what bringing it along would do there,
   which families would read the measurement again and from when, and what
   would not come back: the rows of repositories the configuration no longer
-  covers, and of families it has switched off. The last line says whether
-  applying it needs nobody's word: GitHub still serves the whole history, so
-  every row the store holds would come back, the old rows would be set aside
-  for 24 hours rather than deleted, and every row in the store is this
+  covers, and of families it has switched off. For the comments, those are
+  other people's comments on such a repository: the account's own come back
+  through `outbound` wherever they are. The last line says whether applying it
+  needs nobody's word: GitHub still serves the whole history, so every row the
+  store holds would come back, the old rows would be set aside for at least 24
+  hours rather than deleted, and every row in the store is this
   configuration's. A store shared with another collector, one holding rows the
-  refill would not bring back, an InfluxDB 2, whose only way is a delete, and
-  every store that cannot be asked need somebody's word, and the line says
-  which reason applies.
+  refill would not bring back, one whose rows could not be compared with the
+  configuration, an InfluxDB 2, whose only way is a delete, and every store
+  that cannot be asked need somebody's word, and the line says which reason
+  applies. A row that names no account belongs to a configuration of
+  organisations alone, which writes no user: it is this configuration's only
+  when this one has no `targets.user` either.
 - `note`: the rows are there and nothing can put them right, so the plan says
   what they mean and changes nothing.
 - `frozen`: nothing this configuration runs writes the measurement any more,
@@ -2516,6 +2536,14 @@ setting's:
   the old rows are set aside; then it reads the measurement again from GitHub
   and only then sweeps.
 - `warn` applies nothing.
+
+A one-shot run, `-once` or `-backfill`, on a new state file applies nothing on
+its own under `auto` either, and warns instead. That is every run of the Action
+that does not restore its state file with `actions/cache`, whose state file goes
+with its runner, and with it the record that a refill is still owed: a refill
+that failed, or a job cancelled half way, would leave the store cleared and
+nothing anywhere saying so. The next run on a host, which has a state file by
+then, or `-migrate -yes`, applies it.
 
 A pending change a start does not apply is a `WARN` at every start, named by
 store, with the reason it was left and the two commands, copied from the
@@ -2552,8 +2580,18 @@ systemctl start ghchronicle
 
 Run it as the user the service runs as, with the environment the service has:
 it saves the state file and the files beside it, and a file root saves is one
-the service can no longer read. [systemd](https://jmrp.io/docs/ghchronicle/install/systemd/#after-an-upgrade)
+the service can no longer read. A run that finds the state file there and
+cannot read it, or cannot parse it, stops and names it rather than starting
+from a new one, which would forget a refill still owed: give the file back to
+the service's user. [systemd](https://jmrp.io/docs/ghchronicle/install/systemd/#after-an-upgrade)
 and [Docker](https://jmrp.io/docs/ghchronicle/install/docker/#after-an-upgrade) show how.
+
+Pause a cron job or a timer that runs `-once` as well, and let a `-backfill`
+that is running finish first. Neither holds the lock while it sweeps, and a SQL
+file two processes write at once is not one psql can replay. Their state file
+is safe either way: a run that saves it keeps what another process recorded of
+the stores since it read it, so a `-once` that ran across `-migrate -yes` does
+not put back the record it read before.
 
 `-migrate -yes` prints the same plan and then applies every pending change, the
 unsafe ones too, since `-yes` is the word the plan asked for. Each one is
@@ -2566,8 +2604,10 @@ the plan says what happened to each:
   commands to run there.
 - `failed`: the store refused, with its reason. The others still go ahead.
 - `held back`: the store holds rows of accounts this configuration does not
-  collect. Set aside, those come back only when whoever collects them reads
-  them again, so this takes `-migrate-others` as well as `-yes`.
+  collect, or whose rows it holds could not be compared with this
+  configuration, and the line says which and why. Set aside, another's rows
+  come back only when whoever collects them reads them again, so this takes
+  `-migrate-others` as well as `-yes`.
 - `unreachable`: the store did not answer, so nothing was done there.
 - `refill`: what was read back from GitHub, from when and into which stores,
   or why reading it back did not finish: see [reading the history
@@ -2591,7 +2631,7 @@ inputs](https://jmrp.io/docs/ghchronicle/install/actions/#inputs).
 
 | Store                                                                         | What applying does                                                                                                        |
 | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| [InfluxDB 3](https://jmrp.io/docs/ghchronicle/sinks/influxdb/#what-a-migration-does-here)         | Deletes the one table, which InfluxDB keeps as `<measurement>-<instant>`, queryable, and purges itself 24 hours later     |
+| [InfluxDB 3](https://jmrp.io/docs/ghchronicle/sinks/influxdb/#what-a-migration-does-here)         | Deletes the one table, which InfluxDB keeps as `<measurement>-<instant>`, queryable, and purges itself 72 hours later     |
 | InfluxDB 2                                                                    | Deletes every row of the measurement in the bucket. Nothing is kept, so a start never does it on its own                  |
 | [PostgreSQL](https://jmrp.io/docs/ghchronicle/sinks/postgres/#what-a-migration-does-here)         | Renames the table `<measurement>-<instant>` in the sink's schema; ghchronicle drops it 24 hours later                     |
 | [Elasticsearch](https://jmrp.io/docs/ghchronicle/sinks/elasticsearch/#what-a-migration-does-here) | Blocks writes to the index, clones it to `<index>-<instant>` and deletes it; ghchronicle deletes the clone 24 hours later |
@@ -2610,10 +2650,14 @@ Where a store keeps the old rows aside, the plan names each copy under the
 store, with a `kept aside` line saying when it was set aside and when it goes,
 and the state file keeps it until then. ghchronicle purges its own copies once
 they have been kept 24 hours: the service after a sweep, any run at its next
-start, and `-migrate -yes` whenever it runs. A run on a new state file, which is
-every run of the Action, asks PostgreSQL and Elasticsearch for copies named the
-way a migration names them, since its state file cannot name them. Until a
-copy goes, undoing the change is on each store's page.
+start, and `-migrate -yes` whenever it runs. A run on a new state file, every
+run of the Action that does not restore one among them, asks PostgreSQL and
+Elasticsearch for copies named the way a migration names them, since its state
+file cannot name them. InfluxDB 3 purges its own on a schedule of its own, which
+is read back from the system table of its `_internal` database: 72 hours after
+the delete by default (measured on 3.11.2 and 3.11.5), and it keeps the name in
+its catalog for its delete grace period after that, 24 hours by default. Until
+a copy goes, undoing the change is on each store's page.
 
 A store that was cleared is written again whole. The [write
 ledger](https://jmrp.io/docs/ghchronicle/sinks/#only-what-changed-is-written) forgets the
@@ -2650,10 +2694,12 @@ and no other.
   the history through it once that store has been cleared.
 - **As far back as the store held.** The day of the oldest row the store held,
   read before it was cleared: a bound later than that would lose the
-  difference for good once the copy is purged. A store that cannot say, the SQL
-  file or Graphite, is read back to `backfill.since`, and with no bound when
-  there is none. One refill for several stores reads back as far as the
-  furthest.
+  difference for good once the copy is purged. A store that cannot say how far
+  back its rows go, the SQL file, Graphite, or an InfluxDB 3 Core that would
+  not count them (below), is read back with no bound: what applying takes
+  there is every row whatever its date, and `backfill.since` bounds what a
+  backfill reaches, not what a store holds. One refill for several stores
+  reads back as far as the furthest.
 - **Waiting, as a backfill waits.** It has a GitHub client of its own that
   waits for a spent rate limit to turn over, where a sweep skips, and
   `-backfill-retry` goes back for what it leaves as it does for a backfill.
@@ -2662,11 +2708,15 @@ and no other.
   the fake GitHub, takes about 2 seconds; on the author's account, the
   `outbound` walk it needs took 33 seconds when 2.6.1's was done by hand.
 
-The refill is owed from the moment a store is cleared, and the state file
-records it then, before anything is read, under the store's `refill` key: a
-store cleared and not read back looks, to anyone who asks it, exactly like one
-that never held the old shape, and only that record says the history is still
-to come. It goes when the refill reaches the end of every family. A refill cut
+The refill is owed before a store is touched, and the state file records it
+then, under the store's `refill` key: a store cleared and not read back looks,
+to anyone who asks it, exactly like one that never held the old shape, and only
+that record says the history is still to come. A clear that failed and left
+the store as it was, which the store says, takes the debt back; one whose
+answer did not arrive, a proxy's 502 or a timeout, is looked at again, and when
+the store cannot say whether it was carried out the refill stays owed, which at
+worst reads the history once for nothing. It goes when the refill reaches the
+end of every family. A refill cut
 short, by a stop, a store that refused a write or GitHub not answering, keeps a
 checkpoint of its own beside the state file, named with `-refill.json`, apart
 from a backfill's so neither refuses or overwrites the other, and is resumed
@@ -2711,6 +2761,20 @@ production's InfluxDB 3.11.5, the copy InfluxDB kept of the table dropped by
 hand for 2.6.1 held 114 comments, and the table read back 121, none of the 114
 missing.
 
+#### InfluxDB 3 Core's query file limit
+
+InfluxDB 3 Core refuses a query that would open more Parquet files than its
+`--query-file-limit`, 432 by default, and a table a sweep writes every ten
+minutes is past that in days. The check reads the catalog, which opens no file,
+so it still finds the old shape in such a table, and a table with no old tag is
+not counted at all. What it cannot do there is count the rows, which leaves the
+refill with no bound, nor read whose rows the table holds, which leaves the
+change needing your word and `-migrate -yes` holding it back for
+`-migrate-others`; the plan quotes the server's refusal. Measured on 3.11.2
+with the limit lowered to 3: before this, the same table was `unreachable` at
+every start and `-migrate -yes` could not apply it at all. Raising the limit on
+the server, for the length of the migration, lets it answer everything.
+
 #### What the state file remembers of each store
 
 The `stores` key of [the state file](https://jmrp.io/docs/ghchronicle/configuration/#state_file)
@@ -2721,9 +2785,15 @@ fresh install has nothing to migrate. The first start after an upgrade from
 2.6.1 or earlier records the first writer as unknown, which for a SQL file, a
 Graphite or a Telegraf reads as older than any change, so those show each
 change of a 2.x release as pending, or as a note where nothing can put it
-right, until it is applied. A sink pointed at another store starts a
-new record. A state file deleted after an upgrade takes the record with it, and
-the stores that cannot be asked are then taken to be the running release's.
+right, until it is applied. A sink pointed at another store starts a new
+record, and the one it leaves is kept while it still owes a refill or names a
+copy there, said at every start and by `-migrate` as `owed there`, and taken
+back if the sink points there again. A URL written another way, with a
+trailing slash, a capital or the default port, is the same store. A state file
+deleted after an upgrade takes the record with it, and the stores that cannot
+be asked are then taken to be the running release's; a refill still owed goes
+with it too, and nothing reads that history back until a `-backfill -families`
+of the families it names does.
 
 A change made before 1.0.0, the `state` and `reason` tags of the alert items,
 was never written by a release, so only a store that can be asked can show it.

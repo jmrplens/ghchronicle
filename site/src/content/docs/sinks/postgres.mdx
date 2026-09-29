@@ -203,6 +203,22 @@ where nothing is kept aside, so a start never applies it on its own; `-migrate
 still meets the old table, and a rotation that deletes that file before it was
 replayed takes the drop with it.
 
+With `path: "-"` the drop and the rows read again go to standard output, and
+`-migrate -yes` prints its plan and its report on standard error, so standard
+output is the SQL alone and takes the same pipe as `-once`:
+
+```sh
+ghchronicle -config config.yaml -migrate -yes | psql "$DATABASE_URL"
+```
+
+**Measured with psql against PostgreSQL 18.6**: piped this way, the table
+2.6.0 made was dropped and made again with the new key, holding the comments
+read again. Before, the plan went first on the same stream, psql read its first
+line as the start of a statement and lost the drop with it, and the target kept
+the old table while the state file recorded the change as applied. Run without
+the pipe, the SQL goes to the terminal and nowhere else, and the change is
+still recorded as applied.
+
 ## TimescaleDB
 
 Turn each table into a hypertable once it exists. The primary key already

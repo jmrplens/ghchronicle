@@ -222,7 +222,8 @@ func parseFlags(args []string, stderr io.Writer) (options, error) {
 			"it applies every pending change and reads the history it cleared again")
 	fs.BoolVar(&o.migrateOthers, strings.TrimPrefix(flagOthers, "-"), false,
 		"with -migrate -yes, also apply a change to a store that holds rows of accounts this configuration "+
-			"does not collect, which come back only when whoever collects them reads them again")
+			"does not collect, which come back only when whoever collects them reads them again, or whose "+
+			"rows could not be compared with it")
 	fs.BoolVar(&o.publishDashboard, "publish-dashboard", false,
 		"publish the Grafana dashboard and the datasource it reads from, then exit; "+
 			"needs the grafana section of the config and asks GitHub nothing")
@@ -369,6 +370,11 @@ func execute(args []string, stdout, stderr io.Writer) {
 		return
 	}
 	defer func() { _ = lock.Release() }()
+	state, err := openState(cfg, &o)
+	if err != nil {
+		fatal(stderr, err)
+		return
+	}
 	sinks, ledger, err := buildSinks(cfg, logger, o.oneShot())
 	if err != nil {
 		fatal(stderr, err)
@@ -391,8 +397,9 @@ func execute(args []string, stdout, stderr io.Writer) {
 	publishOnStart(ctx, cfg, o, logger)
 
 	runner := newRunner(cfg, api, sinks, logger, &o)
+	runner.State = state
 	runner.Refill, runner.RefillEveryStart = ledgerForgot(cfg, ledger)
-	stampStores(ctx, runner, cfg, &o, migration{api: api, sinks: sinks, ledger: ledger, log: logger})
+	stampStores(ctx, runner, cfg, &o, migration{api: api, sinks: sinks, ledger: ledger, log: logger, retry: o.retry})
 	switch {
 	case o.backfill:
 		err = runBackfill(ctx, runner, cfg, accumulator, &o, logger)
@@ -449,6 +456,26 @@ func stampStores(ctx context.Context, runner *run.Runner, cfg *config.Config, o 
 	migrateOnStart(ctx, m, !o.oneShot())
 }
 
+// openState is the state file this run reads, once the command line is held
+// to the configuration, which is what a run needs before it builds a sink.
+//
+// A backfill of a family the configuration switches off is refused here,
+// before the start asks GitHub or the stores anything about migrations or
+// applies one, since the walk would read none of it. A run that writes to the
+// stores refuses a state file it cannot read, which is where a migration
+// records the history it still owes them (see run.OpenState); a card-only run
+// writes to none and saves nothing, so it reads what it can as every release
+// did.
+func openState(cfg *config.Config, o *options) (*run.State, error) {
+	if err := walkable(cfg, o.only); err != nil {
+		return nil, err
+	}
+	if o.cardOnly && o.card != "" {
+		return run.LoadState(cfg.StateFile), nil
+	}
+	return run.OpenState(cfg.StateFile)
+}
+
 // oneShot says the run ends after what it was asked to do rather than
 // serving. Such a run starts no exporter, since it would serve nobody and its
 // port collides with the one a long-running instance holds, and it does not
@@ -483,13 +510,13 @@ func readCommandLine(args []string, stdout, stderr io.Writer) (options, bool) {
 	return o, !printOnly(&o, stdout)
 }
 
-// newRunner is the sweep scheduler for the run the command line asked for.
+// newRunner is the sweep scheduler for the run the command line asked for,
+// with no state: execute hands it the one openState read.
 func newRunner(cfg *config.Config, api *ghapi.Client, sinks []sink.Sink,
 	logger *slog.Logger, o *options,
 ) *run.Runner {
 	return &run.Runner{
-		Cfg: cfg, API: api, Sinks: sinks,
-		State: run.LoadState(cfg.StateFile), Log: logger,
+		Cfg: cfg, API: api, Sinks: sinks, Log: logger,
 		// Every kind of run reads it, and every kind but a card-only one and
 		// a backfill writes it back: see run.Runner's CacheFile.
 		CacheFile: cfg.CacheFile(),
@@ -665,7 +692,7 @@ func reported(ctx context.Context, o options, cfg *config.Config,
 		// This one asks GitHub for the repository list alone, and the
 		// stores what they hold. With -yes it changes them, which takes the
 		// sinks and is not a report.
-		migratePlan(ctx, cfg, api, o.path, stdout, time.Now())
+		err = migratePlan(ctx, cfg, api, o.path, stdout, time.Now())
 	case o.list:
 		err = listRepositories(ctx, api, cfg, stdout)
 	default:
@@ -922,9 +949,8 @@ func runBackfill(ctx context.Context, runner *run.Runner, cfg *config.Config,
 	}
 	scope := run.ScopeOf(cfg, bound)
 	if o.only != nil {
-		if narrowErr := walkable(cfg, o.only); narrowErr != nil {
-			return narrowErr
-		}
+		// walkable has refused a family this configuration switches off,
+		// before the start: see execute.
 		runner.Only, scope = set(o.only), scope.Narrowed(o.only, nil)
 		logger.Info("backfill of some families only", "families", strings.Join(o.only, ","))
 	}

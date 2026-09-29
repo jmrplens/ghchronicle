@@ -176,14 +176,14 @@ func TestACopyPastItsDayIsNotCompared(t *testing.T) {
 		Config: in.Config, State: in.State, Save: func() error { return nil },
 		Readers: map[string]teardown.ItemReader{"influxdb": influx, "postgres": &fakeItems{name: "postgres"}},
 		Refill:  func(context.Context, RefillWalk) error { return nil },
-		Now:     func() time.Time { return at.Add(25 * time.Hour) }, Log: slog.New(slog.DiscardHandler),
+		Now:     func() time.Time { return at.Add(73 * time.Hour) }, Log: slog.New(slog.DiscardHandler),
 	}
 	done, err := a.Apply(t.Context(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got := done.Refill.Reconciled; len(got) != 1 || got[0].Store != "influxdb" || got[0].Err == nil ||
-		!strings.Contains(got[0].Err.Error(), "due to be purged at 2026-10-02 09:10 UTC") || len(influx.asked) != 0 {
+		!strings.Contains(got[0].Err.Error(), "due to be purged at 2026-10-04 09:10 UTC") || len(influx.asked) != 0 {
 		t.Errorf("reconciled %+v, asked %v", got, influx.asked)
 	}
 }

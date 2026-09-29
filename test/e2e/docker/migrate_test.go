@@ -101,7 +101,7 @@ func counts(ctx context.Context, t *testing.T, s *Stack) string {
 	}}
 	var b strings.Builder
 	for _, in := range teardown.Inspectors(cfg) {
-		shape, err := in.Shape(ctx, "gh_discussion_comment", []string{"is_answer"}, nil)
+		shape, err := in.Shape(ctx, "gh_discussion_comment", []string{"is_answer"})
 		if err != nil {
 			t.Fatalf("asking %s: %v", in.Name(), err)
 		}
@@ -132,10 +132,12 @@ func seedPostgres(ctx context.Context, t *testing.T, s *Stack, ns string) {
 		"DROP SCHEMA IF EXISTS " + ns + " CASCADE;",
 		"CREATE SCHEMA " + ns + ";",
 		`CREATE TABLE ` + ns + `.gh_discussion_comment ("time" TIMESTAMPTZ NOT NULL, ` +
-			`"comment" TEXT NOT NULL DEFAULT '', "is_answer" TEXT NOT NULL DEFAULT '', ` +
-			`"user" TEXT NOT NULL DEFAULT '', "answers" BIGINT, PRIMARY KEY ("time", "comment", "is_answer", "user"));`,
+			`"author" TEXT NOT NULL DEFAULT '', "comment" TEXT NOT NULL DEFAULT '', "full_name" TEXT NOT NULL DEFAULT '', ` +
+			`"is_answer" TEXT NOT NULL DEFAULT '', "user" TEXT NOT NULL DEFAULT '', "answers" BIGINT, ` +
+			`PRIMARY KEY ("time", "author", "comment", "full_name", "is_answer", "user"));`,
 		`INSERT INTO ` + ns + `.gh_discussion_comment VALUES ` +
-			`('2023-11-14T22:13:20Z', '1', 'false', 'octocat', 0), ('2023-11-14T22:13:20Z', '1', 'true', 'octocat', 1);`,
+			`('2023-11-14T22:13:20Z', 'a', '1', 'o/r', 'false', 'octocat', 0), ` +
+			`('2023-11-14T22:13:20Z', 'a', '1', 'o/r', 'true', 'octocat', 1);`,
 		`CREATE TABLE ` + ns + `.gh_dependabot_alert_item ("time" TIMESTAMPTZ NOT NULL, ` +
 			`"number" TEXT NOT NULL DEFAULT '', "owner" TEXT NOT NULL DEFAULT '', "alert_state" TEXT, PRIMARY KEY ("time", "number", "owner"));`,
 		`INSERT INTO ` + ns + `.gh_dependabot_alert_item VALUES ('2024-01-11T19:06:40Z', '1', 'o', 'open');`,
@@ -154,9 +156,9 @@ func seedElasticsearch(ctx context.Context, t *testing.T, s *Stack, ns string) {
 	t.Helper()
 	index := ns + "-gh_discussion_comment"
 	bulk := `{"index":{"_index":"` + index + `","_id":"a1"}}
-{"@timestamp":"2023-11-14T22:13:20Z","comment":"1","is_answer":"false","user":"octocat","answers":0}
+{"@timestamp":"2023-11-14T22:13:20Z","author":"a","comment":"1","full_name":"o/r","is_answer":"false","user":"octocat","answers":0}
 {"index":{"_index":"` + index + `","_id":"a2"}}
-{"@timestamp":"2023-11-14T22:13:20Z","comment":"1","is_answer":"true","user":"octocat","answers":1}
+{"@timestamp":"2023-11-14T22:13:20Z","author":"a","comment":"1","full_name":"o/r","is_answer":"true","user":"octocat","answers":1}
 {"index":{"_index":"` + ns + `-gh_dependabot_alert_item","_id":"d1"}}
 {"@timestamp":"2024-01-11T19:06:40Z","number":"1","owner":"o","alert_state":"open"}
 `

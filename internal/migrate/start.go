@@ -26,6 +26,9 @@ type Start struct {
 	Plan Plan
 	// Auto is migrate: auto. Without it nothing is applied, only said.
 	Auto bool
+	// Hold is why this start applies nothing on its own although Auto
+	// says it may, empty when it may.
+	Hold string
 	// CanApply says whether this build has a way to bring a store along.
 	CanApply func(store string) bool
 	// DryRun and Apply are the command lines a warning names, and Others
@@ -109,11 +112,13 @@ func (s Start) notOnItsOwn(c Chosen) []string {
 	var why []string
 	if !s.Auto {
 		why = append(why, "migrate: warn applies nothing on its own")
+	} else if s.Hold != "" {
+		why = append(why, s.Hold)
 	}
 	if !c.Item.Safe {
 		why = append(why, c.Item.Unsafe...)
 	}
-	if s.Auto && c.Item.Safe && s.CanApply != nil && !s.CanApply(c.Store) {
+	if s.Auto && s.Hold == "" && c.Item.Safe && s.CanApply != nil && !s.CanApply(c.Store) {
 		why = append(why, "this build has no way to bring "+c.Store+" along on its own")
 	}
 	return why

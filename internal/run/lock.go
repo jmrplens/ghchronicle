@@ -22,6 +22,9 @@ const (
 	// HeldByStart is a one-shot run bringing a store along before its sweep,
 	// which lets go as soon as that is done.
 	HeldByStart = "a run applying migrations before its sweep"
+	// HeldByUninstall is -uninstall -yes removing the stores' tables or the
+	// state file, which the process holding it would go on writing.
+	HeldByUninstall = "-uninstall -yes"
 )
 
 // Holder is who holds the lock, as the holder wrote it into the file.

@@ -224,7 +224,13 @@ la unidad, así que puede seguir en modo 600, y ejecuta el binario como
 fichero que solo root podía leer y corrió como el usuario indicado. Si la lanza
 root, `-migrate -yes` guarda como de root, en modo 600, los ficheros que
 reescribe junto al de estado, `state.json` entre ellos, y el servicio, que corre
-como `ghchronicle`, ya no puede leer lo que recuerda.
+como `ghchronicle`, se detiene entonces al arrancar y nombra el fichero en vez
+de empezar con uno nuevo, que olvidaría una relectura aún debida: devuélveselo
+con `chown ghchronicle:ghchronicle`.
+
+Con `-once` lanzado desde cron en vez de un servicio, comenta la línea mientras
+duran las dos órdenes: un `-once` no tiene ningún bloqueo mientras hace su
+pasada, así que nada le impide correr a la vez que `-migrate -yes`.
 
 ## cron en vez de un servicio
 

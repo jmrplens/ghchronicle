@@ -194,8 +194,8 @@ func (a Applying) reconcile(ctx context.Context, owed []Owed) []Reconciliation {
 				continue
 			}
 			r := Reconciliation{Store: o.Store, Measurement: m.Measurement, Aside: aside.Name}
-			if a.now().After(aside.At.Add(teardown.Grace)) {
-				r.Err = fmt.Errorf("the copy was due to be purged at %s", aside.At.Add(teardown.Grace).UTC().Format(timeLayout))
+			if due := PurgedFrom(aside); a.now().After(due) {
+				r.Err = fmt.Errorf("the copy was due to be purged at %s", due.UTC().Format(timeLayout))
 			} else {
 				r.Before, r.After, r.Gone, r.Err = compareItems(ctx, reader, aside.Name, m)
 			}

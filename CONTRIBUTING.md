@@ -10,9 +10,10 @@ the shorter, repository-side version of it.
 ## What this is, in one paragraph
 
 One static Go binary with no runtime dependencies. Its direct dependencies are
-`gopkg.in/yaml.v3`, the PostgreSQL driver `github.com/jackc/pgx/v5`, and
-`golang.org/x/term` (over `golang.org/x/sys`) so that `-setup` can read a
-secret without echoing it; `go.mod` is the list. It sweeps the GitHub
+`gopkg.in/yaml.v3`, the PostgreSQL driver `github.com/jackc/pgx/v5`,
+`golang.org/x/term` so that `-setup` can read a secret without echoing it, and
+`golang.org/x/sys`, which `x/term` builds on and which takes the lock beside the
+state file (`flock` on Unix, `LockFileEx` on Windows); `go.mod` is the list. It sweeps the GitHub
 API on a schedule and writes each observation as a point stamped with the date
 the thing happened, not the date it was collected. That single rule is what
 makes re-collection converge instead of accumulating, and most of the design
@@ -121,17 +122,21 @@ collector writes only under a condition goes in `conditionalColumns`
 the test fails until it is there.
 
 **A change to a measurement's tag keys**, a tag that becomes a field or one
-that is renamed or removed, means an entry in `migrate.Registry`
-(`internal/migrate/registry.go`): the release, the tags only the old shape
-carries, and every family that writes the measurement, so `-migrate` can find
-the old shape in a store and say what bringing it along takes.
-`TestEveryChangeOfIdentityIsRegistered` sweeps the fake GitHub, compares every
-measurement's tag keys with `internal/migrate/identity.json`, and refuses to
-rewrite that file with `-update` while a tag that went away has no entry;
-`TestEveryMigrationNamesEveryFamilyThatWritesIt` sweeps it one family at a
-time and fails on an entry whose families are not the ones that write it. A
-tag added to an existing measurement is refused outright, for the reason in
-the paragraph above.
+that is removed, means a new entry in `migrate.Registry`
+(`internal/migrate/registry.go`), with an ID of its own: the release, the tags
+only the old shape carries, and every family that writes the measurement, so
+`-migrate` can find the old shape in a store and say what bringing it along
+takes. `TestEveryChangeOfIdentityIsRegistered` sweeps the fake GitHub, compares
+every measurement's tag keys with `internal/migrate/identity.json`, and refuses
+to rewrite that file with `-update` while a tag that went away has no entry
+that is not yet pinned in `internal/migrate/testdata/registry.json`; a pinned
+entry, one a release may have shipped, never changes, and `-update` pins every
+entry it accepts. `TestEveryMigrationNamesEveryFamilyThatWritesIt` sweeps it
+one family at a time and fails on an entry whose families are not the ones
+that write it, and `TestEveryFamilyWritesAMeasurementInOneShape` on two
+families that write one measurement with different tag keys. A tag renamed is
+a tag removed and one added, and a tag added to an existing measurement is
+refused outright, for the reason in the paragraph above.
 
 **A panel one store draws differently from the others** means the reason in
 that store's own description of the panel, and an entry in `dashboardsDiffer`

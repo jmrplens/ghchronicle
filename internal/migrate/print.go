@@ -6,8 +6,6 @@ import (
 	"slices"
 	"strings"
 	"time"
-
-	"github.com/jmrplens/ghchronicle/v2/internal/teardown"
 )
 
 // statusWidth is the status column: the longest word, "unreachable", and a
@@ -211,13 +209,18 @@ func printStore(w io.Writer, st StorePlan) {
 			"or a start under migrate: auto, reads it\n", statusWidth, "refill owed", quoted(o.Families),
 			bound(o.Since), quoted(o.Measurements), quoted(o.Migrations))
 	}
+	for _, e := range st.Elsewhere {
+		fmt.Fprintf(w, "  %-*s%s, %s, writing %s: cleared by %s at %s, where this sink no longer points; "+
+			"nothing reads it while it points here\n", statusWidth, "owed there", quoted(e.Refill.Families),
+			bound(e.Refill.Since), quoted(e.Refill.Measurements), quoted(e.Refill.Migrations), e.Destination)
+	}
 	for _, a := range st.Kept {
 		purged := "purged by ghchronicle after "
 		if a.ByServer {
 			purged = "purged by the store itself after "
 		}
 		fmt.Fprintf(w, "  %-*s%s: %s, set aside %s, %s%s\n", statusWidth, "kept aside", a.Migration, a.Name,
-			a.At.UTC().Format(timeLayout), purged, a.At.Add(teardown.Grace).UTC().Format(timeLayout))
+			a.At.UTC().Format(timeLayout), purged, PurgedFrom(a).UTC().Format(timeLayout))
 	}
 }
 
@@ -256,7 +259,7 @@ func printItem(w io.Writer, it Item) {
 	}
 	if it.Safe {
 		detail("", "safe to apply unattended: GitHub serves the whole history, the old rows are set aside "+
-			"for 24 hours, and every row is this configuration's")
+			"for at least 24 hours, and every row is this configuration's")
 		return
 	}
 	for _, why := range it.Unsafe {

@@ -4,7 +4,10 @@ package run
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"time"
@@ -16,11 +19,13 @@ import (
 //
 // Nine things, and deleting the file costs a different thing for each of
 // them. Seven of the nine cost only rate limit, because what is collected
-// again overwrites what is already stored. last_head is the one that loses
-// something: the dependency changes between the head it held and the next one
-// are read from a range that nothing can name once the head is gone. stores
-// is the one that costs a question nobody can answer afterwards: which
-// release first wrote a store that cannot be asked what shape its rows are in.
+// again overwrites what is already stored. last_head loses something: the
+// dependency changes between the head it held and the next one are read from
+// a range that nothing can name once the head is gone. So does stores: which
+// release first wrote a store that cannot be asked what shape its rows are
+// in, and the history a migration cleared out of a store and has not read
+// back, which the store, asked, shows as a store that never held the old
+// shape. Nothing reads that history back until a backfill of its families.
 //
 //   - last_run: when each family last ran, so a restart does not re-collect
 //     everything at once.
@@ -43,8 +48,8 @@ import (
 //     so the achievements family walks the pull requests merged since instead
 //     of the account's whole history. Absent walks the whole history.
 //   - stores: per configured store, where it points, which release first
-//     wrote it and which last did, and the migrations applied to it. See
-//     StoreRecord.
+//     wrote it and which last did, the migrations applied to it, the copies
+//     set aside there and the refill still owed. See StoreRecord.
 type State struct {
 	path     string
 	LastRun  map[string]time.Time `json:"last_run"`
@@ -80,12 +85,52 @@ type State struct {
 	// written before 2.6.2, which is itself an answer: every store it served
 	// was first written by a release that kept no record.
 	Stores map[string]*StoreRecord `json:"stores,omitempty"`
+
+	// loaded is Stores as this process read them, which is what Save tells
+	// this process's changes from another's by.
+	loaded map[string]*StoreRecord
 }
 
+// LoadState is the state file at path, or a state with nothing in it when
+// there is none or it cannot be read: see OpenState for a run that acts on
+// what the file says.
 func LoadState(path string) *State {
 	s := readState(path)
 	s.path = path
+	s.loaded = s.storesCopy()
 	return s
+}
+
+// OpenState is the state file at path for a run that writes to the stores:
+// what is not there is a first run, and what is there and cannot be read, or
+// does not parse, is an error rather than a first run.
+//
+// The difference matters since the file records which stores a migration
+// cleared and still owes the history of. Read as a first run, a file another
+// user left unreadable, root's after a -migrate -yes run as root most often,
+// forgot every one of those, and the run's first save then renamed its own
+// file over it, which lost them for good.
+func OpenState(path string) (*State, error) {
+	if path == "" {
+		return LoadState(path), nil
+	}
+	b, err := os.ReadFile(path)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return LoadState(path), nil
+	case err != nil:
+		return nil, fmt.Errorf("the state file %s cannot be read (%w); a run as another user, root most often, "+
+			"leaves it so: give it back to the user this runs as. Moved aside instead, the next run starts from a "+
+			"new one and forgets what it recorded, a refill a migration still owes among it", path, err)
+	}
+	if !json.Valid(b) {
+		return nil, fmt.Errorf("the state file %s does not parse; a new one is made by moving it aside, and "+
+			"forgets what it recorded, a refill a migration still owes among it", path)
+	}
+	s := decodeState(b)
+	s.path = path
+	s.loaded = s.storesCopy()
+	return s, nil
 }
 
 // readState is the state file at path, with every map there to write into
@@ -132,7 +177,9 @@ func decodeState(b []byte) *State {
 }
 
 // Save writes through a temporary file so a crash mid-write cannot leave a
-// truncated state that would trigger a full re-collection.
+// truncated state that would trigger a full re-collection. What another
+// process recorded of the stores since this one read the file is kept: see
+// takeTheirs.
 func (s *State) Save() error {
 	if s.path == "" {
 		return nil
@@ -145,11 +192,16 @@ func (s *State) Save() error {
 			return err
 		}
 	}
+	s.takeTheirs()
 	b, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return err
 	}
-	return replaceFile(s.path, b)
+	if writeErr := replaceFile(s.path, b); writeErr != nil {
+		return writeErr
+	}
+	s.loaded = s.storesCopy()
+	return nil
 }
 
 // replaceFile writes b beside path and renames it over path, so a reader sees

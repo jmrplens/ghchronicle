@@ -141,6 +141,12 @@ func (c *cleared) influx(t *testing.T) {
 	if n := asideInfluxCount(c.ctx, t, c.s, applyNamespace, c.asides["influxdb"].Name); n != 2 {
 		t.Errorf("the copy answers %d rows, want the 2 it held", n)
 	}
+	// When the server purges it, as its _internal system table says: 72
+	// hours after the delete, not the 24 every text here said before this
+	// was read back (measured on 3.11.2 and 3.11.5).
+	if a := c.asides["influxdb"]; !a.Until.Equal(a.At.Add(72 * time.Hour)) {
+		t.Errorf("the server purges its copy from %s, want 72 hours after %s", a.Until, a.At)
+	}
 	if n := asideInfluxCount(c.ctx, t, c.s, applyOther, "gh_discussion_comment"); n != 2 {
 		t.Errorf("the other database's table holds %d rows, want its 2", n)
 	}

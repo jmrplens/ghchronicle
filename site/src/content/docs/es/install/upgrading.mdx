@@ -54,14 +54,20 @@ Cada línea empieza por lo que encontró la comprobación:
   preguntar, puede guardarla. Las líneas de debajo dicen por qué, qué haría
   allí ponerlo al día, qué familias volverían a leer la medida y desde cuándo,
   y lo que no volvería: las filas de repositorios que la configuración ya no
-  cubre y las de familias que tiene apagadas. La última línea dice si
-  aplicarlo no necesita la palabra de nadie: GitHub todavía sirve toda la
-  historia, así que volvería cada fila que guarda el almacén, las filas
-  antiguas se apartarían 24 horas en vez de borrarse, y todas las filas del
+  cubre y las de familias que tiene apagadas. En los comentarios, esas son los
+  comentarios de otros en un repositorio así: los de la propia cuenta vuelven
+  a través de `outbound` estén donde estén. La última línea dice si aplicarlo
+  no necesita la palabra de nadie: GitHub todavía sirve toda la historia, así
+  que volvería cada fila que guarda el almacén, las filas antiguas se
+  apartarían al menos 24 horas en vez de borrarse, y todas las filas del
   almacén son de esta configuración. Un almacén compartido con otro colector,
-  uno que guarda filas que la relectura no traería de vuelta, un InfluxDB 2,
-  cuya única vía es un borrado, y todo almacén al que no se le puede preguntar
-  necesitan la palabra de alguien, y la línea dice qué razón aplica.
+  uno que guarda filas que la relectura no traería de vuelta, uno cuyas filas
+  no se pudieron comparar con la configuración, un InfluxDB 2, cuya única vía
+  es un borrado, y todo almacén al que no se le puede preguntar necesitan la
+  palabra de alguien, y la línea dice qué razón aplica. Una fila que no nombra
+  ninguna cuenta es de una configuración solo de organizaciones, que no
+  escribe usuario: es de esta configuración solo cuando esta tampoco tiene
+  `targets.user`.
 - `note`: las filas están ahí y nada puede arreglarlas, así que el plan dice
   qué significan y no cambia nada.
 - `frozen`: nada de lo que ejecuta esta configuración escribe ya la medida,
@@ -83,6 +89,15 @@ primera pasada, y lo que hace después lo decide el ajuste
   almacén, incluido dónde se apartan las filas antiguas; después vuelve a leer
   la medida de GitHub, y solo entonces hace la pasada.
 - `warn` no aplica nada.
+
+Una ejecución de una sola vez, `-once` o `-backfill`, sobre un fichero de estado
+nuevo tampoco aplica nada por su cuenta bajo `auto`, y avisa en su lugar. Esa
+es cada ejecución de la Action que no restaura su fichero de estado con
+`actions/cache`, cuyo fichero de estado se va con su runner, y con él el
+registro de que aún se debe una relectura: una relectura que falló, o un job
+cancelado a medias, dejaría el almacén despejado y nada en ninguna parte que lo
+dijera. La siguiente ejecución en una máquina, que para entonces tiene fichero
+de estado, o `-migrate -yes`, lo aplica.
 
 Un cambio pendiente que un arranque no aplica es un `WARN` en cada arranque,
 con el almacén, la razón por la que se dejó y las dos órdenes, copiadas de la
@@ -119,9 +134,20 @@ systemctl start ghchronicle
 
 Ejecútalo con el usuario con que corre el servicio y con el entorno que tiene
 el servicio: guarda el fichero de estado y los que hay a su lado, y un fichero
-que guarda root es uno que el servicio ya no puede leer.
+que guarda root es uno que el servicio ya no puede leer. Una ejecución que
+encuentra el fichero de estado y no puede leerlo, o no puede analizarlo, se
+detiene y lo nombra en vez de empezar con uno nuevo, que olvidaría una
+relectura aún debida: devuélvele el fichero al usuario del servicio.
 [systemd](/ghchronicle/es/install/systemd/#tras-una-actualización) y
 [Docker](/ghchronicle/es/install/docker/#tras-una-actualización) muestran cómo.
+
+Pausa también un cron o un temporizador que ejecute `-once`, y deja terminar
+antes un `-backfill` que esté en marcha. Ninguno tiene el bloqueo mientras hace
+su pasada, y un fichero SQL que escriben dos procesos a la vez no es uno que
+psql pueda reproducir. Su fichero de estado está a salvo en cualquier caso: una
+ejecución que lo guarda conserva lo que otro proceso registró de los almacenes
+desde que ella lo leyó, así que un `-once` que corrió a la vez que
+`-migrate -yes` no devuelve el registro que había leído antes.
 
 `-migrate -yes` imprime el mismo plan y después aplica cada cambio pendiente,
 también los que no son seguros, porque `-yes` es la palabra que pedía el plan.
@@ -134,8 +160,10 @@ no se hace dos veces. Una línea bajo el plan dice qué pasó con cada uno:
   las órdenes que hay que ejecutar allí.
 - `failed`: el almacén se negó, con su razón. Los demás siguen adelante.
 - `held back`: el almacén guarda filas de cuentas que esta configuración no
-  recoge. Apartadas, esas solo vuelven cuando quien las recoge las lee de
-  nuevo, así que esto lleva `-migrate-others` además de `-yes`.
+  recoge, o de quién son sus filas no se pudo comparar con esta configuración,
+  y la línea dice cuál y por qué. Apartadas, las filas de otro solo vuelven
+  cuando quien las recoge las lee de nuevo, así que esto lleva
+  `-migrate-others` además de `-yes`.
 - `unreachable`: el almacén no respondió, así que allí no se hizo nada.
 - `refill`: qué se volvió a leer de GitHub, desde cuándo y en qué almacenes,
   o por qué la relectura no terminó: ver [volver a leer el
@@ -160,7 +188,7 @@ entradas](/ghchronicle/es/install/actions/#entradas).
 
 | Almacén                                                                           | Qué hace aplicarlo                                                                                                         |
 | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| [InfluxDB 3](/ghchronicle/es/sinks/influxdb/#qué-hace-aquí-una-migración)         | Borra esa tabla, que InfluxDB guarda como `<medida>-<instante>`, consultable, y purga él mismo 24 horas después            |
+| [InfluxDB 3](/ghchronicle/es/sinks/influxdb/#qué-hace-aquí-una-migración)         | Borra esa tabla, que InfluxDB guarda como `<medida>-<instante>`, consultable, y purga él mismo 72 horas después            |
 | InfluxDB 2                                                                        | Borra todas las filas de la medida en el bucket. No se guarda nada, así que un arranque nunca lo hace por su cuenta        |
 | [PostgreSQL](/ghchronicle/es/sinks/postgres/#qué-hace-aquí-una-migración)         | Renombra la tabla `<medida>-<instante>` en el esquema del destino; ghchronicle la borra 24 horas después                   |
 | [Elasticsearch](/ghchronicle/es/sinks/elasticsearch/#qué-hace-aquí-una-migración) | Bloquea las escrituras del índice, lo clona a `<índice>-<instante>` y lo borra; ghchronicle borra el clon 24 horas después |
@@ -180,11 +208,15 @@ bajo el almacén, con una línea `kept aside` que dice cuándo se apartó y cuá
 se va, y el fichero de estado la guarda hasta entonces. ghchronicle purga sus
 propias copias cuando llevan 24 horas guardadas: el servicio tras una pasada,
 cualquier ejecución en su siguiente arranque, y `-migrate -yes` cada vez que se
-ejecuta. Una ejecución sobre un fichero de estado nuevo, que es cada ejecución
-de la Action, pregunta a PostgreSQL y a Elasticsearch por las copias con el
-nombre que les da una migración, porque su fichero de estado no puede
-nombrarlas. Hasta que una copia se va, cómo deshacer el cambio está en la
-página de cada almacén.
+ejecuta. Una ejecución sobre un fichero de estado nuevo, entre ellas cada
+ejecución de la Action que no restaura uno, pregunta a PostgreSQL y a
+Elasticsearch por las copias con el nombre que les da una migración, porque su
+fichero de estado no puede nombrarlas. InfluxDB 3 purga las suyas con un
+calendario propio, que se lee de la tabla de sistema de su base de datos
+`_internal`: 72 horas después del borrado por omisión (medido en 3.11.2 y
+3.11.5), y guarda el nombre en su catálogo durante su periodo de gracia de
+borrado después de eso, 24 horas por omisión. Hasta que una copia se va, cómo
+deshacer el cambio está en la página de cada almacén.
 
 Un almacén despejado se vuelve a escribir entero. El [registro de
 escrituras](/ghchronicle/es/sinks/#solo-se-escribe-lo-que-ha-cambiado) olvida la
@@ -223,9 +255,11 @@ los almacenes que se despejaron y en ningún otro.
 - **Tan atrás como llegaba el almacén.** El día de la fila más antigua que
   guardaba el almacén, leída antes de despejarlo: un límite posterior perdería
   la diferencia para siempre cuando se purgue la copia. Un almacén que no puede
-  decirlo, el fichero SQL o Graphite, se relee hasta `backfill.since`, y sin
-  límite cuando no lo hay. Una relectura para varios almacenes llega tan atrás
-  como el que más.
+  decir hasta dónde llegan sus filas, el fichero SQL, Graphite o un InfluxDB 3
+  Core que no quiso contarlas (abajo), se relee sin límite: lo que se lleva
+  aplicarlo allí es cada fila sea cual sea su fecha, y `backfill.since` acota lo
+  que alcanza un relleno histórico, no lo que guarda un almacén. Una relectura
+  para varios almacenes llega tan atrás como el que más.
 - **Esperando, como espera un relleno histórico.** Tiene un cliente de GitHub
   propio que espera a que se renueve un límite de peticiones gastado, donde una
   pasada lo salta, y `-backfill-retry` vuelve a por lo que deja igual que en un
@@ -235,12 +269,15 @@ los almacenes que se despejaron y en ningún otro.
   del autor, el recorrido de `outbound` que necesita tardó 33 segundos cuando
   el de la 2.6.1 se hizo a mano.
 
-La relectura se debe desde el momento en que se despeja un almacén, y el
-fichero de estado lo registra entonces, antes de leer nada, bajo la clave
-`refill` del almacén: un almacén despejado y no releído parece, a quien le
-pregunte, exactamente uno que nunca guardó la forma antigua, y solo ese
-registro dice que el historial aún está por llegar. Se va cuando la relectura
-llega al final de todas las familias. Una relectura cortada, por una parada,
+La relectura se debe antes de tocar un almacén, y el fichero de estado lo
+registra entonces, bajo la clave `refill` del almacén: un almacén despejado y
+no releído parece, a quien le pregunte, exactamente uno que nunca guardó la
+forma antigua, y solo ese registro dice que el historial aún está por llegar.
+Un despeje que falló y dejó el almacén como estaba, lo que dice el almacén,
+retira la deuda; uno cuya respuesta no llegó, un 502 de un proxy o un tiempo
+agotado, se vuelve a mirar, y cuando el almacén no puede decir si se llevó a
+cabo la relectura sigue debiéndose, lo que como mucho lee el historial una vez
+para nada. Se va cuando la relectura llega al final de todas las familias. Una relectura cortada, por una parada,
 un almacén que rechazó una escritura o un GitHub que no respondió, guarda un
 punto de control propio junto al fichero de estado, con `-refill.json` en el
 nombre, aparte del de un relleno histórico para que ninguno rechace ni pise al
@@ -289,6 +326,21 @@ en solo lectura contra el InfluxDB 3.11.5 de producción, la copia que guardó
 InfluxDB de la tabla borrada a mano para la 2.6.1 tenía 114 comentarios, y la
 tabla releída 121, sin que faltara ninguno de los 114.
 
+### El límite de ficheros por consulta de InfluxDB 3 Core
+
+InfluxDB 3 Core rechaza una consulta que abriría más ficheros Parquet que su
+`--query-file-limit`, 432 por omisión, y una tabla que una pasada escribe cada
+diez minutos lo supera en días. La comprobación lee el catálogo, que no abre
+ningún fichero, así que sigue encontrando la forma antigua en una tabla así, y
+una tabla sin etiqueta antigua no se cuenta en absoluto. Lo que no puede hacer
+allí es contar las filas, lo que deja la relectura sin límite, ni leer de quién
+son las filas de la tabla, lo que deja el cambio necesitando tu palabra y a
+`-migrate -yes` reteniéndolo a la espera de `-migrate-others`; el plan cita el
+rechazo del servidor. Medido en 3.11.2 con el límite bajado a 3: antes de esto,
+la misma tabla era `unreachable` en cada arranque y `-migrate -yes` no podía
+aplicarlo en absoluto. Subir el límite en el servidor, mientras dura la
+migración, le deja responder a todo.
+
 ### Lo que el fichero de estado recuerda de cada almacén
 
 La clave `stores` del [fichero de estado](/ghchronicle/es/configuration/#state_file)
@@ -300,10 +352,16 @@ nueva no tiene nada que migrar. El primer arranque tras actualizar desde la
 2.6.1 o anterior registra la primera versión como desconocida, lo que para un
 fichero SQL, un Graphite o un Telegraf se lee como anterior a cualquier cambio,
 así que esos muestran cada cambio de una versión 2.x como pendiente, o como
-nota donde nada puede arreglarlo, hasta que se aplique. Un
-destino apuntado a otro almacén empieza un registro nuevo. Un fichero de estado
-borrado tras una actualización se lleva el registro consigo, y los almacenes a
-los que no se puede preguntar se toman entonces por de la versión en marcha.
+nota donde nada puede arreglarlo, hasta que se aplique. Un destino apuntado a
+otro almacén empieza un registro nuevo, y el que deja se conserva mientras aún
+deba allí una relectura o nombre una copia, se dice en cada arranque y en
+`-migrate` como `owed there`, y se recupera si el destino vuelve a apuntar
+allí. Una URL escrita de otra forma, con una barra al final, una mayúscula o el
+puerto por omisión, es el mismo almacén. Un fichero de estado borrado tras una
+actualización se lleva el registro consigo, y los almacenes a los que no se
+puede preguntar se toman entonces por de la versión en marcha; también se lleva
+una relectura aún debida, y nada vuelve a leer ese historial hasta que lo haga
+un `-backfill -families` de las familias que nombra.
 
 Un cambio hecho antes de la 1.0.0, las etiquetas `state` y `reason` de los
 elementos de alerta, no lo escribió nunca una versión publicada, así que solo

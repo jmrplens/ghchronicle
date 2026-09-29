@@ -7,8 +7,10 @@ Context for AI agents working in this repository.
 `ghchronicle` collects every metric GitHub exposes about an account and writes
 each observation as a point dated when the thing happened. Go, single static
 binary. Its direct dependencies are `gopkg.in/yaml.v3`, the PostgreSQL driver
-`github.com/jackc/pgx/v5`, and `golang.org/x/term` (over `golang.org/x/sys`)
-so that `-setup` can read a secret without echoing it; `go.mod` is the list.
+`github.com/jackc/pgx/v5`, `golang.org/x/term` so that `-setup` can read a
+secret without echoing it, and `golang.org/x/sys`, which `x/term` builds on and
+which takes the lock beside the state file (`flock` on Unix, `LockFileEx` on
+Windows); `go.mod` is the list.
 
 The reason it exists: GitHub keeps almost nothing. Traffic is a rolling
 fourteen days, the event feed is the last three hundred events of the past
@@ -117,32 +119,48 @@ rule); the planning panels read one row per comment across both, for a store
 nobody has brought along yet.
 
 **A change to what a row is keyed by is a migration.** A point's identity is
-its measurement, its tags and its time, so a release that removes, renames or
-moves a tag leaves every row already stored beside the new ones for ever, in
-every store that keeps rows. Such a change owes, in the same change, an entry
+its measurement, its tags and its time, so a release that removes a tag, or
+moves one into the fields, leaves every row already stored beside the new ones
+for ever, in every store that keeps rows. A tag renamed, or added, is refused
+outright: the registry can name a tag that went away and has no way yet to find
+the rows that lack one. A removal owes, in the same change, a new entry
 in `migrate.Registry` (`internal/migrate/registry.go`): an ID
 `<release>/<measurement>/<what>`, which state files keep and which is never
 renamed or reused; the first release that writes the new shape; the tags only
 the old shape carries (`OldTags`, what a store is asked about and what makes
 Graphite's old paths one node deeper); every family that writes the
-measurement; the tag that says whose rows they are; the tags that name one
-item; and whether GitHub still serves the whole history (`Whole`, which lets a
+measurement; the tag that says whose rows they are; the tag that says who wrote
+a row (`Author`) where an account-wide family writes the measurement beside a
+per-repository one; the tags that name one item; and whether GitHub still
+serves the whole history (`Whole`, which lets a
 store be cleared and read again) or today's state only (`Current`, a note that
 changes nothing). A value that changed with the identity kept is `Value`, a
 note too. Three tests hold it. `TestEveryChangeOfIdentityIsRegistered` sweeps
 the fake GitHub and compares every measurement's tag keys with
 `internal/migrate/identity.json`: a tag that went away with no entry fails, and
 `-update` refuses to rewrite the file until there is one; a tag added to an
-existing measurement fails outright. `TestEveryMigrationNamesEveryFamilyThatWritesIt`
+existing measurement fails outright. Only an entry not yet pinned in
+`internal/migrate/testdata/registry.json` explains a removal, and a pinned one
+never changes: a state file that recorded its ID settled it for good, so a
+second tag added to a shipped entry's `OldTags` would never be asked about.
+`-update` pins every entry it accepts. `TestEveryMigrationNamesEveryFamilyThatWritesIt`
 sweeps it one family at a time and fails on an entry whose families are not
 exactly the writers, which is what the manual refill of 2.6.1 got wrong: it
-read `outbound` and not `discussions`. `TestTheRegistryHoldsTogether` holds
+read `outbound` and not `discussions`; `TestEveryFamilyWritesAMeasurementInOneShape`
+fails when two families write one measurement with different tag keys, which
+the union in `identity.json` cannot see. `TestTheRegistryHoldsTogether` holds
 each entry to its own rules. Nothing else is owed: `-migrate` plans every entry
 against every store and changes nothing, `-migrate -yes` applies it, and a
 start under `migrate: auto`, the default, applies on its own only what loses
 nothing, which is GitHub serving the whole history, the old rows set aside for
-24 hours (InfluxDB 3's own soft delete, a rename in PostgreSQL, a clone in
-Elasticsearch) and every row in the store this configuration's. A store that
+at least 24 hours (InfluxDB 3's own soft delete, 72 hours by default, a rename
+in PostgreSQL, a clone in Elasticsearch) and every row in the store this
+configuration's, which the store is asked, repositories as well as accounts
+whenever a family reads per repository. A one-shot run on a new state file
+applies nothing on its own: the Action's state file goes with its runner, and
+only the state file says a refill is still owed. The refill is recorded as owed
+before a store is touched, and taken back only when the store says a failure
+left it as it was. A store that
 can be asked decides whether it holds the old shape, and the state file's
 `stores` record decides for the SQL file, Graphite and Telegraf. Every
 destructive step names exactly one measurement, or the copy it made, in the

@@ -70,6 +70,10 @@ func (s *oldInflux) start(t *testing.T) string {
 			_, _ = io.WriteString(w, oldColumns)
 		case strings.HasPrefix(q, "SELECT count(*)"):
 			_, _ = io.WriteString(w, `[{"n":3,"oldest":"2023-11-14T22:13:20"}]`)
+		case strings.HasPrefix(q, `SELECT DISTINCT "full_name"`):
+			// Every comment the copy holds is the account's own, which
+			// outbound reads again wherever it is.
+			_, _ = io.WriteString(w, `[]`)
 		case strings.HasPrefix(q, "SELECT DISTINCT"):
 			_, _ = io.WriteString(w, `[{"v":"`+login+`"}]`)
 		default:
@@ -81,7 +85,9 @@ func (s *oldInflux) start(t *testing.T) string {
 }
 
 // oldColumns is the catalog of the table 2.6.0 wrote.
-const oldColumns = `[{"column_name":"comment","data_type":"Dictionary(Int32, Utf8)"},` +
+const oldColumns = `[{"column_name":"author","data_type":"Dictionary(Int32, Utf8)"},` +
+	`{"column_name":"comment","data_type":"Dictionary(Int32, Utf8)"},` +
+	`{"column_name":"full_name","data_type":"Dictionary(Int32, Utf8)"},` +
 	`{"column_name":"is_answer","data_type":"Dictionary(Int32, Utf8)"},` +
 	`{"column_name":"user","data_type":"Dictionary(Int32, Utf8)"}]`
 

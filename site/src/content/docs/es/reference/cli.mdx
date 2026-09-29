@@ -35,7 +35,7 @@ ghchronicle -config /etc/ghchronicle/config.yaml
 | `-uninstall`      | ninguno       | Quita lo que esto puso y sale: `dashboard`, `data`, `state`, `all`, separados por comas; lista y no quita nada sin `-yes`                  |
 | `-yes`            | off           | Sigue adelante con `-uninstall` o `-migrate` en vez de solo listar lo que haría                                                            |
 | `-migrate`        | off           | Imprime, para cada almacén configurado, lo que una versión anterior dejó allí con una forma que esta ya no escribe y lo que haría falta para ponerlo al día, y sale; sin `-yes` no cambia nada, y con él aplica cada cambio pendiente y vuelve a leer lo que despejó |
-| `-migrate-others` | off           | Con `-migrate -yes`, aplica también un cambio a un almacén que guarda filas de cuentas que esta configuración no recoge; sin `-migrate` se rechaza con 2 |
+| `-migrate-others` | off           | Con `-migrate -yes`, aplica también un cambio a un almacén que guarda filas de cuentas que esta configuración no recoge, o cuyas filas no se pudieron comparar con ella; sin `-migrate` se rechaza con 2 |
 | `-card`           | ninguno       | Hace una pasada y escribe un SVG de resumen en esta ruta; esa pasada recoge todas las familias, digan lo que digan las cadencias          |
 | `-card-only`      | apagada       | Con `-card`, escribe el SVG y nada más: no hace falta ningún destino, no se escribe en ninguno y el fichero de estado se queda como estaba |
 | `-card-theme`     | `auto`        | `dark`, `light`, `auto` o `both`: la tarjeta clara en `-card` y la oscura a su lado con `_dark` antes de la extensión, en una sola pasada |
@@ -99,11 +99,14 @@ antiguas, el informe compara las dos y nombra lo que GitHub ya no sirve. Una
 relectura cortada guarda un punto de control propio, y la misma orden la
 retoma, aunque no quede nada por aplicar: [volver a leer el
 historial](/ghchronicle/es/install/upgrading/#volver-a-leer-el-historial). Un almacén
-que guarda filas de cuentas que esta configuración no recoge se deja sin
-aplicar salvo que se dé también `-migrate-others`. Necesita un token y la lista
-de repositorios, y se queda el fichero de estado mientras corre: con el
-servicio en marcha se niega, nombrando el proceso, y no cambia nada, así que
-para antes el servicio. Lo que aplica se registra sobre la marcha, así que
+que guarda filas de cuentas que esta configuración no recoge, o cuyas filas no
+se pudieron comparar con ella, se deja sin aplicar salvo que se dé también
+`-migrate-others`. Necesita un token y la lista de repositorios, y se queda el
+fichero de estado mientras corre: con el servicio en marcha se niega, nombrando
+el proceso, y no cambia nada, así que para antes el servicio, y pausa un cron
+que ejecute `-once`. Con el destino SQL en la salida estándar, el plan y el
+informe van a la salida de errores, así que la salida estándar es solo el
+SQL. Lo que aplica se registra sobre la marcha, así que
 volver a ejecutarlo tras un fallo sigue sin hacer nada dos veces.
 
 | Salida | Cuándo                                                                                                                |

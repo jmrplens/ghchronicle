@@ -106,11 +106,17 @@ func (s *oldComments) start(t *testing.T) string {
 		case !strings.Contains(q, "gh_discussion_comment"):
 			_, _ = io.WriteString(w, `[]`)
 		case strings.Contains(q, "information_schema.columns"):
-			_, _ = io.WriteString(w, `[{"column_name":"comment","data_type":"Dictionary(Int32, Utf8)"},`+
+			_, _ = io.WriteString(w, `[{"column_name":"author","data_type":"Dictionary(Int32, Utf8)"},`+
+				`{"column_name":"comment","data_type":"Dictionary(Int32, Utf8)"},`+
+				`{"column_name":"full_name","data_type":"Dictionary(Int32, Utf8)"},`+
 				`{"column_name":"is_answer","data_type":"Dictionary(Int32, Utf8)"},`+
 				`{"column_name":"user","data_type":"Dictionary(Int32, Utf8)"}]`)
 		case strings.HasPrefix(q, "SELECT count(*)"):
 			_, _ = io.WriteString(w, `[{"n":3,"oldest":"2023-11-14T22:13:20"}]`)
+		case strings.HasPrefix(q, `SELECT DISTINCT "full_name"`):
+			// Every comment is the account's own, which outbound reads
+			// again wherever it is.
+			_, _ = io.WriteString(w, `[]`)
 		case strings.HasPrefix(q, "SELECT DISTINCT"):
 			rows := make([]map[string]string, 0, len(s.users))
 			for _, u := range s.users {
@@ -601,5 +607,131 @@ func TestAMigrationAppliedEarlierIsForgottenByThisRunsLedger(t *testing.T) {
 	})
 	if keep, _ := ledger.Reserve("postgres", []sink.Point{comment, repo}); len(keep) != 1 || keep[0].Measurement != "gh_discussion_comment" {
 		t.Errorf("postgres after its clearing is offered %v, want the comment alone", keep)
+	}
+}
+
+// TestAOneShotRunOnANewStateFileAppliesNothingOnItsOwn: every run of the
+// Action is one, and its state file goes with its runner, and with it the
+// record that a refill is still owed: a refill that failed, or a job
+// stopped half way, left the store cleared and nothing anywhere saying so.
+// Such a start warns with the commands, and the service, whose state file
+// stays, applies what is safe on the same new state file.
+func TestAOneShotRunOnANewStateFileAppliesNothingOnItsOwn(t *testing.T) {
+	gh := fakegh.New(t, fixtures)
+	ways := &recordingWays{}
+	ways.install(t)
+	dir := t.TempDir()
+	store := &oldComments{users: []string{fakegh.Login}}
+	cfg := upgradedConfig(t, dir, gh.URL(), store.start(t), "")
+	if err := os.Remove(filepath.Join(dir, "state.json")); err != nil {
+		t.Fatal(err)
+	}
+	got := runCommand(t, "-config", cfg, "-once")
+	if got.status != notExited || len(ways.applied) != 0 {
+		t.Fatalf("-once on a new state file = %d and applied %v:\n%s", got.status, ways.applied, got.stderr)
+	}
+	if !strings.Contains(got.stderr, `msg="migration pending" sink=influxdb`) ||
+		!strings.Contains(got.stderr, "a one-shot run on a new state file applies nothing on its own") {
+		t.Errorf("the item is not said as pending, with why:\n%s", got.stderr)
+	}
+
+	// The service on a new state file: the state file stays, so it applies.
+	if err := os.Remove(filepath.Join(dir, "state.json")); err != nil {
+		t.Fatal(err)
+	}
+	ctx, stop := context.WithCancel(t.Context())
+	signalsFrom(ctx, t)
+	done := make(chan outcome, 1)
+	go func() { done <- runCommand(t, "-config", cfg) }()
+	if !waitUntil(func() bool { ways.mu.Lock(); defer ways.mu.Unlock(); return len(ways.applied) > 0 }) {
+		t.Error("the service on a new state file did not apply the safe item")
+	}
+	stop()
+	<-done
+}
+
+// TestAStartsRefillGoesBackAsBackfillRetrySays: a refill a start pays is read
+// the way a backfill is, and -backfill-retry is how long it goes back for
+// what a pass left; the start's migration used to be built without it.
+func TestAStartsRefillGoesBackAsBackfillRetrySays(t *testing.T) {
+	gh := fakegh.New(t, fixtures)
+	var retry time.Duration
+	previous := storeWays
+	storeWays = func(m migration) (map[string]migrate.Applier, migrate.Refiller) {
+		retry = m.retry
+		return map[string]migrate.Applier{}, nil
+	}
+	t.Cleanup(func() { storeWays = previous })
+	dir := t.TempDir()
+	store := &oldComments{users: []string{fakegh.Login}}
+	cfg := upgradedConfig(t, dir, gh.URL(), store.start(t), "")
+	got := runCommand(t, "-config", cfg, "-backfill", "-families", "outbound", "-backfill-since", "1d",
+		"-backfill-retry", "90m")
+	if got.status != notExited || retry != 90*time.Minute {
+		t.Errorf("-backfill -backfill-retry 90m = %d, and the start's migration was built with %s:\n%s",
+			got.status, retry, got.stderr)
+	}
+}
+
+// TestMigrateYesKeepsStandardOutputForTheSQLStream: with the SQL sink on
+// standard output, what -migrate -yes writes there is the SQL alone, the drop
+// and the rows read again, for the same pipe into psql as -once; the plan and
+// the report go to standard error.
+func TestMigrateYesKeepsStandardOutputForTheSQLStream(t *testing.T) {
+	gh := fakegh.New(t, fixtures)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "state.json"), []byte(`{"last_run":{"repo":"2026-09-27T10:00:00Z"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := writeConfig(t, dir, gh.URL(), "sinks:\n  sql:\n    path: \"-\"\n")
+	// The sink writes to the process's own standard output, which is
+	// caught here for the length of the run.
+	read, write, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	previous := os.Stdout
+	os.Stdout = write
+	streamed := make(chan string, 1)
+	go func() { b, _ := io.ReadAll(read); streamed <- string(b) }()
+	got := runCommand(t, "-config", cfg, "-migrate", "-yes")
+	os.Stdout = previous
+	_ = write.Close()
+	sql := <-streamed
+	if got.status != notExited || got.stdout != "" {
+		t.Errorf("-migrate -yes = %d, and wrote to the stream it was handed:\n%s", got.status, got.stdout)
+	}
+	if !strings.Contains(got.stderr, "what this release would change") || !strings.Contains(got.stderr, "1 applied.") {
+		t.Errorf("the plan and the report are not on standard error:\n%s", got.stderr)
+	}
+	if !strings.HasPrefix(strings.TrimSpace(sql), `DROP TABLE IF EXISTS "gh_discussion_comment";`) ||
+		strings.Contains(sql, "what this release would change") || !strings.Contains(sql, "INSERT INTO") {
+		t.Errorf("standard output is not the SQL alone:\n%s", sql)
+	}
+}
+
+// TestARunRefusesAStateFileItCannotRead: read as a first run, a state file
+// another user left unreadable forgot the refills a migration still owes,
+// and the run's first save renamed its own file over it. The run stops
+// before it builds a sink, naming the file; the dry run too, since what it
+// would say about those refills is what the file holds.
+func TestARunRefusesAStateFileItCannotRead(t *testing.T) {
+	gh := fakegh.New(t, fixtures)
+	dir := t.TempDir()
+	cfg := writeConfig(t, dir, gh.URL(), "sinks:\n  file:\n    path: "+filepath.Join(dir, "points.lp")+"\n")
+	if err := os.WriteFile(filepath.Join(dir, "state.json"), []byte(`{"last_run":`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{{"-once"}, {"-migrate"}, {"-migrate", "-yes"}} {
+		got := runCommand(t, append([]string{"-config", cfg}, args...)...)
+		if got.status != 1 || !strings.Contains(got.stderr, "state.json does not parse") {
+			t.Errorf("%v on a state file that does not parse = %d:\n%s", args, got.status, got.stderr)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(dir, "points.lp")); !os.IsNotExist(err) {
+		t.Errorf("a run on a state file it could not read wrote to a sink: %v", err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "state.json")); string(b) != `{"last_run":` {
+		t.Errorf("the state file it could not read was replaced: %s", b)
 	}
 }

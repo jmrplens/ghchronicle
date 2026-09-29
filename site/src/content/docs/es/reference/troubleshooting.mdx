@@ -141,6 +141,17 @@ sin entregárselo al uid 65532, un volumen nuevo montado en otro sitio que no se
 el que no se puede renombrar; ver [qué tiene que ser
 escribible](/ghchronicle/es/install/docker/#qué-tiene-que-ser-escribible).
 
+**`the state file ... cannot be read` o `does not parse`, y la ejecución se
+detiene.** El fichero de estado está ahí y esta ejecución no pudo leerlo, o no
+está entero. Una ejecución que escribe en los almacenes no lo toma por uno
+nuevo, lo que olvidaría las relecturas que una migración aún debe y pondría un
+fichero nuevo en su lugar en su primer guardado. Un fichero que dejó root, tras
+un `-migrate -yes` o un relleno lanzado con `sudo`, es la causa habitual:
+devuélveselo con `chown` al usuario con el que corre el colector. Si se aparta
+en su lugar, la siguiente ejecución empieza con uno nuevo, y lo que registraba,
+entre ello una relectura aún debida, se pierde; ver [el fichero de
+estado](/ghchronicle/es/configuration/#state_file).
+
 **`rate limit reserve reached, family skipped`.** Una vez está bien. En cada
 pasada significa que las cadencias son demasiado rápidas para el número de
 repositorios. Si el cubo que se queda corto es `core`, alarga `artifacts` y
@@ -165,8 +176,9 @@ despejada, ghchronicle comparó la copia de las filas antiguas con la tabla y
 encontró elementos que GitHub ya no sirve: un repositorio borrado o que ya no
 se cubre, un comentario borrado, una alerta cuya función se apagó. `first`
 nombra unos pocos, y `only_in` es la copia que aún los guarda, hasta que se
-purga 24 horas después de la migración. Traspasarlos se hace a mano, desde esa
-copia, mientras está.
+purga: un día después de la migración las de PostgreSQL y Elasticsearch, y
+cuando diga el calendario del servidor la de InfluxDB 3, 72 horas por omisión.
+Traspasarlos se hace a mano, desde esa copia, mientras está.
 
 **Un número es múltiplo del número de pasadas.** Algo que es una instantánea se
 está sumando en el tiempo. Los referrers, las rutas, las etiquetas y los hitos
@@ -272,12 +284,14 @@ log:
 
 Una familia a la que aún no le toca sencillamente no aparece.
 
-<Aside type="tip" title="Borrar el fichero de estado cuesta cuota, y una cosa más">
-  Recuerda ocho cosas, y siete de ellas solo cuestan cuota cuando se van: lo que
-  se vuelve a recoger se indexa por medida, etiquetas y marca de tiempo y
-  sobrescribe. La octava, `last_head`, es el commit desde el que arrancaba cada
-  diff de dependencias, y sin ella la pasada siguiente tiene la fotografía y no
-  el diff. Ver
+<Aside type="tip" title="Borrar el fichero de estado cuesta cuota, y dos cosas más">
+  Recuerda nueve cosas, y siete de ellas solo cuestan cuota cuando se van: lo
+  que se vuelve a recoger se indexa por medida, etiquetas y marca de tiempo y
+  sobrescribe. `last_head` es el commit desde el que arrancaba cada diff de
+  dependencias, y sin él la pasada siguiente tiene la fotografía y no el diff.
+  `stores` es lo que el fichero registra de cada almacén, entre ello una
+  relectura que una migración aún debe, y sin él nada vuelve a leer ese
+  historial hasta que lo haga un `-backfill -families`. Ver
   [el fichero de estado](/ghchronicle/es/configuration/#state_file). El fichero
   de caché que hay a su lado cuesta cuota y nada más: ver [la caché que hay a su
   lado](/ghchronicle/es/configuration/#la-caché-que-hay-a-su-lado).
@@ -424,7 +438,8 @@ instante en UTC: la tabla renombrada de PostgreSQL, el clon de Elasticsearch,
 allí en minúsculas, y el nombre que InfluxDB 3 da a una tabla que borró.
 Ninguno de los paneles que se distribuyen lee ninguna. ghchronicle purga las de
 PostgreSQL y Elasticsearch cuando llevan 24 horas guardadas, e InfluxDB 3 purga
-las suyas; `-migrate` las lista bajo su almacén como `kept aside`.
+las suyas con su propio calendario, 72 horas después del borrado por omisión;
+`-migrate` las lista bajo su almacén como `kept aside`.
 `-uninstall data` quita las de PostgreSQL y Elasticsearch con todo lo demás, y
 deja fuera las de InfluxDB 3 con una nota, porque el servidor rechaza el
 borrado de una tabla que ya ha borrado.
@@ -436,10 +451,14 @@ con una forma que esta versión ya no escribe, y este arranque no lo puso al
 día. `not_applied` dice por qué: `migrate: warn`, o un motivo por el que el
 cambio necesita la palabra de alguien, como un InfluxDB 2, cuya única vía es un
 borrado definitivo, un fichero SQL, un Graphite o un Telegraf, donde ghchronicle
-no aparta nada, filas de cuentas que esta configuración no recoge, o filas que
-volver a leer no traería de vuelta. `plan` y `apply` son las dos órdenes, y
-`first`, en el servicio, dice que lo pares antes de la segunda. Se dice en cada
-arranque hasta que el almacén se pone al día: mira
+no aparta nada, filas de cuentas que esta configuración no recoge, filas que
+volver a leer no traería de vuelta, o filas cuyas cuentas o repositorios no se
+pudieron leer, lo que un InfluxDB 3 Core que pasa de su límite de ficheros por
+consulta se niega a decir; o una ejecución de una sola vez sobre un fichero de
+estado nuevo, cada ejecución de la Action sin uno restaurado, que no aplica
+nada por su cuenta. `plan` y `apply` son las dos órdenes, y `first`, en el
+servicio, dice que lo pares antes de la segunda. Se dice en cada arranque hasta
+que el almacén se pone al día: mira
 [Migraciones](/ghchronicle/es/install/upgrading/#migraciones).
 
 **`applying a migration before the first sweep`.** No es un error. Con
@@ -479,6 +498,20 @@ junto al fichero de estado, `<nombre>-refill.json`, y `refill owed`, en [cosas
 que sí son errores](#cosas-que-sí-son-errores), es lo que dice de él un arranque
 posterior.
 
+**`the store may have been cleared, so the refill stays owed`.** Despejar el
+almacén falló de una manera que no dice si se llevó a cabo: un 502 de un proxy,
+un tiempo agotado, una conexión que se rompió después de que el almacén hiciera
+lo que se le pidió. La relectura se anotó como debida antes de tocar el almacén
+y sigue debiéndose, así que el historial se vuelve a leer ocurriera o no el
+despeje; el cambio se vuelve a preguntar en el siguiente arranque. Como mucho
+eso lee el historial una vez para nada.
+
+**`the state file records a refill owed to ... where it no longer points`.**
+Una migración despejó un almacén, la relectura no terminó, y el destino apunta
+ahora a otro almacén. El registro se conserva, y la relectura se lee la próxima
+vez que el destino apunte allí; hasta entonces nada la lee. `-migrate` la
+muestra bajo el almacén como `owed there`.
+
 **`not reconciled: the copy and the table could not be compared`.** El
 historial se volvió a leer, y la copia de las filas antiguas no se pudo leer, o
 ya tocaba purgarla. Lo que volvió está en la tabla; solo falta la lista de lo
@@ -489,7 +522,7 @@ de que una migración la apartara, ghchronicle no pudo quitar la copia de
 PostgreSQL ni borrar el clon de Elasticsearch, o no pudo preguntar al almacén
 qué copias guarda. Lo vuelve a intentar tras cada pasada y en cada arranque;
 `aside` nombra la copia, que también se puede quitar a mano. InfluxDB 3 purga
-las suyas.
+las suyas con su propio calendario.
 
 **`the cache file still claims what the cleared store held`.** Una migración no
 pudo reescribir el fichero de caché para olvidar los rechazos, y las ejecuciones

@@ -270,7 +270,10 @@ encuentran el candado que este mantiene junto al fichero de estado: con el
 servicio aún en marcha, `-migrate -yes` se niega, nombra el proceso con el
 número que le da el contenedor del propio servicio, y no cambia nada. Medido con
 dos contenedores sobre un mismo volumen con nombre: un `flock` que tenía uno se
-le negó al otro, y se le concedió en cuanto el primero se fue.
+le negó al otro, y se le concedió en cuanto el primero se fue. Un contenedor de
+una sola pasada que lanza un planificador, más abajo, no tiene ningún bloqueo
+mientras hace su pasada, así que pausa el planificador mientras duran las dos
+ejecuciones.
 
 ## Una pasada y salir
 

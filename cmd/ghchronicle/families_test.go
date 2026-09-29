@@ -72,9 +72,14 @@ func TestABackfillOfSomeFamiliesWalksThoseAlone(t *testing.T) {
 		t.Errorf("the log does not say what was walked and that it ended:\n%s", got.stderr)
 	}
 
+	asked := len(gh.Requests())
 	got = runCommand(t, "-config", cfg, "-backfill", "-families", "history")
 	if got.status != 1 || !strings.Contains(got.stderr, "this configuration switches history off") {
 		t.Errorf("a family switched off = %d:\n%s", got.status, got.stderr)
+	}
+	if n := len(gh.Requests()) - asked; n != 0 || strings.Contains(got.stderr, "migration") {
+		t.Errorf("a family switched off was refused after %d requests to GitHub and a migration check:\n%s",
+			n, got.stderr)
 	}
 }
 

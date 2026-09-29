@@ -49,7 +49,7 @@ func (p Purging) Owed() bool {
 	}
 	for _, rec := range p.State.Stores {
 		for _, a := range rec.SetAside {
-			if !p.Now.Before(a.At.Add(teardown.Grace)) {
+			if !p.Now.Before(PurgedFrom(a)) {
 				return true
 			}
 		}
@@ -85,7 +85,7 @@ func (p Purging) Run(ctx context.Context) time.Time {
 		}
 		held := p.candidates(ctx, rec, byName[st.name])
 		for _, a := range held {
-			due := a.At.Add(teardown.Grace)
+			due := PurgedFrom(a)
 			if p.Now.Before(due) {
 				if next.IsZero() || due.Before(next) {
 					next = due

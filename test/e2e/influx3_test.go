@@ -46,7 +46,9 @@ type influx3 struct {
 	mu      sync.Mutex
 	tables  map[string]*influxTable
 	deleted map[string]bool
-	sent    []string
+	// deletedAt is when each table it holds deleted was deleted.
+	deletedAt map[string]time.Time
+	sent      []string
 	// wrote is the measurement of every line a write it took carried.
 	wrote []string
 }
@@ -81,6 +83,10 @@ func (s *influx3) serve(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.sent = append(s.sent, r.Method+" "+r.URL.Path+" "+q.Get("q"))
+	if q.Get("db") == "_internal" && r.URL.Path == "/api/v3/query_sql" {
+		s.system(w, q.Get("q"))
+		return
+	}
 	if db := q.Get("db") + q.Get("bucket"); r.URL.Path != "/ping" && db != s.database {
 		http.Error(w, "database not found: "+db, http.StatusNotFound)
 		return
@@ -205,9 +211,30 @@ var (
 	queryColumns = regexp.MustCompile(`^SELECT column_name(, data_type)? FROM information_schema\.columns ` +
 		`WHERE table_schema = 'iox' AND table_name = '([^']+)'$`)
 	querySpan     = regexp.MustCompile(`^SELECT count\(\*\) AS n, min\(time\) AS oldest FROM "([^"]+)"$`)
-	queryDistinct = regexp.MustCompile(`^SELECT DISTINCT (.+) FROM "([^"]+)"( ORDER BY v)?$`)
-	selected      = regexp.MustCompile(`^"([^"]+)" AS (v\d*)$`)
+	queryDistinct = regexp.MustCompile(`^SELECT DISTINCT (.+?) FROM "([^"]+)"` +
+		`(?: WHERE "([^"]+)" IS NULL OR lower\("[^"]+"\) <> lower\('([^']*)'\))?( ORDER BY v)?$`)
+	selected = regexp.MustCompile(`^"([^"]+)" AS (v\d*)$`)
+	// querySystem is when the server purges a table it soft deleted, which
+	// 3.11.2 keeps in the system table of its _internal database.
+	querySystem = regexp.MustCompile(`^SELECT hard_deletion_time FROM system\.tables ` +
+		`WHERE database_name = '([^']+)' AND table_name = '([^']+)'$`)
 )
+
+// system answers the one question asked of _internal: the 72 hours 3.11.2
+// schedules a soft deleted table's hard deletion for (measured).
+func (s *influx3) system(w http.ResponseWriter, q string) {
+	m := querySystem.FindStringSubmatch(q)
+	if m == nil {
+		s.t.Errorf("InfluxDB 3 was asked %q of _internal, which the model does not answer", q)
+		http.Error(w, "the model does not answer this query", http.StatusBadRequest)
+		return
+	}
+	rows := []map[string]any{}
+	if at, deleted := s.deletedAt[m[2]]; deleted && m[1] == s.database {
+		rows = append(rows, map[string]any{"hard_deletion_time": at.Add(72 * time.Hour).Format(time.RFC3339)})
+	}
+	s.answer(w, rows)
+}
 
 func (s *influx3) query(w http.ResponseWriter, q string) {
 	switch {
@@ -274,6 +301,9 @@ func (s *influx3) distinct(w http.ResponseWriter, m []string) {
 	}
 	seen := map[string]map[string]any{}
 	for _, r := range table.rows {
+		if except, has := r.tags[m[3]]; m[3] != "" && has && strings.EqualFold(except, m[4]) {
+			continue
+		}
 		row := map[string]any{}
 		var key strings.Builder
 		for n, col := range cols {
@@ -316,8 +346,13 @@ func (s *influx3) delete(w http.ResponseWriter, name string) {
 	case s.tables[name] == nil:
 		http.Error(w, "Table "+name+" not in DB schema for "+s.database, http.StatusNotFound)
 	default:
-		aside := name + "-" + time.Now().UTC().Format("20060102T150405")
+		now := time.Now().UTC()
+		aside := name + "-" + now.Format("20060102T150405")
 		s.tables[aside], s.deleted[aside] = s.tables[name], true
+		if s.deletedAt == nil {
+			s.deletedAt = map[string]time.Time{}
+		}
+		s.deletedAt[aside] = now.Truncate(time.Second)
 		delete(s.tables, name)
 	}
 }

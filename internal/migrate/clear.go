@@ -32,7 +32,9 @@ func (c Clearing) Apply(ctx context.Context, it Item) (Outcome, error) {
 	}
 	aside, held, err := c.Store.Clear(ctx, m, now())
 	if err != nil {
-		return Outcome{}, err
+		// A copy the clear made before it failed is still a copy, and only
+		// the record purges it.
+		return Outcome{Aside: aside.Name, Kept: kept(it, aside)}, err
 	}
 	if c.Forget != nil {
 		c.Forget(m)
@@ -44,18 +46,39 @@ func (c Clearing) Apply(ctx context.Context, it Item) (Outcome, error) {
 	case aside.ByServer && aside.Name == "":
 		out.Did = "InfluxDB deleted the table " + m + ", and listed no copy of it afterwards"
 	case aside.ByServer:
-		out.Did = "InfluxDB set the table " + m + " aside, and purges it itself 24 hours from now"
+		out.Did = "InfluxDB set the table " + m + " aside, and purges it itself from " +
+			PurgedFrom(run.Aside{At: aside.At, ByServer: true, Until: aside.Until}).UTC().Format(timeLayout)
 	case aside.Name == "":
 		out.Did = "every row of " + m + " was deleted: InfluxDB 2 keeps no copy"
 	default:
 		out.Did = "set " + m + " aside, and ghchronicle purges the copy once 24 hours have passed"
 	}
-	if aside.Name != "" {
-		out.Kept = &run.Aside{
-			Name: aside.Name, Measurement: m, Migration: it.Migration.ID, At: aside.At, ByServer: aside.ByServer,
-		}
-	}
+	out.Kept = kept(it, aside)
 	return out, nil
+}
+
+// kept is the record of the copy a clear made, nil when it made none.
+func kept(it Item, aside teardown.Aside) *run.Aside {
+	if aside.Name == "" {
+		return nil
+	}
+	return &run.Aside{
+		Name: aside.Name, Measurement: it.Migration.Measurement, Migration: it.Migration.ID, At: aside.At,
+		ByServer: aside.ByServer, Until: aside.Until,
+	}
+}
+
+// PurgedFrom is when a copy falls due: when the store said it purges it,
+// or, where it did not say, a day after it was made for a copy ghchronicle
+// purges and InfluxDB 3's own default for one the server does.
+func PurgedFrom(a run.Aside) time.Time {
+	switch {
+	case !a.Until.IsZero():
+		return a.Until
+	case a.ByServer:
+		return a.At.Add(teardown.ServerKeeps)
+	}
+	return a.At.Add(teardown.Grace)
 }
 
 // Dropper is a sink that can write the drop of a table into what it writes.

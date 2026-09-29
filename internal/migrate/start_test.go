@@ -20,7 +20,7 @@ import (
 // log it writes to.
 func startOf(t *testing.T, auto bool) (Start, *bytes.Buffer) {
 	t.Helper()
-	in := upgradeInput(t, oldShape(), oldShape("octocat", "hubot"), nil)
+	in := upgradeInput(t, oldShape(), oldShape(), nil, "octocat", "hubot")
 	in.TrustRecord = true
 	Stamp(in.State, in.Config, in.Release)
 	var log bytes.Buffer
@@ -281,9 +281,14 @@ func (hangingStore) Describe(ctx context.Context) (string, error) {
 	return "", ctx.Err()
 }
 
-func (hangingStore) Shape(ctx context.Context, _ string, _, _ []string) (teardown.Shape, error) {
+func (hangingStore) Shape(ctx context.Context, _ string, _ []string) (teardown.Shape, error) {
 	<-ctx.Done()
 	return teardown.Shape{}, ctx.Err()
+}
+
+func (hangingStore) Spread(ctx context.Context, _ string, _ []teardown.Distinct) (teardown.Spread, error) {
+	<-ctx.Done()
+	return teardown.Spread{}, ctx.Err()
 }
 
 // TestTheRepositoryListIsReadOnlyWhenAStoreWantsIt: a start whose stores hold

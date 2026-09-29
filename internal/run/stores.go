@@ -53,7 +53,17 @@ type StoreRecord struct {
 	// exactly like one that never held the old shape: this is the only thing
 	// that says its history is still to come.
 	Refill *Refill `json:"refill,omitempty"`
+	// Former is the records of the stores this sink pointed at before, kept
+	// while they still owe something there: a refill, or a copy set aside. A
+	// record replaced for a new destination took those with it, and the
+	// store it was about was then never read back; a URL written with a
+	// trailing slash was enough. Taken back if the sink points there again.
+	Former []*StoreRecord `json:"former,omitempty"`
 }
+
+// Owes says whether the record names something still to do in its store: a
+// refill owed, or a copy set aside and not yet purged.
+func (r *StoreRecord) Owes() bool { return r != nil && (r.Refill != nil || len(r.SetAside) > 0) }
 
 // Refill is what a store is owed after a migration cleared it.
 type Refill struct {
@@ -84,6 +94,17 @@ func (r *StoreRecord) OweRefill(migration, measurement string, families []string
 	r.Refill.Families = sortedUnion(r.Refill.Families, families...)
 }
 
+// Clone is a copy of the refill, nil for none.
+func (r *Refill) Clone() *Refill {
+	if r == nil {
+		return nil
+	}
+	return &Refill{
+		Migrations: slices.Clone(r.Migrations), Families: slices.Clone(r.Families),
+		Measurements: slices.Clone(r.Measurements), Since: r.Since,
+	}
+}
+
 // sortedUnion is list with more added, sorted, each once.
 func sortedUnion(list []string, more ...string) []string {
 	out := append(slices.Clone(list), more...)
@@ -100,6 +121,9 @@ type Aside struct {
 	// ByServer says the store purges the copy itself, InfluxDB 3's soft
 	// delete, so the record is only forgotten once it falls due.
 	ByServer bool `json:"by_server,omitempty"`
+	// Until is when the store said it purges the copy itself, zero when it
+	// did not say.
+	Until time.Time `json:"until,omitzero"`
 }
 
 // KeepAside records a copy, replacing a record of the same name.

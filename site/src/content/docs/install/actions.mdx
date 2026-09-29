@@ -169,23 +169,32 @@ it downloads a release binary and calls it.
     ```
 
     It takes no card. A store holding rows of accounts this configuration does
-    not collect is held back and the step fails, since only `-migrate-others`
-    clears it, and that is a decision to take at a terminal, not in a
-    workflow. Every run of the Action starts from a new state file, so a store
-    that cannot be asked, a SQL file, a Graphite or whatever is behind a
-    Telegraf, has no history here and is never taken to need a change. A job
-    that timed out while reading the history again leaves nothing the next
-    job can resume from: run `mode: backfill` for the same configuration after
-    it.
+    not collect, or whose rows could not be compared with it, is held back and
+    the step fails, since only `-migrate-others` clears it, and that is a
+    decision to take at a terminal, not in a workflow. Without a state file
+    [restored between runs](#two-things-a-hosted-runner-does-not-keep), every
+    run of the Action starts from a new one, so a store that cannot be asked, a
+    SQL file, a Graphite or whatever is behind a Telegraf, has no history here
+    and is never taken to need a change; with one restored, those follow its
+    record as they would on a host. A job that timed out while reading the
+    history again leaves nothing the next job can resume from, since
+    `actions/cache` saves nothing for a job that did not succeed: run
+    `mode: backfill` for the same configuration after it.
 
   </TabItem>
 </Tabs>
 
-In `once` and `backfill`, a start checks the stores the same way, applies what
-is safe to apply unattended under `migrate: auto`, and warns about the rest.
-The Action turns every one of those warnings into an annotation on the run, so
-a pending change shows on the workflow's summary page rather than only in its
-log.
+In `once` and `backfill`, a start checks the stores the same way and warns
+about what is pending. On a new state file, which is every run without one
+restored, it applies nothing on its own even under `migrate: auto`: the state
+file goes with the runner, and with it the record that a refill is still owed,
+so a refill that failed or a job cancelled half way would leave a store cleared
+and nothing saying so. With a state file restored it applies what is safe to
+apply unattended, as a host does. The Action turns every line that says a
+change is pending, one was applied at the start, one failed or a refill is
+owed into an annotation on the run as the line is written, so it shows on the
+workflow's summary page rather than only in its log, a job cancelled half way
+included.
 
 ## A card in your profile README
 

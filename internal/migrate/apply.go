@@ -18,7 +18,11 @@ import (
 // the store keeps for a day to a command printed for whoever runs it.
 type Applier interface {
 	// Apply brings the item's store along, and says what it did. An error
-	// leaves the item pending, with nothing recorded.
+	// leaves the item pending. One that wraps teardown.ErrUntouched left the
+	// store as it was; any other may have changed it, and the refill
+	// recorded as owed before the attempt stays owed. An Outcome with Kept
+	// beside an error is a copy made that the state file has to name, to
+	// purge it in its turn.
 	Apply(ctx context.Context, it Item) (Outcome, error)
 }
 
@@ -130,6 +134,15 @@ func (a Applying) Apply(ctx context.Context, chosen []Chosen) (Outcomes, error) 
 }
 
 // one applies one item and records it.
+//
+// The refill is recorded as owed, and saved, before the store is touched. A
+// store cleared looks, to anyone who asks it afterwards, like one that never
+// held the old shape, so a record written after the clear is a record a kill
+// between the two, or an answer lost on the way back from a store that did
+// what it was asked, leaves unwritten, and the history is then never read
+// again. Owed first, the worst a clear that did not happen costs is a refill
+// read for nothing; and a failure the store says changed nothing takes the
+// debt back.
 func (a Applying) one(ctx context.Context, c Chosen) (Outcome, error) {
 	m := c.Item.Migration
 	failed := func(err error) (Outcome, error) {
@@ -144,37 +157,74 @@ func (a Applying) one(ctx context.Context, c Chosen) (Outcome, error) {
 	if applier == nil {
 		return failed(fmt.Errorf("this build has no way to bring %s along", c.Store))
 	}
-	out, err := applier.Apply(ctx, c.Item)
-	if err != nil {
-		return failed(err)
-	}
 	rec := a.State.Stores[c.Store]
 	if rec == nil || rec.Destination != c.Destination {
 		rec = &run.StoreRecord{Destination: c.Destination}
 		a.State.Stores[c.Store] = rec
 	}
+	owedBefore := rec.Refill.Clone()
+	if len(c.Item.Refill) > 0 {
+		rec.OweRefill(m.ID, m.Measurement, c.Item.Refill, c.Item.Since)
+		if err := a.Save(); err != nil {
+			// Nothing has been touched yet, and nothing will be: a clear
+			// whose refill the state file cannot hold is a clear nothing
+			// may read back.
+			rec.Refill = owedBefore
+			return failed(fmt.Errorf("the refill it owes could not be recorded before the store was touched: %w", err))
+		}
+	}
+	out, err := applier.Apply(ctx, c.Item)
+	if err != nil {
+		a.settleFailure(c, rec, owedBefore, out, err)
+		return failed(err)
+	}
 	rec.MarkApplied(m.ID, a.now())
 	if out.Kept != nil {
 		rec.KeepAside(*out.Kept)
 	}
-	if len(c.Item.Refill) > 0 {
-		// Owed from here: the store no longer holds the history, and the
-		// store itself cannot say so once it is cleared.
-		rec.OweRefill(m.ID, m.Measurement, c.Item.Refill, c.Item.Since)
-	}
+	// Saved before this process forgets what it wrote there: the cache
+	// file's rewrite is seconds on a large one, and the record is what a
+	// stop inside them must not lose.
+	a.save(c, m)
 	if a.Cleared != nil {
 		a.Cleared(c)
-	}
-	if err = a.Save(); err != nil {
-		// Applied and not recorded: a store that can be asked shows it
-		// cleared at the next start, a store that cannot is asked to be
-		// cleared again, and a refill cut short is not known to be owed.
-		a.Log.Error("migration applied and not recorded: the state file was not saved", "sink", c.Store,
-			"migration", m.ID, "err", err)
 	}
 	a.Log.Info("migration applied", "sink", c.Store, "measurement", m.Measurement, "migration", m.ID,
 		"did", out.Did, "aside", out.Aside)
 	return out, nil
+}
+
+// settleFailure records what a failed item leaves: the copy a failed clear
+// made, which only the record purges, and the refill, taken back when the
+// store says it was left as it was and kept owed when it cannot say, since the
+// store may have been cleared behind an answer that did not arrive.
+func (a Applying) settleFailure(c Chosen, rec *run.StoreRecord, owedBefore *run.Refill, out Outcome, err error) {
+	m := c.Item.Migration
+	if out.Kept != nil {
+		rec.KeepAside(*out.Kept)
+	}
+	switch {
+	case errors.Is(err, teardown.ErrUntouched):
+		rec.Refill = owedBefore
+	case len(c.Item.Refill) > 0:
+		a.Log.Warn("the store may have been cleared, so the refill stays owed", "sink", c.Store,
+			"measurement", m.Measurement, "migration", m.ID, "families", strings.Join(c.Item.Refill, ","))
+		if a.Cleared != nil {
+			a.Cleared(c)
+		}
+	}
+	a.save(c, m)
+}
+
+// save writes the state file after an item, and says when it could not.
+func (a Applying) save(c Chosen, m Migration) {
+	if err := a.Save(); err != nil {
+		// A store that can be asked shows it cleared at the next start, a
+		// store that cannot is asked to be cleared again; the refill owed
+		// was saved before the store was touched.
+		a.Log.Error("migration not recorded: the state file was not saved", "sink", c.Store,
+			"migration", m.ID, "err", err)
+	}
 }
 
 // now is the clock records are dated by.
@@ -236,9 +286,10 @@ func (p Plan) Unreached() []string {
 // HeldBack is why -migrate -yes left an item for -migrate-others.
 func (c Chosen) HeldBack() string {
 	if len(c.Item.Others) > 0 {
-		return fmt.Sprintf("it holds rows of %s, which this configuration does not collect", quoted(c.Item.Others))
+		return fmt.Sprintf("it holds rows of %s, which this configuration does not collect",
+			quoted(named(c.Item.Others, c.Item.Migration.Account)))
 	}
-	return "whose rows it holds could not be read"
+	return firstOf(c.Item.Unchecked, "whose rows it holds could not be read")
 }
 
 // joinReasons is a list of reasons as one attribute.

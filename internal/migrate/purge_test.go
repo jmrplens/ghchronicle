@@ -39,8 +39,9 @@ func (f *fakePurger) Purge(_ context.Context, name string) error {
 
 // TestACopyIsPurgedOnceItHasBeenKeptItsDay and not before: the record names
 // it, the store purges it, the record forgets it and is saved. A copy the
-// server purges is only forgotten, and one not yet due is when the next
-// purge is.
+// server purges is only forgotten, once the day the server named has come or,
+// where it named none, once the 72 hours InfluxDB 3 keeps one by default have
+// passed; and one not yet due is when the next purge is.
 func TestACopyIsPurgedOnceItHasBeenKeptItsDay(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -60,6 +61,11 @@ func TestACopyIsPurgedOnceItHasBeenKeptItsDay(t *testing.T) {
 	state.Stores["influxdb"].KeepAside(run.Aside{
 		Name:        "gh_discussion_comment-20261001T091004",
 		Measurement: "gh_discussion_comment", At: time.Date(2026, 10, 1, 9, 10, 4, 0, time.UTC), ByServer: true,
+		Until: time.Date(2026, 10, 2, 9, 10, 4, 0, time.UTC),
+	})
+	state.Stores["influxdb"].KeepAside(run.Aside{
+		Name:        "gh_code_scanning_alert_item-20261001T091004",
+		Measurement: "gh_code_scanning_alert_item", At: time.Date(2026, 10, 1, 9, 10, 4, 0, time.UTC), ByServer: true,
 	})
 	purger := &fakePurger{name: "postgres"}
 	es := &fakePurger{name: "elasticsearch"}
@@ -76,7 +82,10 @@ func TestACopyIsPurgedOnceItHasBeenKeptItsDay(t *testing.T) {
 	if want := time.Date(2026, 10, 3, 9, 10, 4, 0, time.UTC); !next.Equal(want) {
 		t.Errorf("next = %s, want %s", next, want)
 	}
-	if len(pg.SetAside) != 1 || state.Stores["influxdb"].SetAside != nil || saves != 1 {
+	if left := state.Stores["influxdb"].SetAside; len(left) != 1 || left[0].Measurement != "gh_code_scanning_alert_item" {
+		t.Errorf("InfluxDB's records after: %v, want the one it named no day for, not yet 72 hours old", left)
+	}
+	if len(pg.SetAside) != 1 || saves != 1 {
 		t.Errorf("records after: postgres %v, influxdb %v, %d saves", pg.SetAside, state.Stores["influxdb"].SetAside, saves)
 	}
 	if !strings.Contains(log.String(), `msg="set-aside copy purged"`) {

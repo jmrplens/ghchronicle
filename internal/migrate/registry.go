@@ -67,6 +67,12 @@ type Migration struct {
 	// Account is the tag that says whose rows these are, for telling a store
 	// this configuration alone writes from one it shares with another.
 	Account string
+	// Author is the tag that names who wrote a row, for a measurement an
+	// account-wide family writes beside a per-repository one: the rows the
+	// account wrote come back through the account-wide family wherever they
+	// are, and only the others depend on their repository still being
+	// covered. Empty for a measurement only per-repository families write.
+	Author string
 	// Item is the tags that name one item, whatever shape its rows are in:
 	// what the copy of the old rows and the table read back are compared by
 	// once a refill ends, to name the items GitHub no longer served. Empty
@@ -126,7 +132,7 @@ var Registry = []Migration{
 		Measurement: "gh_discussion_comment", Kind: Identity,
 		OldTags:  []string{"is_answer"},
 		Families: []string{"discussions", "outbound"},
-		Account:  "user", Item: []string{"comment"}, Reach: Whole,
+		Account:  "user", Author: "author", Item: []string{"comment"}, Reach: Whole,
 		Why: "is_answer was a tag, so a comment read before and after its " +
 			"acceptance is two rows at one instant",
 		Issue: "https://github.com/jmrplens/ghchronicle/issues/96",

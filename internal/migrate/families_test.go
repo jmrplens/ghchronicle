@@ -17,13 +17,32 @@ import (
 var writersOnTheFake = struct {
 	once    sync.Once
 	writers map[string][]string
+	// shapes is, per measurement and then per family that writes it, the
+	// tag keys that family alone wrote.
+	shapes map[string]map[string][]string
 }{}
 
 func familyWriters(t *testing.T) map[string][]string {
 	t.Helper()
+	sweepEachFamily(t)
+	return writersOnTheFake.writers
+}
+
+// familyShapes is, per measurement and then per family that writes it, the
+// tag keys that family alone wrote.
+func familyShapes(t *testing.T) map[string]map[string][]string {
+	t.Helper()
+	sweepEachFamily(t)
+	return writersOnTheFake.shapes
+}
+
+// sweepEachFamily sweeps the fake one family at a time, once for every test.
+func sweepEachFamily(t *testing.T) {
+	t.Helper()
 	writersOnTheFake.once.Do(func() {
 		var mu sync.Mutex
 		writers := map[string][]string{}
+		byFamily := map[string]map[string][]string{}
 		t.Run("sweep", func(t *testing.T) {
 			for _, family := range fakegh.Families() {
 				t.Run(family, func(t *testing.T) {
@@ -31,8 +50,12 @@ func familyWriters(t *testing.T) map[string][]string {
 					shapes := sweepFake(t, []string{family})
 					mu.Lock()
 					defer mu.Unlock()
-					for m := range shapes {
+					for m, tags := range shapes {
 						writers[m] = append(writers[m], family)
+						if byFamily[m] == nil {
+							byFamily[m] = map[string][]string{}
+						}
+						byFamily[m][family] = tags
 					}
 				})
 			}
@@ -40,12 +63,36 @@ func familyWriters(t *testing.T) map[string][]string {
 		for m := range writers {
 			slices.Sort(writers[m])
 		}
-		writersOnTheFake.writers = writers
+		writersOnTheFake.writers, writersOnTheFake.shapes = writers, byFamily
 	})
 	if writersOnTheFake.writers == nil {
 		t.Fatal("the per-family sweep of the fake did not complete")
 	}
-	return writersOnTheFake.writers
+}
+
+// TestEveryFamilyWritesAMeasurementInOneShape: identity.json holds each
+// measurement's tag keys over the whole sweep, the union of what every family
+// writing it wrote, so one of two families dropping a tag leaves the union as
+// it was and passes the gate, while the same item reached by both walks is
+// two series. gh_discussion_comment is written by discussions and outbound,
+// gh_contribution_day by account and history: measured, removing own from
+// outbound's comments, or user from history's days, passed every test of this
+// package before this one.
+func TestEveryFamilyWritesAMeasurementInOneShape(t *testing.T) {
+	shapes := familyShapes(t)
+	for _, m := range slices.Sorted(maps.Keys(shapes)) {
+		first := ""
+		for _, family := range slices.Sorted(maps.Keys(shapes[m])) {
+			if first == "" {
+				first = family
+				continue
+			}
+			if tags := shapes[m][family]; !slices.Equal(tags, shapes[m][first]) {
+				t.Errorf("%s is written by %s with the tags %v and by %s with %v: the same item read by both is "+
+					"two series", m, first, shapes[m][first], family, tags)
+			}
+		}
+	}
 }
 
 // TestEveryMigrationNamesEveryFamilyThatWritesIt holds each entry's Families

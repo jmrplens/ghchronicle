@@ -197,12 +197,17 @@ func (p *postgres) Items(ctx context.Context, table string, tags []string) ([]st
 // itemPage is how many items one composite aggregation page asks for.
 const itemPage = 1000
 
-// Items pages a composite aggregation over the keyword sub-field dynamic
-// mapping gives every string, which is the one way to have every distinct
-// combination rather than the top few. The index is refreshed first: the
-// sink does not wait for a refresh, and a document written a moment ago is
-// not searchable until one, so a comparison straight after a refill would
-// name items that are there.
+// Items pages a composite aggregation over the field the mapping makes
+// aggregatable for each tag (see Spread), which is the one way to have every
+// distinct combination rather than the top few. The index is refreshed
+// first: the sink does not wait for a refresh, and a document written a
+// moment ago is not searchable until one, so a comparison straight after a
+// refill would name items that are there.
+//
+// The buckets are held to the count of the documents that hold every tag,
+// for the reason Spread holds its own: an aggregation over a field that is
+// not there answers nothing and no error, and a copy read as holding no item
+// would say GitHub served every one again.
 func (e *elastic) Items(ctx context.Context, table string, tags []string) ([]string, error) {
 	// A copy is named by its whole index, prefix and all, as Clear named it;
 	// a measurement by itself, as everywhere else.
@@ -225,64 +230,94 @@ func (e *elastic) Items(ctx context.Context, table string, tags []string) ([]str
 	if err != nil {
 		return nil, err
 	}
+	all := make([]any, 0, len(tags))
 	for _, t := range tags {
-		n, _, countErr := e.count(ctx, endpoint, map[string]any{"exists": map[string]string{"field": t}})
+		exists := map[string]any{"exists": map[string]string{"field": t}}
+		n, _, countErr := e.count(ctx, endpoint, exists)
 		if countErr != nil {
 			return nil, countErr
 		}
 		if n == 0 && total > 0 {
 			return nil, fmt.Errorf("%s has no %s", index, t)
 		}
+		all = append(all, exists)
 	}
-	return e.composite(ctx, endpoint, tags)
+	holding, _, err := e.count(ctx, endpoint, map[string]any{"bool": map[string]any{"filter": all}})
+	if err != nil {
+		return nil, err
+	}
+	fields, err := e.keywordFields(ctx, endpoint, tags)
+	if err != nil {
+		return nil, err
+	}
+	sources := make([]string, len(tags))
+	for n, t := range tags {
+		field, ok := fields[t]
+		if !ok {
+			return nil, fmt.Errorf("%s: %s is mapped as neither a keyword nor text with a keyword sub-field, "+
+				"so its values cannot be aggregated", index, t)
+		}
+		sources[n] = field
+	}
+	items, read, err := e.composite(ctx, endpoint, sources)
+	if err != nil {
+		return nil, err
+	}
+	if read < holding {
+		return nil, fmt.Errorf("%s: %d of the %d documents that hold %s have no value in %s, which the mapping "+
+			"or an ignore_above keeps out of them", index, holding-read, holding, strings.Join(tags, " and "),
+			strings.Join(sources, " and "))
+	}
+	return items, nil
 }
 
 // composite walks the aggregation's pages until one comes back without an
-// after_key, which is the last.
-func (e *elastic) composite(ctx context.Context, endpoint string, tags []string) ([]string, error) {
-	sources := make([]map[string]any, len(tags))
-	for n, t := range tags {
-		sources[n] = map[string]any{"v" + strconv.Itoa(n): map[string]any{"terms": map[string]string{"field": t + ".keyword"}}}
+// after_key, which is the last, and counts the documents its buckets hold.
+func (e *elastic) composite(ctx context.Context, endpoint string, fields []string) (items []string, read int64, err error) {
+	sources := make([]map[string]any, len(fields))
+	for n, f := range fields {
+		sources[n] = map[string]any{"v" + strconv.Itoa(n): map[string]any{"terms": map[string]string{"field": f}}}
 	}
-	var out []string
 	var after map[string]any
 	for {
 		composite := map[string]any{"size": itemPage, "sources": sources}
 		if after != nil {
 			composite["after"] = after
 		}
-		payload, err := json.Marshal(map[string]any{"size": 0, "aggs": map[string]any{
+		payload, marshalErr := json.Marshal(map[string]any{"size": 0, "aggs": map[string]any{
 			"items": map[string]any{"composite": composite},
 		}})
-		if err != nil {
-			return nil, err
+		if marshalErr != nil {
+			return nil, 0, marshalErr
 		}
-		res, err := e.read(ctx, endpoint+"/_search", payload)
-		if err != nil {
-			return nil, err
+		res, readErr := e.read(ctx, endpoint+"/_search", payload)
+		if readErr != nil {
+			return nil, 0, readErr
 		}
 		var page struct {
 			Aggs struct {
 				Items struct {
 					After   map[string]any `json:"after_key"`
 					Buckets []struct {
-						Key map[string]any `json:"key"`
+						Key  map[string]any `json:"key"`
+						Rows int64          `json:"doc_count"`
 					} `json:"buckets"`
 				} `json:"items"`
 			} `json:"aggregations"`
 		}
 		if err = json.Unmarshal(res.body, &page); err != nil {
-			return nil, fmt.Errorf("reading the aggregation: %w", err)
+			return nil, 0, fmt.Errorf("reading the aggregation: %w", err)
 		}
 		for _, b := range page.Aggs.Items.Buckets {
-			values := make([]string, len(tags))
-			for n := range tags {
+			values := make([]string, len(fields))
+			for n := range fields {
 				values[n] = fmt.Sprint(b.Key["v"+strconv.Itoa(n)])
 			}
-			out = append(out, strings.Join(values, " "))
+			items = append(items, strings.Join(values, " "))
+			read += b.Rows
 		}
 		if page.Aggs.Items.After == nil || len(page.Aggs.Items.Buckets) == 0 {
-			return sortedItems(out), nil
+			return sortedItems(items), read, nil
 		}
 		after = page.Aggs.Items.After
 	}

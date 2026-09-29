@@ -219,8 +219,13 @@ unit does, so it stays mode 600, and runs the binary as `ghchronicle`: measured
 on systemd 257, a command started that way saw the token of a file only root
 could read and ran as the user named. Run by root instead, `-migrate -yes`
 saves the files it rewrites beside the state file as root's, mode 600,
-`state.json` among them, and the service, which runs as `ghchronicle`, can no
-longer read what it remembers.
+`state.json` among them, and the service, which runs as `ghchronicle`, then
+stops at its start and names the file rather than start from a new one, which
+would forget a refill still owed: `chown ghchronicle:ghchronicle` it back.
+
+With `-once` run from cron rather than a service, comment the line out for the
+length of the two commands: a `-once` holds no lock while it sweeps, so nothing
+stops it running beside `-migrate -yes`.
 
 ## cron instead of a service
 

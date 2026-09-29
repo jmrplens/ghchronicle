@@ -2,7 +2,9 @@ package teardown
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -46,9 +48,28 @@ func (q *requests) changes() []string {
 }
 
 // influx3Tables is an InfluxDB 3 whose catalog lists tables, and which does
-// to a deleted table what 3.11.2 does: renames it <name>-<instant> and keeps
-// listing it.
+// to a deleted table what 3.11.2 does: renames it <name>-<instant>, keeps
+// listing it, and schedules its hard deletion 72 hours later in the system
+// table of its _internal database.
 func influx3Tables(t *testing.T, q *requests, tables ...string) *config.InfluxSink {
+	t.Helper()
+	return influx3Deleting(t, q, deleteAnswers, tables...)
+}
+
+// How an InfluxDB 3 answers a delete of a table.
+const (
+	// deleteAnswers carries it out and says so.
+	deleteAnswers = iota
+	// deleteLies carries it out and answers 502, as a proxy in front of it
+	// does when the server takes longer than it waits.
+	deleteLies
+	// deleteFails answers 500 and carries out nothing.
+	deleteFails
+	// deleteRefused answers 403, as it does to a token that may not delete.
+	deleteRefused
+)
+
+func influx3Deleting(t *testing.T, q *requests, answer int, tables ...string) *config.InfluxSink {
 	t.Helper()
 	var mu sync.Mutex
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -61,11 +82,27 @@ func influx3Tables(t *testing.T, q *requests, tables ...string) *config.InfluxSi
 		case r.Method == http.MethodDelete && r.URL.Path == "/api/v3/configure/table":
 			name := r.URL.Query().Get("table")
 			i := slices.Index(tables, name)
-			if i < 0 {
+			switch {
+			case answer == deleteRefused:
+				w.WriteHeader(http.StatusForbidden)
+				return
+			case answer == deleteFails:
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			case i < 0:
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}
 			tables[i] = name + "-20260929T101012"
+			if answer == deleteLies {
+				w.WriteHeader(http.StatusBadGateway)
+			}
+		case r.URL.Path == "/api/v3/query_sql" && r.URL.Query().Get("db") == "_internal":
+			if !strings.Contains(r.URL.Query().Get("q"), "table_name = 'gh_discussion_comment-20260929T101012'") {
+				_, _ = io.WriteString(w, `[]`)
+				return
+			}
+			_, _ = io.WriteString(w, `[{"hard_deletion_time":"2026-10-02T10:10:12Z"}]`)
 		case r.URL.Path == "/api/v3/query_sql":
 			rows := []map[string]string{}
 			for _, name := range tables {
@@ -96,12 +133,45 @@ func TestInfluxDB3SetsATableAsideByDeletingIt(t *testing.T) {
 	want := Aside{
 		Name: "gh_discussion_comment-20260929T101012", Measurement: "gh_discussion_comment",
 		At: time.Date(2026, 9, 29, 10, 10, 12, 0, time.UTC), ByServer: true,
+		Until: time.Date(2026, 10, 2, 10, 10, 12, 0, time.UTC),
 	}
 	if aside != want {
 		t.Errorf("aside = %+v, want %+v", aside, want)
 	}
 	if got := q.changes(); !slices.Equal(got, []string{"DELETE /api/v3/configure/table?db=github&table=gh_discussion_comment"}) {
 		t.Errorf("it changed %v, want the one table deleted", got)
+	}
+}
+
+// TestADeleteWhoseAnswerDidNotArriveIsReadBack: a delete InfluxDB carried
+// out behind an answer that says otherwise is a table set aside, and one it
+// turned down, or did not carry out, left the store as it was; only the
+// first may owe a refill.
+func TestADeleteWhoseAnswerDidNotArriveIsReadBack(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name    string
+		answer  int
+		applied bool
+	}{
+		{"carried out behind a 502", deleteLies, true},
+		{"not carried out", deleteFails, false},
+		{"refused", deleteRefused, false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			store := &influx{sink: influx3Deleting(t, &requests{}, c.answer, "gh_discussion_comment")}
+			aside, held, err := store.Clear(t.Context(), "gh_discussion_comment", clearedAt)
+			if c.applied {
+				if err != nil || !held || aside.Name != "gh_discussion_comment-20260929T101012" {
+					t.Errorf("a delete carried out reads as %+v, %v, %v", aside, held, err)
+				}
+				return
+			}
+			if !errors.Is(err, ErrUntouched) || aside.Name != "" {
+				t.Errorf("a delete not carried out reads as %+v, %v, want the store left as it was", aside, err)
+			}
+		})
 	}
 }
 
@@ -169,6 +239,12 @@ type elasticIndices struct {
 	blocked map[string]bool
 	// short makes a clone hold one document fewer than its source.
 	short bool
+	// deleting is how a delete of an index is answered, one of the
+	// delete constants above; blind makes every count fail once an index
+	// has been deleted.
+	deleting int
+	blind    bool
+	deleted  bool
 }
 
 func (e *elasticIndices) serve(t *testing.T, q *requests) *config.ElasticsearchSink {
@@ -181,6 +257,8 @@ func (e *elasticIndices) serve(t *testing.T, q *requests) *config.ElasticsearchS
 		index := parts[0]
 		n, found := e.docs[index]
 		switch {
+		case e.blind && e.deleted && len(parts) == 2 && parts[1] == "_count":
+			w.WriteHeader(http.StatusServiceUnavailable)
 		case index == "_cat":
 			var rows []map[string]string
 			for name := range e.docs {
@@ -190,7 +268,7 @@ func (e *elasticIndices) serve(t *testing.T, q *requests) *config.ElasticsearchS
 		case !found:
 			w.WriteHeader(http.StatusNotFound)
 		case len(parts) == 1 && r.Method == http.MethodDelete:
-			delete(e.docs, index)
+			e.delete(w, index)
 		case parts[1] == "_count":
 			_ = json.NewEncoder(w).Encode(map[string]int{"count": n})
 		case parts[1] == "_block":
@@ -209,6 +287,23 @@ func (e *elasticIndices) serve(t *testing.T, q *requests) *config.ElasticsearchS
 	}))
 	t.Cleanup(srv.Close)
 	return &config.ElasticsearchSink{URL: srv.URL, Prefix: "ghchronicle"}
+}
+
+// delete answers a delete of an index the way deleting says: an index, as
+// against a clone, whose delete fails is left, and one whose delete lies is
+// gone behind a 502.
+func (e *elasticIndices) delete(w http.ResponseWriter, index string) {
+	source := !strings.Contains(index, "-2026")
+	if source && e.deleting == deleteFails {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	delete(e.docs, index)
+	delete(e.blocked, index)
+	e.deleted = true
+	if source && e.deleting == deleteLies {
+		w.WriteHeader(http.StatusBadGateway)
+	}
 }
 
 // TestElasticsearchClonesTheIndexAsideAndDeletesIt, in that order: no more
@@ -263,6 +358,56 @@ func TestAnIndexThatCouldNotBeClonedTakesWritesAgain(t *testing.T) {
 	}
 	if es.docs["ghchronicle-gh_discussion_comment"] != 3 || len(es.docs) != 1 || es.blocked["ghchronicle-gh_discussion_comment"] {
 		t.Errorf("after a failed clone: indices %v, blocked %v", es.docs, es.blocked)
+	}
+}
+
+// TestADeleteOfAnIndexIsLookedAtBeforeAnythingIsUndone: a delete the
+// cluster carried out behind a 502 is a clear, and the clone is the one copy
+// of the rows, so it is kept; a delete that did not happen leaves the index
+// taking writes and the clone purged; and one nobody can tell about keeps
+// the clone, named, and is not said to have left the store as it was.
+//
+// Measured on 9.5.3 before this: through a proxy that answered 502 to the
+// delete the cluster carried out, Clear purged the clone, and neither the
+// index nor its copy was left.
+func TestADeleteOfAnIndexIsLookedAtBeforeAnythingIsUndone(t *testing.T) {
+	t.Parallel()
+	const index, clone = "ghchronicle-gh_discussion_comment", "ghchronicle-gh_discussion_comment-20260929t101010"
+	for _, c := range []struct {
+		name     string
+		deleting int
+		blind    bool
+		want     map[string]int
+		applied  bool
+		touched  bool
+	}{
+		{"carried out behind a 502", deleteLies, false, map[string]int{clone: 3}, true, true},
+		{"not carried out", deleteFails, false, map[string]int{index: 3}, false, false},
+		{"not known", deleteLies, true, map[string]int{clone: 3}, false, true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			es := &elasticIndices{docs: map[string]int{index: 3}, blocked: map[string]bool{}, deleting: c.deleting, blind: c.blind}
+			store := &elastic{sink: es.serve(t, &requests{})}
+			aside, held, err := store.Clear(t.Context(), "gh_discussion_comment", clearedAt)
+			switch {
+			case !held:
+				t.Errorf("an index that was there reads as not held")
+			case c.applied && (err != nil || aside.Name != clone):
+				t.Errorf("a delete carried out reads as %+v, %v", aside, err)
+			case !c.applied && err == nil:
+				t.Errorf("a delete not known to be carried out reads as done")
+			case !c.applied && errors.Is(err, ErrUntouched) == c.touched:
+				t.Errorf("untouched is %v, want %v: %v", errors.Is(err, ErrUntouched), !c.touched, err)
+			case c.touched && aside.Name != clone:
+				t.Errorf("the clone kept is not named: %+v", aside)
+			}
+			es.mu.Lock()
+			defer es.mu.Unlock()
+			if !maps.Equal(es.docs, c.want) || es.blocked[index] {
+				t.Errorf("indices after = %v, blocked %v, want %v", es.docs, es.blocked, c.want)
+			}
+		})
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -143,9 +144,14 @@ func (e *elastic) Name() string { return "elasticsearch" }
 
 // Holds lists the indices under the sink's prefix. The prefix is what the sink
 // writes under, so an index outside it was not put there by this.
+//
+// In lower case, as the sink writes it: an index name may not carry an
+// upper-case letter, and _cat/indices matches case and all, so a prefix
+// configured as Rev96Up listed nothing (measured on 9.5.3) and a copy set
+// aside under it was never found to be purged.
 func (e *elastic) Holds(ctx context.Context) ([]string, error) {
 	endpoint := strings.TrimSuffix(e.sink.URL, "/") + "/_cat/indices/" +
-		url.PathEscape(e.sink.Prefix+"*") + "?format=json&h=index"
+		url.PathEscape(e.prefix()+"*") + "?format=json&h=index"
 	body, status, err := e.call(ctx, http.MethodGet, endpoint,
 		map[int]bool{http.StatusNotFound: true})
 	if err != nil {
@@ -173,13 +179,16 @@ func (e *elastic) Holds(ctx context.Context) ([]string, error) {
 
 // Drop deletes one index.
 func (e *elastic) Drop(ctx context.Context, item string) error {
-	if e.sink.Prefix == "" || !strings.HasPrefix(item, e.sink.Prefix) {
-		return fmt.Errorf("%s is not under the sink's prefix %q", item, e.sink.Prefix)
+	if e.sink.Prefix == "" || !strings.HasPrefix(item, e.prefix()) {
+		return fmt.Errorf("%s is not under the sink's prefix %q", item, e.prefix())
 	}
 	endpoint := strings.TrimSuffix(e.sink.URL, "/") + "/" + url.PathEscape(item)
 	_, _, err := e.call(ctx, http.MethodDelete, endpoint, map[int]bool{http.StatusNotFound: true})
 	return err
 }
+
+// prefix is the sink's prefix as its index names carry it.
+func (e *elastic) prefix() string { return strings.ToLower(e.sink.Prefix) }
 
 func (e *elastic) call(ctx context.Context, method, endpoint string,
 	tolerate map[int]bool,
@@ -291,7 +300,24 @@ func exchange(ctx context.Context, r request, tolerate map[int]bool) (answer, er
 		out.body = body
 		return out, nil
 	}
-	return out, fmt.Errorf("%s: %s", res.Status, trim(string(body)))
+	return out, &statusError{status: res.StatusCode, text: res.Status + ": " + trim(string(body))}
+}
+
+// statusError is a store's answer outside 2xx, with the store's own
+// complaint.
+type statusError struct {
+	status int
+	text   string
+}
+
+func (e *statusError) Error() string { return e.text }
+
+// refused says whether a store turned a request down: a 4xx is an answer
+// about the request, given before anything was done, where a 5xx or a
+// connection that broke says nothing about whether it was.
+func refused(err error) bool {
+	var s *statusError
+	return errors.As(err, &s) && s.status >= 400 && s.status < 500
 }
 
 // complaint is how much of a store's complaint an error carries: one line's

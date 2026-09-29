@@ -274,7 +274,8 @@ of.
 >
 > This is the usual cause of `influx write: 400`. The delete does not destroy the
 > table at once: InfluxDB renames it `<name>-<instant>`, keeps it queryable and
-> purges it 24 hours later, and the name takes new writes straight away. For the
+> purges it 72 hours later by default, and the name takes new writes straight
+> away. For the
 > changes the binary knows of, `-migrate -yes` sends it: see below.
 
 ### Rejected lines
@@ -320,14 +321,26 @@ the instant in UTC, for example `gh_discussion_comment-20261001T091004`, stays
 listed and answers queries under that name, and the next write under the old
 name creates the table afresh, in the new shape, even where a column changes
 from a tag to a field. The binary reads the name back from the catalog, prints
-it, and keeps it in the state file. From 3.4.0 the server purges the copy 24
-hours after the delete; 3.0.0 has no purge at all, and the plan says so for a
-server older than 3.4.0. Nothing else can purge it: a delete of the renamed
-table is answered with a 409, with or without `hard_delete_at`, so ghchronicle
-forgets the copy once its day is over and leaves it to the server.
-`hard_delete_at` is never sent: measured on 3.11.5, `now` had not removed the
-rows eleven minutes later, and it takes the day to undo the change away. Until
-then the copy's rows can be read with SQL and written back through the sink.
+it, and keeps it in the state file, with when the server has scheduled its
+hard deletion, read from the system table of its `_internal` database. That is
+72 hours after the delete (measured on 3.11.2 and 3.11.5), and the server keeps
+the name in its catalog for its `--delete-grace-period` after that, 24 hours by
+default; where the time cannot be read, 72 hours is assumed. 3.0.0 has no purge
+at all, and the plan says so for a server older than 3.4.0. Nothing else can
+purge it: a delete of the renamed table is answered with a 409, with or without
+`hard_delete_at`, so ghchronicle forgets the copy once the server's time for it
+has come and leaves it to the server. `hard_delete_at` is never sent: measured
+on 3.11.5, `now` had not removed the rows eleven minutes later, and it takes
+the days to undo the change away. Until then the copy's rows can be read with
+SQL and written back through the sink.
+
+InfluxDB 3 Core refuses a query that would open more Parquet files than its
+`--query-file-limit`, 432 by default, which a table written every ten minutes
+passes in days. The check reads the catalog, which opens none, and counts the
+rows only of a table that holds the old tag; a count Core refuses leaves the
+refill with no bound, and a refused read of whose rows the table holds leaves
+the change needing your word, the refusal quoted in the plan. See [the query
+file limit](https://jmrp.io/docs/ghchronicle/install/upgrading/#influxdb-3-cores-query-file-limit).
 
 The token has to be allowed to delete a table. A refused delete leaves the
 change pending, and the error names the same request to send by hand.
@@ -851,6 +864,22 @@ where nothing is kept aside, so a start never applies it on its own; `-migrate
 still meets the old table, and a rotation that deletes that file before it was
 replayed takes the drop with it.
 
+With `path: "-"` the drop and the rows read again go to standard output, and
+`-migrate -yes` prints its plan and its report on standard error, so standard
+output is the SQL alone and takes the same pipe as `-once`:
+
+```sh
+ghchronicle -config config.yaml -migrate -yes | psql "$DATABASE_URL"
+```
+
+**Measured with psql against PostgreSQL 18.6**: piped this way, the table
+2.6.0 made was dropped and made again with the new key, holding the comments
+read again. Before, the plan went first on the same stream, psql read its first
+line as the start of a statement and lost the drop with it, and the target kept
+the old table while the state file recorded the change as applied. Run without
+the pipe, the SQL goes to the terminal and nowhere else, and the change is
+still recorded as applied.
+
 ### TimescaleDB
 
 Turn each table into a hypertable once it exists. The primary key already
@@ -1166,7 +1195,9 @@ The sink creates no index template. Dynamic mapping gives every string field a
 
 If you want explicit mappings, create the index templates before the first
 write. Nothing in the sink depends on them; only the panels' choice of
-`.keyword` does.
+`.keyword` does. [`-migrate`](https://jmrp.io/docs/ghchronicle/sinks/elasticsearch/#what-a-migration-does-here) reads the mapping
+before it asks whose rows an index holds, so a template that maps strings as
+`keyword`, with no `.keyword` sub-field, is read from the field itself.
 
 ### The dashboard
 
@@ -1204,9 +1235,24 @@ change sets the index aside in three steps. **Measured against Elasticsearch
 3. The index is deleted, and the sink's next write creates it again, with a
    mapping of its own.
 
+Before the change is applied, the plan asks whose rows the index holds and
+which repositories they belong to, with a terms aggregation on whatever field
+the mapping makes aggregatable: the `.keyword` sub-field dynamic mapping gives a
+string, or the field itself where a template maps it as `keyword`. The buckets
+have to add up to every document that holds the field, or the answer is not
+taken: measured on 9.5.3, an aggregation on `user.keyword` over an index whose
+template mapped `user` as `keyword` answered no buckets and no error, which
+read as an index holding nobody else's rows, and a value past the sub-field's
+`ignore_above` is in no bucket either. A document without the field is a row
+that names nobody, which the plan says as such.
+
 A step that fails before the delete takes the write block off again, so a
 cluster that refused the clone goes on taking the sink's writes, and the
-change stays pending with the cluster's reason. The API key needs the
+change stays pending with the cluster's reason. A delete that fails is looked
+at again before anything is undone: measured through a proxy that answered 502
+to a delete the cluster carried out, the index was gone, so the clone, the one
+copy of its documents, is kept and the change recorded as applied; only an
+index still there has its block taken off and its clone deleted. The API key needs the
 `manage` and `delete_index` privileges on the prefix's indices; a key that can
 only write is refused that way.
 

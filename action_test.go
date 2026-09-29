@@ -914,8 +914,11 @@ func actionStep(t *testing.T, name string) string {
 // TestTheActionsRunStepAnnotatesAPendingMigrationAndKeepsTheStatus: a start
 // that leaves a migration pending logs a warning, and the Run step turns each
 // into an annotation on the run, escaped the way a workflow command reads
-// one; the binary's output still reaches the step's log, and its exit status
-// is the step's.
+// one; so does a migration a start applies, and a refill left owed, each
+// right after its line rather than once the binary has ended, since a job
+// stopped while a start reads back what it cleared never gets there. The
+// binary's output still reaches the step's log, and its exit status is the
+// step's.
 func TestTheActionsRunStepAnnotatesAPendingMigrationAndKeepsTheStatus(t *testing.T) {
 	if _, err := exec.LookPath("bash"); err != nil {
 		t.Skip("the Action's steps run in bash, and there is none here")
@@ -927,7 +930,10 @@ func TestTheActionsRunStepAnnotatesAPendingMigrationAndKeepsTheStatus(t *testing
 	stubDir := t.TempDir()
 	pending := `level=WARN msg="migration pending" sink=graphite migration=2.6.1/gh_discussion_comment/is_answer ` +
 		`why="100% of it"`
-	body := "#!/usr/bin/env bash\necho 'level=INFO msg=\"sweep finished\"'\necho '" + pending + "' >&2\nexit 3\n"
+	applying := `level=WARN msg="applying a migration before the first sweep" sink=influxdb`
+	owed := `level=ERROR msg="refill did not finish, and is still owed" sinks=influxdb`
+	body := "#!/usr/bin/env bash\necho 'level=INFO msg=\"sweep finished\"'\necho '" + pending + "' >&2\n" +
+		"echo '" + applying + "' >&2\necho '" + owed + "' >&2\nexit 3\n"
 	if err = os.WriteFile(filepath.Join(stubDir, "ghchronicle"), []byte(body), stubMode); err != nil {
 		t.Fatal(err)
 	}
@@ -939,9 +945,17 @@ func TestTheActionsRunStepAnnotatesAPendingMigrationAndKeepsTheStatus(t *testing
 	if status := cmd.ProcessState.ExitCode(); status != 3 {
 		t.Errorf("exit %d, want the binary's 3:\n%s", status, out)
 	}
-	annotation := "::warning title=ghchronicle migration pending::" + strings.ReplaceAll(pending, "%", "%25") + "\n"
-	if !strings.Contains(string(out), annotation) || strings.Count(string(out), "::warning") != 1 {
-		t.Errorf("want one annotation %q in:\n%s", annotation, out)
+	for _, want := range []string{
+		pending + "\n::warning title=ghchronicle migration pending::" + strings.ReplaceAll(pending, "%", "%25") + "\n",
+		applying + "\n::warning title=ghchronicle migration applied at the start::" + applying + "\n",
+		owed + "\n::warning title=ghchronicle refill owed::" + owed + "\n",
+	} {
+		if !strings.Contains(string(out), want) {
+			t.Errorf("want the line and its annotation %q in:\n%s", want, out)
+		}
+	}
+	if n := strings.Count(string(out), "::warning"); n != 3 {
+		t.Errorf("%d annotations, want one for each of the three lines:\n%s", n, out)
 	}
 	if !strings.Contains(string(out), `msg="sweep finished"`) || !strings.Contains(string(out), pending+"\n") {
 		t.Errorf("the binary's own output did not reach the step's log:\n%s", out)

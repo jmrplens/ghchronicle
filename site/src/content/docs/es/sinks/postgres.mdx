@@ -213,6 +213,22 @@ solo, sin el que lleva el borrado, sigue encontrando la tabla antigua, y una
 rotación que borra ese fichero antes de reproducirlo se lleva el borrado con
 él.
 
+Con `path: "-"` el borrado y las filas releídas van a la salida estándar, y
+`-migrate -yes` imprime su plan y su informe en la salida de errores, así que
+la salida estándar es solo el SQL y admite la misma tubería que `-once`:
+
+```sh
+ghchronicle -config config.yaml -migrate -yes | psql "$DATABASE_URL"
+```
+
+**Medido con psql contra PostgreSQL 18.6**: por esa tubería, la tabla que hizo
+la 2.6.0 se borró y se volvió a crear con la clave nueva, con los comentarios
+releídos. Antes, el plan iba primero por el mismo flujo, psql leía su primera
+línea como el comienzo de una sentencia y perdía el borrado con ella, y el
+destino conservaba la tabla antigua mientras el fichero de estado registraba el
+cambio como aplicado. Ejecutado sin la tubería, el SQL va a la terminal y a
+ningún otro sitio, y el cambio igualmente se registra como aplicado.
+
 ## TimescaleDB
 
 Convierte cada tabla en hypertable una vez exista. La clave primaria ya incluye

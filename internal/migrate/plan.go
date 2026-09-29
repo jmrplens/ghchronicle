@@ -74,19 +74,21 @@ type Item struct {
 	// Lost is what a refill cannot bring back, one sentence each.
 	Lost []string
 	// Others is the accounts whose rows the store holds and this
-	// configuration does not collect, and AccountsChecked whether the store
-	// could be compared with the configuration at all: a store that can be
-	// asked and was not is no more known to be this configuration's alone
-	// than one that holds somebody else's rows.
+	// configuration does not collect, the empty string for rows that name no
+	// account, and AccountsChecked whether the store could be compared with
+	// the configuration at all: a store that can be asked and was not is no
+	// more known to be this configuration's alone than one that holds
+	// somebody else's rows. Unchecked is why it was not.
 	Others          []string
 	AccountsChecked bool
+	Unchecked       string
 	// Recorded says the record settled the item and the store was not asked.
 	// Asked says the store was asked, which is the only kind of store whose
 	// rows can be told apart by account.
 	Recorded bool
 	Asked    bool
 	// Safe says applying needs nobody's word: GitHub serves the whole
-	// history, the old rows are set aside for 24 hours rather than
+	// history, the old rows are set aside for at least 24 hours rather than
 	// destroyed, and every row is this configuration's. Unsafe is why not.
 	Safe   bool
 	Unsafe []string
@@ -109,6 +111,10 @@ type StorePlan struct {
 	// Owed is the history a migration cleared here and has not read back,
 	// nil when there is none.
 	Owed *run.Refill
+	// Elsewhere is the records of the stores this sink pointed at before
+	// that still owe a refill there, which nothing reads while it points
+	// here.
+	Elsewhere []*run.StoreRecord
 }
 
 // Plan is every configured store and what this release would change in it.
@@ -228,8 +234,17 @@ func (in *Input) plan(ctx context.Context, st store, asker teardown.Inspector) S
 		sp.Quiet = st.quiet
 		return sp
 	}
-	if rec := in.State.Stores[st.name]; rec != nil && rec.Destination == st.destination {
-		sp.Kept, sp.Owed = rec.SetAside, rec.Refill
+	if rec := in.State.Stores[st.name]; rec != nil {
+		if rec.Destination == st.destination {
+			sp.Kept, sp.Owed = rec.SetAside, rec.Refill
+		} else if rec.Refill != nil {
+			sp.Elsewhere = append(sp.Elsewhere, rec)
+		}
+		for _, f := range rec.Former {
+			if f.Refill != nil && f.Destination != st.destination {
+				sp.Elsewhere = append(sp.Elsewhere, f)
+			}
+		}
 	}
 	if in.StoreTimeout > 0 {
 		var cancel context.CancelFunc
@@ -326,7 +341,7 @@ func (in *Input) item(ctx context.Context, st store, asker teardown.Inspector, s
 // otherwise settles the item.
 func (in *Input) ask(ctx context.Context, it *Item, asker teardown.Inspector, rec *run.StoreRecord) bool {
 	m := it.Migration
-	shape, err := asker.Shape(ctx, m.Measurement, m.OldTags, nil)
+	shape, err := asker.Shape(ctx, m.Measurement, m.OldTags)
 	if err != nil {
 		it.Status, it.Evidence = Unreachable, err.Error()
 		return false
@@ -335,7 +350,7 @@ func (in *Input) ask(ctx context.Context, it *Item, asker teardown.Inspector, re
 	when, applied := appliedOn(rec, m.ID)
 	switch {
 	case m.Kind == Value:
-		return in.heldValue(it, rec, shape.Exists)
+		return in.heldValue(it, rec, shape)
 	case len(shape.Old) > 0:
 		it.Evidence = fmt.Sprintf("rows of %s carry %s as %s%s", m.Measurement, quoted(shape.Old),
 			plural(len(shape.Old), "a tag", "tags"), span(shape))
@@ -357,17 +372,17 @@ func (in *Input) ask(ctx context.Context, it *Item, asker teardown.Inspector, re
 // heldValue decides a Value change in a store that can be asked: its rows
 // cannot be told apart, so the record of what first wrote the store is the
 // only thing that can say none of them is older than the change.
-func (in *Input) heldValue(it *Item, rec *run.StoreRecord, exists bool) bool {
+func (in *Input) heldValue(it *Item, rec *run.StoreRecord, shape teardown.Shape) bool {
 	m := it.Migration
 	switch {
-	case !exists:
+	case !shape.Exists:
 		it.Status, it.Evidence = NotNeeded, "the store holds no "+m.Measurement
 	case rec != nil && m.writtenBy(rec.FirstWrittenBy):
 		it.Status, it.Evidence = NotNeeded, "first written by "+rec.FirstWrittenBy
 	case rec == nil && in.State.Fresh():
 		it.Status, it.Evidence = NotNeeded, "the state file is new, so this release is the first to write here"
 	default:
-		it.Evidence = fmt.Sprintf("the store holds %s%s", m.Measurement, span(teardown.Shape{Rows: it.Rows, Oldest: it.Oldest}))
+		it.Evidence = fmt.Sprintf("the store holds %s%s", m.Measurement, span(shape))
 		return true
 	}
 	return false
@@ -433,14 +448,20 @@ func (in *Input) decide(ctx context.Context, it *Item, st store, asker teardown.
 	for _, f := range off {
 		it.Lost = append(it.Lost, fmt.Sprintf("the rows %s wrote: this configuration does not run it", f))
 	}
-	checked := false
+	// Bounded by the oldest row the store held, which a store that can be
+	// asked says: the set-aside takes every row back to it, and a bound
+	// later than it would lose the difference for good. A store that cannot
+	// be asked, and one that would not count its rows, cannot say how far
+	// back its rows go, and what applying takes there is every row whatever
+	// its date, so the refill has no bound. backfill.since is a bound on
+	// what a backfill reaches and not on what a store holds: bounded by it,
+	// a SQL file or a Graphite kept longer lost every row dated before it,
+	// and the plan did not say so.
 	if st.reach == asked {
 		it.Since = dayOf(it.Oldest)
-		checked = in.whose(ctx, it, asker)
-	} else if since, err := in.Config.Backfill.SinceTime(in.Now); err == nil {
-		it.Since = dayOf(since)
+		in.whose(ctx, it, asker)
 	}
-	it.Unsafe = unsafe(st, server, checked, it)
+	it.Unsafe = unsafe(st, server, it)
 	it.Safe = len(it.Unsafe) == 0
 }
 
@@ -458,42 +479,98 @@ func (in *Input) families(m Migration) (on, off []string) {
 }
 
 // whose reads which accounts and repositories the store holds rows of, and
-// reports whether the question could be answered.
-func (in *Input) whose(ctx context.Context, it *Item, asker teardown.Inspector) bool {
+// records whether that could be compared with this configuration.
+//
+// Any family of the migration that reads per repository makes the
+// repository a row belongs to a question: such a row comes back only while
+// its repository is covered. An account-wide family beside it reads again
+// the rows the account wrote, wherever they are, so those are left out of
+// the question, by the tag that names who wrote a row. Without that,
+// gh_discussion_comment, written by discussions and by outbound, was never
+// asked about its repositories at all, and a store holding other people's
+// comments on a repository no longer covered was set aside as safe.
+func (in *Input) whose(ctx context.Context, it *Item, asker teardown.Inspector) {
 	m := it.Migration
-	perRepo := !slices.ContainsFunc(m.Families, func(f string) bool { return !run.PerRepository(f) })
-	values := []string{m.Account}
+	user := in.Config.Targets.User
+	questions := []teardown.Distinct{{Tag: m.Account}}
+	perRepo := slices.ContainsFunc(m.Families, run.PerRepository)
 	if perRepo {
-		values = append(values, "full_name")
-	}
-	shape, err := asker.Shape(ctx, m.Measurement, nil, values)
-	if err != nil {
-		it.Unsafe = append(it.Unsafe, "whose rows these are could not be read: "+err.Error())
-		return false
-	}
-	repos, known := in.list(ctx)
-	if perRepo && known {
-		if gone := missingFrom(shape.Values["full_name"], repos); len(gone) > 0 {
-			it.Lost = append(it.Lost, fmt.Sprintf("the rows of %d %s this configuration no longer covers: %s",
-				len(gone), plural(len(gone), "repository", "repositories"), sample(gone)))
+		repo := teardown.Distinct{Tag: "full_name"}
+		if m.Author != "" {
+			repo.ExceptTag, repo.Except = m.Author, user
 		}
+		questions = append(questions, repo)
+	}
+	spread, err := asker.Spread(ctx, m.Measurement, questions)
+	if err != nil {
+		unchecked(it, "whose rows these are could not be read: "+err.Error())
+		return
+	}
+	if perRepo && !in.covered(ctx, it, spread) {
+		return
+	}
+	if why, unread := spread.Unread[m.Account]; unread {
+		unchecked(it, "whose rows these are could not be read: "+why)
+		return
 	}
 	mine, known := in.accountsOf(ctx, m.Account)
 	if !known {
+		unchecked(it, "the repository list could not be read, so the owners its rows carry were not compared "+
+			"with the ones this configuration collects")
+		return
+	}
+	it.Others = missingFrom(spread.Values[m.Account], mine)
+	it.AccountsChecked = true
+}
+
+// covered compares the repositories the store's rows belong to with the ones
+// the configuration covers, and says whether it could.
+func (in *Input) covered(ctx context.Context, it *Item, spread teardown.Spread) bool {
+	m := it.Migration
+	if why, unread := spread.Unread["full_name"]; unread {
+		unchecked(it, "which repositories its rows belong to could not be read: "+why)
 		return false
 	}
-	it.Others = missingFrom(shape.Values[m.Account], mine)
-	it.AccountsChecked = true
+	repos, known := in.list(ctx)
+	if !known {
+		unchecked(it, "the repository list could not be read, so the repositories its rows belong to were not "+
+			"compared with the ones this configuration covers")
+		return false
+	}
+	gone := missingFrom(spread.Values["full_name"], repos)
+	if len(gone) == 0 {
+		return true
+	}
+	lost := fmt.Sprintf("the rows of %d %s this configuration no longer covers", len(gone),
+		plural(len(gone), "repository", "repositories"))
+	if user := in.Config.Targets.User; m.Author != "" && user != "" {
+		lost += ", other than the ones " + user + " wrote, which " +
+			quoted(slices.DeleteFunc(slices.Clone(m.Families), run.PerRepository)) + " reads again wherever they are"
+	}
+	it.Lost = append(it.Lost, lost+": "+sample(named(gone, "full_name")))
 	return true
+}
+
+// unchecked records why the store could not be compared with the
+// configuration, which makes the item need somebody's word.
+func unchecked(it *Item, why string) {
+	it.Unchecked = why
+	it.Unsafe = append(it.Unsafe, why)
 }
 
 // accountsOf is every value of an account tag that this configuration's own
 // rows carry, and whether that is known.
+//
+// A configuration with no targets.user, one of organizations or repositories
+// alone, writes the empty user on its rows: the per-repository families still
+// run and name nobody. The empty value is then its own, and a user any row
+// names is somebody else's. With a user, a row with none is somebody else's:
+// another configuration's that collects organizations alone.
 func (in *Input) accountsOf(ctx context.Context, tag string) ([]string, bool) {
 	t := in.Config.Targets
 	out := []string{t.User}
 	if tag == "user" {
-		return out, t.User != ""
+		return out, true
 	}
 	repos, known := in.list(ctx)
 	out = append(out, t.Orgs...)
@@ -501,25 +578,21 @@ func (in *Input) accountsOf(ctx context.Context, tag string) ([]string, bool) {
 		owner, _, _ := strings.Cut(full, "/")
 		out = append(out, owner)
 	}
-	return out, known
+	return slices.DeleteFunc(out, func(v string) bool { return v == "" }), known
 }
 
 // unsafe is every reason the migration needs somebody's word before it is
-// applied.
-func unsafe(st store, server string, checked bool, it *Item) []string {
+// applied: the ones whose already found, and the ones the store and the
+// comparison give.
+func unsafe(st store, server string, it *Item) []string {
 	var why []string
 	if reason := destroys(st, server); reason != "" {
 		why = append(why, reason)
 	}
-	switch {
-	case st.reach != asked:
-	case !checked && len(it.Unsafe) == 0:
-		why = append(why, "the repository list could not be read, so whose rows these are was not compared "+
-			"with this configuration")
-	case len(it.Others) > 0:
+	if len(it.Others) > 0 {
 		why = append(why, fmt.Sprintf("it holds rows of %s, which this configuration does not collect; "+
 			"set aside, they come back only when the configuration that collects them reads them again",
-			quoted(it.Others)))
+			quoted(named(it.Others, it.Migration.Account))))
 	}
 	// Whatever the store: a row the refill does not bring back is a row lost
 	// once the set-aside goes, which is exactly what applying on its own
@@ -561,10 +634,10 @@ func action(st store, server string, m Migration) (what string, commands []strin
 			return "delete every row of " + m.Measurement + ": InfluxDB 2 keeps no table aside, so the delete is final", nil
 		}
 		what = "set aside: InfluxDB renames the table " + m.Measurement + "-<time> and keeps it queryable " +
-			"for 24 hours before it purges it"
+			"until it purges it itself, 72 hours later by default"
 		if influxBefore34(server) {
-			what = "set aside: InfluxDB renames the table " + m.Measurement + "-<time>; 3.0.0 has no deleter " +
-				"and 3.4.0 purges after 24 hours, so a server between may keep it until somebody drops it"
+			what = "set aside: InfluxDB renames the table " + m.Measurement + "-<time>; 3.0.0 has no deleter, " +
+				"so a server before 3.4.0 may keep it until somebody drops it"
 		}
 		return what, nil
 	case "postgres":
@@ -628,6 +701,9 @@ func appliedOn(rec *run.StoreRecord, id string) (time.Time, bool) {
 // span is the rows a store holds and since when, as the tail of a sentence.
 func span(s teardown.Shape) string {
 	switch {
+	case s.Uncounted != "":
+		return "; its rows were not counted, so how far back they go is not known and the refill has no bound: " +
+			s.Uncounted
 	case s.Oldest.IsZero():
 		return ""
 	case s.Rows < 0:
@@ -647,13 +723,27 @@ func dayOf(t time.Time) time.Time {
 }
 
 // missingFrom is every value of held that want does not name, compared the
-// way GitHub compares logins and repository names: without case. An empty
-// value is not a value.
+// way GitHub compares logins and repository names: without case. The empty
+// value, a row that names nobody, is a value like any other: it is only
+// want's when want names it.
 func missingFrom(held, want []string) []string {
 	var out []string
 	for _, v := range held {
-		if v != "" && !slices.ContainsFunc(want, func(w string) bool { return strings.EqualFold(v, w) }) {
+		if !slices.ContainsFunc(want, func(w string) bool { return strings.EqualFold(v, w) }) {
 			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// named is a list of a tag's values as a sentence names them: the empty
+// value is the rows that carry none.
+func named(values []string, tag string) []string {
+	out := make([]string, len(values))
+	for i, v := range values {
+		out[i] = v
+		if v == "" {
+			out[i] = "(no " + tag + ")"
 		}
 	}
 	return out

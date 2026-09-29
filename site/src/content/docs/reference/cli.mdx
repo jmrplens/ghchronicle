@@ -35,7 +35,7 @@ ghchronicle -config /etc/ghchronicle/config.yaml
 | `-uninstall`      | none          | Remove what this put in place and exit: `dashboard`, `data`, `state`, `all`, comma separated; it lists and removes nothing without `-yes` |
 | `-yes`            | off           | Go ahead with `-uninstall` or `-migrate` rather than only listing what it would do                                                         |
 | `-migrate`        | off           | Print, for every configured store, what an earlier release left there in a shape this one no longer writes and what bringing it along would take, then exit; it changes nothing without `-yes`, and with it applies every pending change and reads what it cleared again |
-| `-migrate-others` | off           | With `-migrate -yes`, also apply a change to a store holding rows of accounts this configuration does not collect; without `-migrate` it is refused with 2 |
+| `-migrate-others` | off           | With `-migrate -yes`, also apply a change to a store holding rows of accounts this configuration does not collect, or whose rows could not be compared with it; without `-migrate` it is refused with 2 |
 | `-card`           | none          | Run one sweep and write a summary SVG to this path; that sweep runs every family, whatever the cadences say                                |
 | `-card-only`      | off           | With `-card`, write the SVG and nothing else: no sink is needed, none is written to, and the state file is left as it was                  |
 | `-card-theme`     | `auto`        | `dark`, `light`, `auto`, or `both`: the light card at `-card` and the dark one beside it with `_dark` before the extension, from one sweep |
@@ -98,10 +98,13 @@ names what GitHub no longer serves. One cut short keeps a checkpoint of its
 own, and the same command resumes it, even with nothing left to apply:
 [reading the history back](/ghchronicle/install/upgrading/#reading-the-history-back).
 A store holding rows of
-accounts this configuration does not collect is held back unless
-`-migrate-others` is given as well. It needs a token and the repository list,
-and it takes the state file for as long as it runs: with the service running it
-refuses, naming the process, and changes nothing, so stop the service first.
+accounts this configuration does not collect, or whose rows could not be
+compared with it, is held back unless `-migrate-others` is given as well. It
+needs a token and the repository list, and it takes the state file for as long
+as it runs: with the service running it refuses, naming the process, and
+changes nothing, so stop the service first, and pause a cron job running
+`-once`. With the SQL sink on standard output, the plan and the report go to
+standard error, so standard output is the SQL alone.
 What it applies is recorded as it goes, so running it again after a failure
 carries on without doing anything twice.
 

@@ -16,15 +16,20 @@ import (
 	"github.com/jmrplens/ghchronicle/v2/internal/teardown"
 )
 
-// fakeStore answers the planner's questions from a table of shapes and keeps
-// the questions, so a test can say what was asked as well as what was
-// decided.
+// fakeStore answers the planner's questions from a table of shapes and of
+// rows, and keeps the questions, so a test can say what was asked as well as
+// what was decided.
 type fakeStore struct {
 	name, server string
 	err          error
 	shapes       map[string]teardown.Shape
-	asked        []string
-	described    int
+	// rows is each measurement's rows, tag by tag, for the distinct values
+	// the planner asks about; a tag a row lacks is the empty value.
+	rows map[string][]map[string]string
+	// unread is a tag whose values the store will not read, and why.
+	unread    map[string]string
+	asked     []string
+	described int
 }
 
 func (f *fakeStore) Name() string { return f.name }
@@ -34,48 +39,73 @@ func (f *fakeStore) Describe(context.Context) (string, error) {
 	return f.server, f.err
 }
 
-func (f *fakeStore) Shape(_ context.Context, m string, old, values []string) (teardown.Shape, error) {
+func (f *fakeStore) Shape(_ context.Context, m string, old []string) (teardown.Shape, error) {
 	f.asked = append(f.asked, m)
 	held, ok := f.shapes[m]
 	if !ok {
 		return teardown.Shape{}, nil
 	}
-	out := teardown.Shape{Exists: held.Exists, Rows: held.Rows, Oldest: held.Oldest, Values: map[string][]string{}}
+	out := teardown.Shape{Exists: held.Exists, Rows: held.Rows, Oldest: held.Oldest, Uncounted: held.Uncounted}
 	for _, t := range held.Old {
 		if slices.Contains(old, t) {
 			out.Old = append(out.Old, t)
 		}
 	}
-	for _, t := range values {
-		if v, has := held.Values[t]; has {
-			out.Values[t] = v
+	return out, nil
+}
+
+func (f *fakeStore) Spread(_ context.Context, m string, questions []teardown.Distinct) (teardown.Spread, error) {
+	f.asked = append(f.asked, m)
+	out := teardown.Spread{Values: map[string][]string{}, Unread: map[string]string{}}
+	for _, d := range questions {
+		if why, unread := f.unread[d.Tag]; unread {
+			out.Unread[d.Tag] = why
+			continue
 		}
+		for _, row := range f.rows[m] {
+			if d.Except != "" && strings.EqualFold(row[d.ExceptTag], d.Except) {
+				continue
+			}
+			if !slices.Contains(out.Values[d.Tag], row[d.Tag]) {
+				out.Values[d.Tag] = append(out.Values[d.Tag], row[d.Tag])
+			}
+		}
+		slices.Sort(out.Values[d.Tag])
 	}
 	return out, nil
 }
 
 // oldShape is a store written by 2.6.0 and before: gh_discussion_comment
-// with is_answer as a tag, the alert items as 1.0.0 left them, and the cache
-// entries of the days before 2.6.0.
-func oldShape(users ...string) map[string]teardown.Shape {
+// with is_answer as a tag, written by the users named, each a comment of
+// their own on octocat/hello-world, the alert items as 1.0.0 left them, and
+// the cache entries of the days before 2.6.0.
+func oldShape() map[string]teardown.Shape {
+	oldest := time.Date(2023, 11, 14, 22, 13, 20, 0, time.UTC)
+	return map[string]teardown.Shape{
+		"gh_discussion_comment":       {Exists: true, Old: []string{"is_answer"}, Rows: 3, Oldest: oldest},
+		"gh_dependabot_alert_item":    {Exists: true, Rows: 12, Oldest: oldest},
+		"gh_code_scanning_alert_item": {Exists: true, Old: []string{"state", "reason"}, Rows: 40, Oldest: oldest},
+		"gh_actions_cache_entry":      {Exists: true, Rows: 90, Oldest: oldest},
+	}
+}
+
+// oldRows is the rows of oldShape: the comments of the users named, octocat
+// alone when none is, and the alerts of octocat/hello-world and of
+// octocat/gone, a repository this configuration no longer covers.
+func oldRows(users ...string) map[string][]map[string]string {
 	if len(users) == 0 {
 		users = []string{"octocat"}
 	}
-	oldest := time.Date(2023, 11, 14, 22, 13, 20, 0, time.UTC)
-	return map[string]teardown.Shape{
-		"gh_discussion_comment": {
-			Exists: true, Old: []string{"is_answer"}, Rows: 3, Oldest: oldest,
-			Values: map[string][]string{"user": users},
-		},
-		"gh_dependabot_alert_item": {
-			Exists: true, Rows: 12, Oldest: oldest,
-			Values: map[string][]string{"owner": {"octocat"}, "full_name": {"octocat/hello-world"}},
-		},
+	var comments []map[string]string
+	for _, u := range users {
+		comments = append(comments, map[string]string{"user": u, "author": u, "full_name": "octocat/hello-world"})
+	}
+	return map[string][]map[string]string{
+		"gh_discussion_comment":    comments,
+		"gh_dependabot_alert_item": {{"owner": "octocat", "full_name": "octocat/hello-world"}},
 		"gh_code_scanning_alert_item": {
-			Exists: true, Old: []string{"state", "reason"}, Rows: 40, Oldest: oldest,
-			Values: map[string][]string{"owner": {"octocat"}, "full_name": {"octocat/hello-world", "octocat/gone"}},
+			{"owner": "octocat", "full_name": "octocat/hello-world"}, {"owner": "octocat", "full_name": "octocat/gone"},
 		},
-		"gh_actions_cache_entry": {Exists: true, Rows: 90, Oldest: oldest},
 	}
 }
 
@@ -107,8 +137,9 @@ func planConfig(t *testing.T, dir string, tweak func(*config.Config)) *config.Co
 
 // upgradeInput is the first -migrate after an upgrade from 2.6.1: a state
 // file with a history of runs and no record of the stores, a SQL file on
-// disk, and three stores that answer with the shapes given.
-func upgradeInput(t *testing.T, influx, postgres, elastic map[string]teardown.Shape) Input {
+// disk, and three stores that answer with the shapes given, each holding the
+// rows of oldRows for the users named, octocat alone when none is.
+func upgradeInput(t *testing.T, influx, postgres, elastic map[string]teardown.Shape, users ...string) Input {
 	t.Helper()
 	dir := t.TempDir()
 	cfg := planConfig(t, dir, nil)
@@ -119,9 +150,9 @@ func upgradeInput(t *testing.T, influx, postgres, elastic map[string]teardown.Sh
 		Config: cfg, State: olderState(t, dir), Release: "2.6.2",
 		Now: time.Date(2026, 9, 28, 12, 0, 0, 0, time.UTC),
 		Inspectors: []teardown.Inspector{
-			&fakeStore{name: "influxdb", server: "InfluxDB 3 Core 3.11.2", shapes: influx},
-			&fakeStore{name: "postgres", server: "PostgreSQL 18.6", shapes: postgres},
-			&fakeStore{name: "elasticsearch", server: "Elasticsearch 9.5.3", shapes: elastic},
+			&fakeStore{name: "influxdb", server: "InfluxDB 3 Core 3.11.2", shapes: influx, rows: oldRows()},
+			&fakeStore{name: "postgres", server: "PostgreSQL 18.6", shapes: postgres, rows: oldRows(users...)},
+			&fakeStore{name: "elasticsearch", server: "Elasticsearch 9.5.3", shapes: elastic, rows: oldRows()},
 		},
 		Repos: []string{"octocat/hello-world"}, ReposKnown: true,
 	}
@@ -219,7 +250,11 @@ func TestAStoreThatCanBeAskedDecidesItself(t *testing.T) {
 
 // TestAStoreThatCannotBeAskedFollowsTheRecord: after an upgrade from a
 // release that kept no record, a SQL file, a Graphite and a Telegraf may hold
-// 2.6.0's shape, and never a pre-release one, which no release wrote.
+// 2.6.0's shape, and never a pre-release one, which no release wrote. What
+// applying takes there is every row whatever its date, and the store cannot
+// say how far back its rows go, so the refill has no bound whatever
+// backfill.since says: bounded by it, a SQL file or a Graphite kept longer
+// lost every row dated before it, and the plan said nothing of them.
 func TestAStoreThatCannotBeAskedFollowsTheRecord(t *testing.T) {
 	t.Parallel()
 	in := upgradeInput(t, nil, nil, nil)
@@ -236,9 +271,11 @@ func TestAStoreThatCannotBeAskedFollowsTheRecord(t *testing.T) {
 		}
 	}
 	sql := itemOf(t, p, "sql", comments)
-	if !strings.Contains(sql.Action, `DROP TABLE IF EXISTS "gh_discussion_comment";`) ||
-		!sql.Since.Equal(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)) {
-		t.Errorf("the SQL file would %q, since %s", sql.Action, sql.Since)
+	if !strings.Contains(sql.Action, `DROP TABLE IF EXISTS "gh_discussion_comment";`) || !sql.Since.IsZero() {
+		t.Errorf("the SQL file would %q, and read it again since %s, want with no bound", sql.Action, sql.Since)
+	}
+	if graphite := itemOf(t, p, "graphite", comments); !graphite.Since.IsZero() {
+		t.Errorf("Graphite would read it again since %s, want with no bound", graphite.Since)
 	}
 	graphite := itemOf(t, p, "graphite", comments)
 	want := "find <storage>/whisper/github/discussion_comment -mindepth 11 -name '*.wsp' -delete"
@@ -329,8 +366,8 @@ func TestNothingThatRunsWritesItAnyMore(t *testing.T) {
 // configuration refills them.
 func TestAStoreSharedWithAnotherCollectorIsNotSafe(t *testing.T) {
 	t.Parallel()
-	in := upgradeInput(t, oldShape("octocat", "hubot"), nil, nil)
-	it := itemOf(t, Make(t.Context(), in), "influxdb", comments)
+	in := upgradeInput(t, oldShape(), oldShape(), nil, "octocat", "hubot")
+	it := itemOf(t, Make(t.Context(), in), "postgres", comments)
 	if it.Status != Pending || it.Safe || !slices.Equal(it.Others, []string{"hubot"}) {
 		t.Errorf("a store shared with hubot is %s, safe %v, others %v", it.Status, it.Safe, it.Others)
 	}
@@ -338,6 +375,104 @@ func TestAStoreSharedWithAnotherCollectorIsNotSafe(t *testing.T) {
 	scan := itemOf(t, Make(t.Context(), in), "influxdb", scanning)
 	if scan.Safe || !strings.Contains(strings.Join(scan.Unsafe, " "), "repository list could not be read") {
 		t.Errorf("owners compared with no repository list: safe %v, %v", scan.Safe, scan.Unsafe)
+	}
+}
+
+// TestCommentsOfARepositoryNoLongerCoveredAreNotComingBack: discussions
+// reads every comment on the covered repositories' threads, and outbound the
+// account's own comments wherever they are. Comments by anybody else on a
+// repository no longer covered are read by neither, so they are named as not
+// coming back and the item is not safe; the account's own comments on
+// somebody else's repository are not, since outbound reads them again.
+//
+// Before, the repositories were only asked about when every family of a
+// migration read per repository, which outbound does not, and this store was
+// set aside as safe.
+func TestCommentsOfARepositoryNoLongerCoveredAreNotComingBack(t *testing.T) {
+	t.Parallel()
+	in := upgradeInput(t, oldShape(), nil, nil)
+	store := in.Inspectors[0].(*fakeStore)
+	store.rows["gh_discussion_comment"] = []map[string]string{
+		{"user": "octocat", "author": "hubot", "full_name": "octocat/hello-world"},
+		{"user": "octocat", "author": "OctoCat", "full_name": "cli/cli"},
+	}
+	it := itemOf(t, Make(t.Context(), in), "influxdb", comments)
+	if it.Status != Pending || !it.Safe || len(it.Lost) > 0 {
+		t.Errorf("the account's own comment elsewhere made the item %s, safe %v, lost %v", it.Status, it.Safe, it.Lost)
+	}
+	store.rows["gh_discussion_comment"] = append(store.rows["gh_discussion_comment"],
+		map[string]string{"user": "octocat", "author": "hubot", "full_name": "octocat/excluded-now"})
+	it = itemOf(t, Make(t.Context(), in), "influxdb", comments)
+	want := "the rows of 1 repository this configuration no longer covers, other than the ones octocat wrote, " +
+		"which outbound reads again wherever they are: octocat/excluded-now"
+	if it.Safe || !slices.Equal(it.Lost, []string{want}) {
+		t.Errorf("another's comment on a repository no longer covered: safe %v, lost %v", it.Safe, it.Lost)
+	}
+	// With the repositories unread, nothing says which rows come back.
+	store.unread = map[string]string{"full_name": "Query would scan 433 Parquet files, exceeding the file limit"}
+	it = itemOf(t, Make(t.Context(), in), "influxdb", comments)
+	if it.Safe || it.AccountsChecked || !strings.Contains(it.Unchecked, "which repositories its rows belong to could not be read") {
+		t.Errorf("repositories unread: safe %v, checked %v, %q", it.Safe, it.AccountsChecked, it.Unchecked)
+	}
+}
+
+// TestRowsThatNameNoAccount: a configuration with a user does not own a row
+// that names none, which another configuration collecting organizations
+// alone writes; one with no user owns exactly those, and is compared with
+// the store like any other rather than held back for a repository list it
+// had read.
+func TestRowsThatNameNoAccount(t *testing.T) {
+	t.Parallel()
+	in := upgradeInput(t, oldShape(), nil, nil)
+	store := in.Inspectors[0].(*fakeStore)
+	store.rows["gh_discussion_comment"] = []map[string]string{
+		{"user": "octocat", "author": "octocat", "full_name": "octocat/hello-world"},
+		{"author": "hubot", "full_name": "octocat/hello-world"},
+	}
+	it := itemOf(t, Make(t.Context(), in), "influxdb", comments)
+	if it.Safe || !slices.Equal(it.Others, []string{""}) || !strings.Contains(strings.Join(it.Unsafe, " "), "(no user)") {
+		t.Errorf("rows with no user beside octocat's: safe %v, others %q, %v", it.Safe, it.Others, it.Unsafe)
+	}
+
+	orgs := upgradeInput(t, oldShape(), nil, nil)
+	orgs.Config.Targets = config.Targets{Orgs: []string{"acme"}}
+	if err := orgs.Config.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	orgs.Repos = []string{"acme/widgets"}
+	store = orgs.Inspectors[0].(*fakeStore)
+	store.rows["gh_discussion_comment"] = []map[string]string{{"author": "hubot", "full_name": "acme/widgets"}}
+	it = itemOf(t, Make(t.Context(), orgs), "influxdb", comments)
+	if it.Status != Pending || !it.Safe || !it.AccountsChecked || len(it.Unsafe) > 0 {
+		t.Errorf("an organisation's configuration and its own rows: %s, safe %v, checked %v, %v",
+			it.Status, it.Safe, it.AccountsChecked, it.Unsafe)
+	}
+	store.rows["gh_discussion_comment"] = append(store.rows["gh_discussion_comment"],
+		map[string]string{"user": "hubot", "author": "hubot", "full_name": "acme/widgets"})
+	it = itemOf(t, Make(t.Context(), orgs), "influxdb", comments)
+	if it.Safe || !slices.Equal(it.Others, []string{"hubot"}) {
+		t.Errorf("an organisation's configuration beside hubot's rows: safe %v, others %v", it.Safe, it.Others)
+	}
+	if held := (Chosen{Item: it}).HeldBack(); !strings.Contains(held, "hubot") || strings.Contains(held, "repository list") {
+		t.Errorf("held back because %q", held)
+	}
+}
+
+// TestAStoreThatWouldNotCountItsRowsIsStillAsked: InfluxDB 3 Core refuses to
+// count a table stored in more Parquet files than its query file limit, and
+// a store that says so is still one that answered: the item is pending, and
+// the refill, whose bound was the oldest row, has none.
+func TestAStoreThatWouldNotCountItsRowsIsStillAsked(t *testing.T) {
+	t.Parallel()
+	shapes := oldShape()
+	shapes["gh_discussion_comment"] = teardown.Shape{
+		Exists: true, Old: []string{"is_answer"}, Rows: -1,
+		Uncounted: "500 Internal Server Error: Query would scan 433 Parquet files, exceeding the file limit",
+	}
+	in := upgradeInput(t, shapes, nil, nil)
+	it := itemOf(t, Make(t.Context(), in), "influxdb", comments)
+	if it.Status != Pending || !it.Since.IsZero() || !it.Safe || !strings.Contains(it.Evidence, "not counted") {
+		t.Errorf("a table the store would not count is %s, since %s, safe %v: %s", it.Status, it.Since, it.Safe, it.Evidence)
 	}
 }
 
@@ -378,7 +513,7 @@ func TestAStoreThatDoesNotAnswerIsSaidAndAskedNothingMore(t *testing.T) {
 // an upgrade from 2.6.0 with every kind of store.
 func TestThePlanReadsAsWritten(t *testing.T) {
 	t.Parallel()
-	in := upgradeInput(t, oldShape(), oldShape("octocat", "hubot"), nil)
+	in := upgradeInput(t, oldShape(), oldShape(), nil, "octocat", "hubot")
 	in.Inspectors[2] = &fakeStore{name: "elasticsearch", err: errors.New("401 Unauthorized:\n missing authentication")}
 	p := Make(t.Context(), in)
 	var out bytes.Buffer
