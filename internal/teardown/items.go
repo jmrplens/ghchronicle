@@ -296,13 +296,7 @@ func (e *elastic) composite(ctx context.Context, endpoint string, fields []strin
 		}
 		var page struct {
 			Aggs struct {
-				Items struct {
-					After   map[string]any `json:"after_key"`
-					Buckets []struct {
-						Key  map[string]any `json:"key"`
-						Rows int64          `json:"doc_count"`
-					} `json:"buckets"`
-				} `json:"items"`
+				Items compositeAgg `json:"items"`
 			} `json:"aggregations"`
 		}
 		if err = json.Unmarshal(res.body, &page); err != nil {
@@ -321,6 +315,17 @@ func (e *elastic) composite(ctx context.Context, endpoint string, fields []strin
 		}
 		after = page.Aggs.Items.After
 	}
+}
+
+// compositeAgg is one page of what a composite aggregation answers: a bucket
+// per combination of the sources' values, and the key the next page is asked
+// after, absent once nothing follows.
+type compositeAgg struct {
+	After   map[string]any `json:"after_key"`
+	Buckets []struct {
+		Key  map[string]any `json:"key"`
+		Rows int64          `json:"doc_count"`
+	} `json:"buckets"`
 }
 
 // sortedItems is a list of items sorted, each once.

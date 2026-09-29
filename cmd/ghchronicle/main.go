@@ -383,7 +383,7 @@ func execute(args []string, stdout, stderr io.Writer) {
 	if o.migrate {
 		// Only -migrate -yes gets this far: the dry run was answered above,
 		// and builds no sink.
-		migrateAndClose(ctx, cfg, api, o, sinks, stdout, stderr, logger)
+		migrateAndClose(ctx, migration{cfg: cfg, api: api, sinks: sinks, log: logger}, o, stdout, stderr)
 		return
 	}
 

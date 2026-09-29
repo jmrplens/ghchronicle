@@ -296,7 +296,7 @@ func (in *Input) settledByRecord(st store, m Migration) *Item {
 	}
 	it := &Item{Migration: m, Rows: -1, Recorded: true}
 	if when, ok := rec.Applied[m.ID]; ok {
-		it.Status, it.Evidence = Applied, "applied on "+when.UTC().Format(time.DateOnly)
+		it.Status, it.Evidence = Applied, appliedEvidence+when.UTC().Format(time.DateOnly)
 		return it
 	}
 	if when, ok := rec.NotNeeded[m.ID]; ok {
@@ -360,7 +360,7 @@ func (in *Input) ask(ctx context.Context, it *Item, asker teardown.Inspector, re
 		}
 		return true
 	case applied:
-		it.Status, it.Evidence = Applied, "applied on "+when.UTC().Format(time.DateOnly)
+		it.Status, it.Evidence = Applied, appliedEvidence+when.UTC().Format(time.DateOnly)
 	case !shape.Exists:
 		it.Status, it.Evidence = NotNeeded, "the store holds no "+m.Measurement
 	default:
@@ -393,7 +393,7 @@ func (in *Input) heldValue(it *Item, rec *run.StoreRecord, shape teardown.Shape)
 func (in *Input) recall(it *Item, st store, rec *run.StoreRecord, retargeted bool) bool {
 	m := it.Migration
 	if when, applied := appliedOn(rec, m.ID); applied {
-		it.Status, it.Evidence = Applied, "applied on "+when.UTC().Format(time.DateOnly)
+		it.Status, it.Evidence = Applied, appliedEvidence+when.UTC().Format(time.DateOnly)
 		return false
 	}
 	switch {
@@ -688,6 +688,10 @@ func influxBefore34(server string) bool {
 	version := fields[len(fields)-1]
 	return compareRelease(version, "3.0.0") >= 0 && compareRelease(version, "3.4.0") < 0
 }
+
+// appliedEvidence begins the evidence of an item the state file records as
+// applied, before the day it was.
+const appliedEvidence = "applied on "
 
 // appliedOn is when the record says a migration was applied, if it was.
 func appliedOn(rec *run.StoreRecord, id string) (time.Time, bool) {

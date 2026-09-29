@@ -1,6 +1,8 @@
 package migrate
 
 import (
+	// The //go:embed directive below reads identity.json at compile time,
+	// which only works in a file that imports embed. Nothing here calls it.
 	_ "embed"
 	"encoding/json"
 	"slices"

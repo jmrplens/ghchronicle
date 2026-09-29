@@ -315,9 +315,11 @@ func migratePlan(ctx context.Context, cfg *config.Config, api *ghapi.Client, con
 // starts: with no token, or no repository list, nothing can be read again,
 // and beside a process that holds the state file it would change the stores
 // that process writes and the state file it saves.
-func migrateApply(ctx context.Context, cfg *config.Config, api *ghapi.Client, o options, sinks []sink.Sink,
-	stdout io.Writer, logger *slog.Logger,
-) error {
+//
+// m carries the run's configuration, client, sinks and log; the state file,
+// read here under the lock, and what the command line says are added to it.
+func migrateApply(ctx context.Context, m migration, o options, stdout io.Writer) error {
+	cfg, logger := m.cfg, m.log
 	if cfg.GitHub.Token == "" {
 		return errors.New("-migrate -yes reads what it clears again from GitHub, and the configuration has no " +
 			"GitHub token; nothing was changed")
@@ -339,7 +341,7 @@ func migrateApply(ctx context.Context, cfg *config.Config, api *ghapi.Client, o 
 	if err != nil {
 		return fmt.Errorf("%w; nothing was changed", err)
 	}
-	repos, why := coveredRepos(ctx, api, cfg)
+	repos, why := coveredRepos(ctx, m.api, cfg)
 	if why != "" {
 		return fmt.Errorf("the repository list could not be read (%s), and bringing a store along needs it to "+
 			"read the history again and to know whose rows the store holds; nothing was changed", why)
@@ -357,7 +359,7 @@ func migrateApply(ctx context.Context, cfg *config.Config, api *ghapi.Client, o 
 		Resume: "Run the same command again once the cause is fixed: what was applied is recorded and is not " +
 			"done twice.",
 	}
-	m := migration{cfg: cfg, api: api, sinks: sinks, state: state, log: logger, configPath: o.path, retry: o.retry}
+	m.state, m.configPath, m.retry = state, o.path, o.retry
 	// Also with nothing pending: a refill an earlier run of this command, or
 	// a start, was stopped before it finished is paid here.
 	if len(chosen) > 0 || len(migrate.OwedIn(state, cfg)) > 0 {
@@ -394,14 +396,12 @@ func migrateApply(ctx context.Context, cfg *config.Config, api *ghapi.Client, o 
 // with psql against 18.6: the plan's first line was read as the start of a
 // statement, the DROP went with it, and the target kept its old table while
 // the state file recorded the migration as applied.
-func migrateAndClose(ctx context.Context, cfg *config.Config, api *ghapi.Client, o options, sinks []sink.Sink,
-	stdout, stderr io.Writer, logger *slog.Logger,
-) {
-	if q := cfg.Sinks.SQL; q != nil && q.Path == "-" {
+func migrateAndClose(ctx context.Context, m migration, o options, stdout, stderr io.Writer) {
+	if q := m.cfg.Sinks.SQL; q != nil && q.Path == "-" {
 		stdout = stderr
 	}
-	err := migrateApply(ctx, cfg, api, o, sinks, stdout, logger)
-	for _, s := range sinks {
+	err := migrateApply(ctx, m, o, stdout)
+	for _, s := range m.sinks {
 		_ = s.Close()
 	}
 	if err != nil {

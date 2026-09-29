@@ -596,9 +596,7 @@ func (e *elastic) Shape(ctx context.Context, measurement string, oldTags []strin
 	}
 	var searched struct {
 		Aggs struct {
-			Oldest struct {
-				Value string `json:"value_as_string"`
-			} `json:"oldest"`
+			Oldest minAgg `json:"oldest"`
 		} `json:"aggregations"`
 	}
 	if err = json.Unmarshal(res.body, &searched); err != nil {
@@ -606,6 +604,12 @@ func (e *elastic) Shape(ctx context.Context, measurement string, oldTags []strin
 	}
 	shape.Oldest, _ = time.Parse(time.RFC3339Nano, searched.Aggs.Oldest.Value)
 	return shape, nil
+}
+
+// minAgg is what a min aggregation on a date answers, as the date written
+// out. An index with no rows answers no value, which parses as no date.
+type minAgg struct {
+	Value string `json:"value_as_string"`
 }
 
 // indexURL is the address of a measurement's index.
