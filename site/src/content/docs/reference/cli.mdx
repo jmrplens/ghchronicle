@@ -30,6 +30,7 @@ ghchronicle -config /etc/ghchronicle/config.yaml
 | `-backfill-since` | none          | Bound the backfill: a date (`2024-01-01`), a duration (`720h`), days (`90d`) or years (`2y`)                                               |
 | `-backfill-status` | off          | Print how far the backfill in progress has got, then exit; it asks GitHub nothing, writes nothing, and needs no token                      |
 | `-backfill-retry` | `0`           | After a backfill ends with families left, wait this long and go back for them, until a pass records nothing new; `0` does not go back       |
+| `-families`       | none          | With `-backfill`, walk only these families, comma separated, the names `-groups` prints; a name that is not a family, or the flag without `-backfill`, is refused with 2 |
 | `-publish-dashboard` | off        | Publish the Grafana dashboard and the datasource it reads from, then exit; it needs the `grafana` section, asks GitHub nothing and needs no token |
 | `-uninstall`      | none          | Remove what this put in place and exit: `dashboard`, `data`, `state`, `all`, comma separated; it lists and removes nothing without `-yes` |
 | `-yes`            | off           | Go ahead with `-uninstall` or `-migrate` rather than only listing what it would do                                                         |
@@ -119,6 +120,13 @@ than giving up.
 
 ```sh
 ghchronicle -config config.yaml -backfill -backfill-since 2y
+```
+
+`-families` narrows a backfill to the families named, into every configured
+store: [some families only](/ghchronicle/how/backfill/#some-families-only).
+
+```sh
+ghchronicle -config config.yaml -backfill -families discussions,outbound
 ```
 
 ## The card, in one line

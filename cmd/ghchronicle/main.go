@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -169,8 +170,12 @@ type options struct {
 	// retry is how long a backfill waits before going back for the families a
 	// pass left behind. Zero never goes back, which is what it did before
 	// this existed.
-	retry    time.Duration
-	since    string
+	retry time.Duration
+	since string
+	// families is -families as given, and only the names it lists: a
+	// backfill of those families and no other.
+	families string
+	only     []string
 	card     string
 	theme    string
 	layout   string
@@ -224,6 +229,9 @@ func parseFlags(args []string, stderr io.Writer) (options, error) {
 		"print how far the backfill in progress has got, and exit; asks GitHub nothing and writes nothing")
 	fs.DurationVar(&o.retry, "backfill-retry", 0,
 		"after a backfill ends with families left, wait this long and go back for them, until a pass records nothing new; zero does not go back")
+	fs.StringVar(&o.families, "families", "",
+		"with -backfill, walk only these families, comma separated; -groups lists them. Its checkpoint is refused by "+
+			"a backfill of other families, and theirs by it")
 	fs.StringVar(&o.card, "card", "", "run one sweep and write a summary SVG to this path")
 	fs.StringVar(&o.theme, "card-theme", "auto",
 		"card theme: dark, light, auto, or both to write the light card at -card and the dark one beside it with _dark before the extension")
@@ -257,7 +265,41 @@ func parseFlags(args []string, stderr io.Writer) (options, error) {
 		fmt.Fprintln(stderr, err)
 		return o, err
 	}
+	var err error
+	if o.only, err = onlyFamilies(o); err != nil {
+		fmt.Fprintln(stderr, err)
+		return o, err
+	}
 	return o, nil
+}
+
+// onlyFamilies reads -families: every name a family, each once, and only
+// beside -backfill, which is the one run that walks some families and not
+// others on purpose. A name that is not a family is refused rather than
+// walked as nothing, which is what a misspelled one would otherwise be: a
+// backfill that finishes at once having read none of what it was asked for.
+func onlyFamilies(o options) ([]string, error) {
+	if strings.TrimSpace(o.families) == "" {
+		if o.families != "" {
+			return nil, errors.New("-families names no family")
+		}
+		return nil, nil
+	}
+	if !o.backfill {
+		return nil, errors.New("-families goes with -backfill")
+	}
+	var out []string
+	for name := range strings.SplitSeq(o.families, ",") {
+		name = strings.TrimSpace(name)
+		if !slices.Contains(config.Families(), name) {
+			return nil, fmt.Errorf("-families: %q is not a family; -groups lists them", name)
+		}
+		if !slices.Contains(out, name) {
+			out = append(out, name)
+		}
+	}
+	slices.Sort(out)
+	return out, nil
 }
 
 // exitProcess is every exit execute takes, so a test can drive execute through
@@ -747,10 +789,15 @@ func reportBackfill(cfg *config.Config, configPath string, stdout io.Writer, now
 		fmt.Fprintf(stdout, "  the checkpoint one leaves behind is not there: %s\n", shownPath(path))
 		return nil
 	}
+	fmt.Fprintln(stdout, "backfill in progress")
+	reportWalk(progress, path, commandLine(configPath, resumeFlags(cfg, progress.Scope)...), stdout, now)
+	return nil
+}
 
+// reportWalk is the lines a checkpoint says about its walk.
+func reportWalk(progress *run.Progress, path, resume string, stdout io.Writer, now time.Time) {
 	left := progress.Unfinished()
 	families, inFlight, repos := progress.Where()
-	fmt.Fprintln(stdout, "backfill in progress")
 	fmt.Fprintf(stdout, "  started      %s (%s ago)\n",
 		progress.Started.Format(time.RFC3339), since(progress.Started, now))
 	fmt.Fprintf(stdout, "  last written %s ago\n", since(progress.Updated, now))
@@ -763,8 +810,22 @@ func reportBackfill(cfg *config.Config, configPath string, stdout io.Writer, now
 	}
 	fmt.Fprintf(stdout, "  written by   %s\n", progress.WrittenBy)
 	fmt.Fprintf(stdout, "  checkpoint   %s\n", path)
-	fmt.Fprintf(stdout, "  resume       ghchronicle -config %s -backfill\n", configPath)
-	return nil
+	fmt.Fprintf(stdout, "  resume       %s\n", resume)
+}
+
+// resumeFlags is what resumes a backfill's checkpoint: -backfill, and what
+// the walk was asked for that the configuration alone does not ask, since a
+// resume under anything else is refused as another walk.
+func resumeFlags(cfg *config.Config, scope run.Scope) []string {
+	flags := []string{"-backfill"}
+	if scope.Since != strings.TrimSpace(cfg.Backfill.Since) && scope.Since != "" {
+		flags = append(flags, "-backfill-since", scope.Since)
+	}
+	if every := run.ScopeOf(cfg, "").Families; !slices.Equal(scope.Families, every) &&
+		len(scope.Families) > 0 && len(scope.Families) < len(every) {
+		flags = append(flags, "-families", strings.Join(scope.Families, ","))
+	}
+	return flags
 }
 
 // since is how long ago an instant was, rounded to the second, and never
@@ -832,13 +893,19 @@ func runBackfill(ctx context.Context, runner *run.Runner, cfg *config.Config,
 	if err != nil {
 		return err
 	}
+	scope := run.ScopeOf(cfg, bound)
+	if o.only != nil {
+		if narrowErr := walkable(cfg, o.only); narrowErr != nil {
+			return narrowErr
+		}
+		runner.Only, scope = set(o.only), scope.Narrowed(o.only, nil)
+		logger.Info("backfill of some families only", "families", strings.Join(o.only, ","))
+	}
 	// Opened before anything is collected, because the one thing it can say is
 	// that this walk must not be resumed, and a refusal is only worth
 	// something before the quota is spent. The bound goes in as it was
 	// spelled, not as it just resolved: see run.Scope.
-	if runner.Progress, err = run.OpenProgress(
-		cfg.BackfillProgressFile(), version, run.ScopeOf(cfg, bound), time.Now(),
-	); err != nil {
+	if runner.Progress, err = run.OpenProgress(cfg.BackfillProgressFile(), version, scope, time.Now()); err != nil {
 		return err
 	}
 	if runner.BackfillSince.IsZero() {
@@ -871,6 +938,29 @@ func runBackfill(ctx context.Context, runner *run.Runner, cfg *config.Config,
 			"complete_before_this_process", len(runner.Progress.Complete))
 	}
 	return writeCards(accumulator, files, o, logger)
+}
+
+// set is a list as a set.
+func set(names []string) map[string]bool {
+	out := make(map[string]bool, len(names))
+	for _, n := range names {
+		out[n] = true
+	}
+	return out
+}
+
+// walkable refuses a family -families names that this configuration switches
+// off. A backfill runs only what the configuration collects, so such a family
+// would be walked as nothing and the backfill would end at once, complete,
+// having read none of it.
+func walkable(cfg *config.Config, families []string) error {
+	for _, f := range families {
+		if _, enabled := cfg.Interval(f); !enabled {
+			return fmt.Errorf("-families: this configuration switches %s off, so a backfill would read none of it; "+
+				"give it a cadence under every.families to walk it", f)
+		}
+	}
+	return nil
 }
 
 // runSweep runs one sweep and, when one was asked for, draws the card from

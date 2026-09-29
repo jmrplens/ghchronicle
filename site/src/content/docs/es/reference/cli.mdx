@@ -30,6 +30,7 @@ ghchronicle -config /etc/ghchronicle/config.yaml
 | `-backfill-since` | ninguno       | Acota el relleno: una fecha (`2024-01-01`), una duración (`720h`), días (`90d`) o años (`2y`)                                             |
 | `-backfill-status` | apagada      | Imprime hasta dónde ha llegado el relleno en curso, y sale; no pregunta nada a GitHub, no escribe nada y no necesita token                 |
 | `-backfill-retry` | `0`           | Cuando un relleno acaba con familias pendientes, espera esto y vuelve a por ellas, hasta que una pasada no anote nada nuevo; `0` no vuelve  |
+| `-families`       | ninguno       | Con `-backfill`, recorre solo estas familias, separadas por comas, los nombres que imprime `-groups`; un nombre que no es una familia, o la opción sin `-backfill`, se rechaza con 2 |
 | `-publish-dashboard` | off        | Publica el dashboard de Grafana y el datasource del que lee, y sale; necesita la sección `grafana`, no le pregunta nada a GitHub y no necesita token |
 | `-uninstall`      | ninguno       | Quita lo que esto puso y sale: `dashboard`, `data`, `state`, `all`, separados por comas; lista y no quita nada sin `-yes`                  |
 | `-yes`            | off           | Sigue adelante con `-uninstall` o `-migrate` en vez de solo listar lo que haría                                                            |
@@ -119,6 +120,13 @@ reponga un presupuesto agotado en vez de rendirse.
 
 ```sh
 ghchronicle -config config.yaml -backfill -backfill-since 2y
+```
+
+`-families` limita un relleno a las familias nombradas, en todos los almacenes
+configurados: [solo algunas familias](/ghchronicle/es/how/backfill/#solo-algunas-familias).
+
+```sh
+ghchronicle -config config.yaml -backfill -families discussions,outbound
 ```
 
 ## La tarjeta, en una línea

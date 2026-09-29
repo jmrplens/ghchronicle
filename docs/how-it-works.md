@@ -493,7 +493,8 @@ ghchronicle -config config.yaml -backfill-status
 
 It reads the checkpoint and prints it: when the walk began, how long ago it
 last recorded anything, how many families are complete out of how many, the
-family it was inside and how far into it, and the command that carries it on.
+family it was inside and how far into it, and the command that carries it on,
+with the `-backfill-since` and the `-families` it was started with.
 It asks GitHub nothing and writes nothing, so it is safe to run while a walk is
 going, and it needs no token: the credential is there because a sweep asks
 GitHub, and this asks nobody. When there is no walk in progress it says so and
@@ -559,6 +560,26 @@ days that takes, pausing at every rate limit reset along the way.
 ```sh
 ghchronicle -config config.yaml -backfill -backfill-since 2y
 ```
+
+### Some families only
+
+```sh
+ghchronicle -config config.yaml -backfill -families discussions,outbound
+```
+
+walks the families named and no other, into every configured store. It is what
+a store that lost one family's history wants: dropped by hand, or sent through
+a Telegraf whose store was cleared, without walking every other family it
+still holds. The names are the families `-groups` prints. One that is not a
+family, and the flag without `-backfill`, are refused with 2, as a command line
+that does not parse; a family the configuration switches off is refused with 1
+before anything is asked, since the walk would read none of it and end
+complete.
+
+Its checkpoint is the backfill's, and records the families it was asked for, so
+a backfill of other families, or of every family, refuses it and names the
+family that differs, and `-backfill-status` prints the resume line with the
+same `-families` in it.
 
 ### Run it once, first
 
