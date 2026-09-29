@@ -257,7 +257,7 @@ func TestCommitsWalkOnPastAQuickRefusal(t *testing.T) {
 				f.write(w, "graphql_commits_page2.json")
 			})
 			points, err := Commits{Walk: Unbounded}.Collect(ctx(t), f.Client, testRepo, testNow)
-			if failed := err != nil; failed != tc.failed {
+			if (err != nil) != tc.failed {
 				t.Errorf("err = %v, want a failure: %v", err, tc.failed)
 			}
 			if got := len(only(t, points, "gh_commit")); got != tc.commits {
