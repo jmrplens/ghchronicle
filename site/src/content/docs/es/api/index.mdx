@@ -183,6 +183,12 @@ lo mismo que el de un `502`. Esa segunda petición cumple tres cosas:
   petición que falla dos veces se registra y se deja para la pasada siguiente,
   como antes. Lo que el colector leyó antes se conserva en cualquier caso.
 
+El log de un job fallido son dos peticiones: la API responde con una
+redirección, que se cobra, y el almacenamiento de objetos envía el texto. Cuando
+el almacenamiento responde uno de los cuatro, se vuelve a preguntar solo al
+almacenamiento, en la misma URL firmada y sin freno, porque no es la API de
+GitHub y no gasta presupuesto. A la API no se le pide una redirección nueva.
+
 Lo que no se vuelve a preguntar:
 
 - **Una negativa.** Cualquier `4xx`, y un `501` o un `505`, es la respuesta que

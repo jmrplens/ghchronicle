@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -484,5 +485,155 @@ func TestANetworkFailureIsNotAskedAgain(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// jobLog is an API that redirects a job log to a storage server of its own,
+// on another host as GitHub's does, whose answers the test decides. It counts
+// what each side was asked.
+type jobLog struct {
+	client            *Client
+	api, storage      atomic.Int32
+	storageAuthorized atomic.Int32
+}
+
+func newJobLog(t *testing.T, apiRemaining int, storage http.HandlerFunc) *jobLog {
+	t.Helper()
+	j := &jobLog{}
+	blob := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		j.storage.Add(1)
+		if r.Header.Get("Authorization") != "" {
+			j.storageAuthorized.Add(1)
+		}
+		if r.URL.Query().Get("sig") != "signed" {
+			t.Errorf("the signature was lost on the way to storage: %s", r.URL.RawQuery)
+		}
+		storage(w, r)
+	}))
+	t.Cleanup(blob.Close)
+	j.client, _ = newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		j.api.Add(1)
+		rateHeaders(w, "core", 5000, apiRemaining, time.Now().Add(time.Hour))
+		http.Redirect(w, r, blob.URL+"/actions-results/job-logs.txt?sig=signed", http.StatusFound)
+	})
+	return j
+}
+
+// failingStorage answers the first n requests with status and then the log.
+func failingStorage(n int32, status int) http.HandlerFunc {
+	var calls atomic.Int32
+	return func(w http.ResponseWriter, _ *http.Request) {
+		if calls.Add(1) <= n {
+			w.WriteHeader(status)
+			_, _ = w.Write([]byte("<Error><Code>ServerBusy</Code></Error>"))
+			return
+		}
+		_, _ = w.Write([]byte("2026-09-28T07:11:40Z ##[error]Process completed with exit code 1.\n"))
+	}
+}
+
+// TestStorageIsAskedAgainOnItsOwn: the redirect was the API's answer and was
+// charged; what failed is the object storage it named. The retry goes to
+// storage alone, on the same signed URL, rather than asking the API for a new
+// redirect, which is a core request.
+func TestStorageIsAskedAgainOnItsOwn(t *testing.T) {
+	t.Parallel()
+	for _, status := range askedAgainStatuses {
+		t.Run(strconv.Itoa(status), func(t *testing.T) {
+			t.Parallel()
+			j := newJobLog(t, 4000, failingStorage(1, status))
+			text, err := j.client.GetText(context.Background(), "/repos/o/n/actions/jobs/1/logs")
+			if err != nil {
+				t.Fatalf("a %d from storage followed by the log failed the request: %v", status, err)
+			}
+			if !strings.Contains(text, "exit code 1") {
+				t.Errorf("text = %q, want the retry's log", text)
+			}
+			if n := j.api.Load(); n != 1 {
+				t.Errorf("the API was asked %d times, want once: its redirect was not what failed", n)
+			}
+			if n := j.storage.Load(); n != 2 {
+				t.Errorf("storage was asked %d times, want the failed request and one more", n)
+			}
+			if n := j.storageAuthorized.Load(); n != 0 {
+				t.Errorf("%d requests to storage carried the token", n)
+			}
+		})
+	}
+}
+
+// TestStorageIsNotBraked: storage spends no budget, so a budget the redirect
+// left at the reserve does not stop the retry to storage. It did when the
+// retry went back through the API.
+func TestStorageIsNotBraked(t *testing.T) {
+	t.Parallel()
+	j := newJobLog(t, 10, failingStorage(1, http.StatusBadGateway))
+	j.client.SetReserve(500, false)
+	if _, err := j.client.GetText(context.Background(), "/repos/o/n/actions/jobs/1/logs"); err != nil {
+		t.Fatalf("a budget at the reserve stopped the retry to storage: %v", err)
+	}
+	if a, s := j.api.Load(), j.storage.Load(); a != 1 || s != 2 {
+		t.Errorf("the API was asked %d times and storage %d, want 1 and 2", a, s)
+	}
+}
+
+// TestStorageTwiceReturnsTheStatus: once, as for the API, and the error names
+// the job log that was asked for.
+func TestStorageTwiceReturnsTheStatus(t *testing.T) {
+	t.Parallel()
+	j := newJobLog(t, 4000, failingStorage(2, http.StatusServiceUnavailable))
+	_, err := j.client.GetText(context.Background(), "/repos/o/n/actions/jobs/1/logs")
+	se, ok := errors.AsType[*StatusError](err)
+	if !ok || se.Code != http.StatusServiceUnavailable || se.Path != "/repos/o/n/actions/jobs/1/logs" {
+		t.Fatalf("err = %v, want the second 503 as a StatusError naming the log", err)
+	}
+	if a, s := j.api.Load(), j.storage.Load(); a != 1 || s != 2 {
+		t.Errorf("the API was asked %d times and storage %d, want 1 and 2", a, s)
+	}
+}
+
+// TestAStorageRefusalIsNotAskedAgain: a signature that expired or a log that
+// is gone is the same answer asked again.
+func TestAStorageRefusalIsNotAskedAgain(t *testing.T) {
+	t.Parallel()
+	for _, status := range []int{http.StatusForbidden, http.StatusNotFound, http.StatusGone} {
+		t.Run(strconv.Itoa(status), func(t *testing.T) {
+			t.Parallel()
+			j := newJobLog(t, 4000, failingStorage(1, status))
+			_, err := j.client.GetText(context.Background(), "/repos/o/n/actions/jobs/1/logs")
+			if _, ok := errors.AsType[*UnavailableError](err); !ok {
+				t.Errorf("err = %v, want the log unavailable", err)
+			}
+			if a, s := j.api.Load(), j.storage.Load(); a != 1 || s != 1 {
+				t.Errorf("the API was asked %d times and storage %d, want once each", a, s)
+			}
+		})
+	}
+}
+
+// TestAStorageLookupThatFailedIsNotAskedAgain is the failure of 2026-09-28:
+// the API answered with its redirect and the storage host's name could not
+// be looked up. Neither side is asked again.
+func TestAStorageLookupThatFailedIsNotAskedAgain(t *testing.T) {
+	t.Parallel()
+	var api, storage atomic.Int32
+	c, srv := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		api.Add(1)
+		http.Redirect(w, r, "https://productionresultssa14.blob.core.windows.net/job-logs.txt?sig=signed", http.StatusFound)
+	})
+	inner := srv.Client().Transport
+	c.http.Transport = roundTrip(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Hostname() == "productionresultssa14.blob.core.windows.net" {
+			storage.Add(1)
+			return nil, lookupFailed(r.URL.Hostname())
+		}
+		return inner.RoundTrip(r)
+	})
+	_, err := c.GetText(context.Background(), "/repos/o/n/actions/jobs/1/logs")
+	if _, ok := errors.AsType[*net.DNSError](err); !ok {
+		t.Fatalf("err = %v, want the lookup's failure", err)
+	}
+	if a, s := api.Load(), storage.Load(); a != 1 || s != 1 {
+		t.Errorf("the API was asked %d times and storage %d, want once each", a, s)
 	}
 }

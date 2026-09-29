@@ -132,8 +132,9 @@ Debug adds seven lines, and no more:
 There is no per-request log: the client in `internal/ghapi` carries no logger,
 so which endpoint was called and which answer came back 304 are not visible at
 any level. That includes its one retry: a REST request answered 500, 502, 503
-or 504 is asked again two seconds later, silently, so a `collector failed`
-naming one of those four has already failed twice.
+or 504 is asked again two seconds later, silently, and so is a job log's
+download from storage, so a `collector failed` naming one of those four has
+already failed twice.
 
 <Aside type="tip" title="JSON for a shipper, text for a person">
   `format: json` emits one object per line, which is what Promtail, Vector or

@@ -173,6 +173,12 @@ attempt:
   a request that fails twice is logged and left to the next sweep as before.
   What the collector read before it is kept either way.
 
+A failed job's log is two requests: the API answers with a redirect, which is
+charged, and object storage sends the text. When storage answers one of the
+four, storage alone is asked again, on the same signed URL and without the
+brake, because it is not GitHub's API and spends no budget. The API is not
+asked for a new redirect.
+
 What is not asked again:
 
 - **A refusal.** Any `4xx`, and a `501` or a `505`, is the answer the same

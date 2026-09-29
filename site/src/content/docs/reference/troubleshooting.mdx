@@ -116,9 +116,9 @@ outage.
 
 **`collector failed` naming a `500`, a `502 Bad Gateway`, a `503` or a `504
 Gateway Timeout`.** GitHub did not finish the answer to a REST request, at its
-gateway or in the application. The client asks once more two seconds later and
-says nothing about it, so a line like this is a request that failed twice, and
-the next sweep asks again.
+gateway or in the application, or the storage a job log is read from did not.
+The client asks once more two seconds later and says nothing about it, so a
+line like this is a request that failed twice, and the next sweep asks again.
 GitHub's GraphQL gateway gives up the same way on a query too large for its ten
 seconds, and there the collectors ask again with a smaller page instead.
 

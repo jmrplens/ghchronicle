@@ -10,6 +10,7 @@ import (
 	"container/list"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -566,8 +567,9 @@ func (e *RateLimitedError) Error() string {
 // like every other line. The message is what it always was, so anything that
 // reads the text, isPaginationLimit for one, reads the same text.
 //
-// A 500, 502, 503 or 504 that arrives here from a REST GET is the second of
-// two: send has already asked once more.
+// A 500, 502, 503 or 504 that arrives here from a REST GET, or from the
+// object storage a job log is read from, is the second of two: send has
+// already asked once more.
 type StatusError struct {
 	// Path is the request, relative to the REST base.
 	Path string
@@ -797,6 +799,19 @@ func replayable(raw []byte, out any) []byte {
 // smaller page instead. Both keep what the walk already read and ask again
 // from where it stopped; each asks the way its own failure can be fixed.
 func (c *Client) send(ctx context.Context, path string, req *http.Request, do func(*http.Request) (*http.Response, error)) (*http.Response, error) {
+	return c.sendTwice(ctx, path, req, do, true)
+}
+
+// fromStorage is send for a request to the object storage a job log
+// redirects to. The same answers are asked again, after the same pause, but
+// not through the brake: storage is not GitHub's API and spends no budget.
+func (c *Client) fromStorage(ctx context.Context, path string, req *http.Request, do func(*http.Request) (*http.Response, error)) (*http.Response, error) {
+	return c.sendTwice(ctx, path, req, do, false)
+}
+
+// sendTwice is send, with charged saying whether the request spends the
+// budget, and so whether the brake is asked before the retry.
+func (c *Client) sendTwice(ctx context.Context, path string, req *http.Request, do func(*http.Request) (*http.Response, error), charged bool) (*http.Response, error) {
 	resp, err := do(req)
 	if err != nil {
 		return nil, err
@@ -821,8 +836,10 @@ func (c *Client) send(ctx context.Context, path string, req *http.Request, do fu
 		return nil, fmt.Errorf("%w, and was not asked again: %w", first, ctx.Err())
 	case <-time.After(pause):
 	}
-	if stopped := c.brake(ctx, path); stopped != nil {
-		return nil, stopped
+	if charged {
+		if stopped := c.brake(ctx, path); stopped != nil {
+			return nil, stopped
+		}
 	}
 	resp, err = do(req.Clone(ctx))
 	if err != nil {
@@ -904,23 +921,16 @@ func (c *Client) GetTextAs(ctx context.Context, path, accept string) (string, er
 		// redirect, and each one would be borrowing connections from
 		// whatever else in the process is using that default.
 		Transport: c.http.Transport,
-		CheckRedirect: func(r *http.Request, via []*http.Request) error {
-			r.Header.Del("Authorization")
-			// The redirect itself is the API's answer and carries the rate
-			// headers; the final response comes from storage and carries
-			// none. Go only returns the final one, so the budget is read
-			// here, on the way through.
-			if r.Response != nil {
-				c.readRate(r.Response)
-			}
-			if len(via) >= 5 {
-				return fmt.Errorf("%s: too many redirects", path)
-			}
-			return nil
-		},
+		// Every redirect comes back to follow rather than being followed
+		// inside Do, because the two ends of one are asked again in two
+		// different ways; see follow.
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
 	resp, err := c.send(ctx, path, req, client.Do)
 	if err != nil {
+		return "", err
+	}
+	if resp, err = c.follow(ctx, path, req, resp, client.Do); err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
@@ -954,6 +964,78 @@ func (c *Client) GetTextAs(ctx context.Context, path, accept string) (string, er
 		c.mu.Unlock()
 	}
 	return string(b), nil
+}
+
+// maxHops is how many redirects follow walks before it gives up. A job log
+// takes one. Four is the limit this client kept when net/http followed the
+// redirects for it, and a chain that long is already a loop: a hop back to
+// the API is a charged request.
+const maxHops = 4
+
+// follow walks the redirects an answer names to the answer at the end of them,
+// which for a job log is one hop, to a signed URL in object storage.
+//
+// It is here and not inside the client's Do because the two ends of that hop
+// fail differently and are asked again differently. The redirect is the API's
+// answer: charged a core request (the used count in the recording proxy's log
+// moved by one on 8,484 of the 8,612 it logged), braked, and asked again by
+// send if it failed. The storage it names is not the API: it spends no budget,
+// so it is asked again without the brake, and on its own URL, which stays
+// signed for ten minutes. Followed inside Do, a storage 502 went back to send
+// as the answer to the API request, and send paid for a new redirect through
+// the brake to get a second signed URL for the same log.
+//
+// Every hop goes without the token: the signed URL carries its own credentials
+// and the storage endpoint rejects a request that arrives with both.
+func (c *Client) follow(ctx context.Context, path string, asked *http.Request, resp *http.Response, do func(*http.Request) (*http.Response, error)) (*http.Response, error) {
+	for hops := 0; ; hops++ {
+		target, err := redirectTarget(resp)
+		if err != nil {
+			_ = resp.Body.Close()
+			return nil, fmt.Errorf("%s: %w", path, err)
+		}
+		if target == "" {
+			return resp, nil
+		}
+		// Drained so the connection goes back to the pool for the hop.
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
+		_ = resp.Body.Close()
+		if hops >= maxHops {
+			return nil, fmt.Errorf("%s: too many redirects", path)
+		}
+		hop, err := http.NewRequestWithContext(ctx, http.MethodGet, target, http.NoBody)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", path, err)
+		}
+		hop.Header = asked.Header.Clone()
+		hop.Header.Del("Authorization")
+		if resp, err = c.fromStorage(ctx, path, hop, do); err != nil {
+			return nil, err
+		}
+	}
+}
+
+// redirectTarget is where a redirect sends the request, resolved against the
+// URL that answered it, or the empty string for an answer that is not one to
+// follow. The statuses are the five net/http follows; a 300 is a choice for a
+// person to make and a 304 is an answer. A redirect with no Location is
+// returned as it is, as net/http returns it, and one whose Location does not
+// parse is an error.
+func redirectTarget(resp *http.Response) (string, error) {
+	switch resp.StatusCode {
+	case http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther,
+		http.StatusTemporaryRedirect, http.StatusPermanentRedirect:
+	default:
+		return "", nil
+	}
+	loc, err := resp.Location()
+	if errors.Is(err, http.ErrNoLocation) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return loc.String(), nil
 }
 
 // GraphQL runs one query and unmarshals data into out.

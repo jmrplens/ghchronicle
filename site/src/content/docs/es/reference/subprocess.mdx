@@ -243,7 +243,8 @@ level=ERROR msg="collector failed" family=artifacts repo=acme/parser err="/repos
 
 Un 500, 502, 503 o 504 en una línea así ya ha fallado dos veces: el cliente
 pregunta una vez más, dos segundos después, antes de rendirse con una petición
-REST, y no registra ninguno de los dos intentos.
+REST o con la descarga del log de un job desde el almacenamiento, y no registra
+ninguno de los dos intentos.
 
 Quien llame y necesite enterarse de eso tiene que leer la salida de error. No
 hay código de salida para ello, a propósito: en una cuenta grande alguna familia

@@ -131,7 +131,8 @@ Debug añade siete líneas, y ninguna más:
 No hay registro por petición: el cliente de `internal/ghapi` no lleva
 registrador, así que qué endpoint se llamó y qué respuesta volvió 304 no se ven
 en ningún nivel. Eso incluye su único reintento: una petición REST respondida
-con 500, 502, 503 o 504 se repite dos segundos después, en silencio, así que un
+con 500, 502, 503 o 504 se repite dos segundos después, en silencio, y también
+la descarga del log de un job desde el almacenamiento, así que un
 `collector failed` que nombra uno de esos cuatro ya ha fallado dos veces.
 
 <Aside type="tip" title="JSON para un agente de envío, texto para una persona">
