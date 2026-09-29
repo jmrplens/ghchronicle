@@ -26,24 +26,7 @@ const nothingRepository = "nothing-was-written-here"
 // repository with nothing in it, in a store that cannot answer it with the
 // nothing the SQL stores draw. Each reason is words of that store's own
 // description of the panel, as in dashboardsDiffer.
-var tilesLeftOverNothing = []dashboardDiffer{
-	{
-		title: "Runs in range", stores: []string{"elasticsearch"},
-		reason: "leaves its group when the range holds no document of it",
-		only: []string{
-			"Success rate", "Run duration", "Queue wait", "Artifact storage walked", "Actions cache",
-		},
-	},
-	{
-		title: "Downloads", stores: []string{"elasticsearch"},
-		reason: "leaves its group when the range holds no document of it", only: []string{"Total"},
-	},
-	{
-		title: "Open alerts", stores: []string{"elasticsearch"},
-		reason: "leaves its group when the range holds no document of it",
-		only:   []string{"Dependabot", "Code scanning"},
-	},
-}
+var tilesLeftOverNothing = []dashboardDiffer{}
 
 // TestEveryTileIsDrawnOverNothing asks every stat, gauge and bar gauge of the
 // five dashboards about nothing, twice: about a repository that holds
@@ -80,7 +63,10 @@ var tilesLeftOverNothing = []dashboardDiffer{
 // its stat no longer adds all its values up. That review found as well that
 // this asked no bar gauge, and "Contribution mix (last year)", a bar per share
 // of the snapshot the Account group reads, drew "No data" over such a range
-// in four stores and four names with nothing beside them in Graphite.
+// in four stores and four names with nothing beside them in Graphite. The
+// last round of 2.6.4 drew the three groups still let leave out a tile the
+// same way as the Repositories group, "Runs in range", "Downloads" and "Open
+// alerts", so the list above is empty, and a tile left out anywhere fails.
 func TestEveryTileIsDrawnOverNothing(t *testing.T) {
 	s := Start(t)
 	run := dashboardsRun(t, s)

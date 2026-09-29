@@ -64,7 +64,9 @@ func graphiteCountsFallBack(t *testing.T) int {
 
 // elasticsearchCountsKeepEmptyBuckets holds every total of an Elasticsearch
 // stat to asking for an empty bucket when it counts and to not asking for one
-// otherwise, and says how many counts it found.
+// otherwise, and says how many counts it found. A count esNamedTotal takes in
+// the bucket a century wide is held to asking for it empty as well, since that
+// bucket is what answers 0 over a range with nothing in it.
 func elasticsearchCountsKeepEmptyBuckets(t *testing.T) int {
 	t.Helper()
 	counts := 0
@@ -74,12 +76,13 @@ func elasticsearchCountsKeepEmptyBuckets(t *testing.T) int {
 		}
 		for _, target := range panelTargets(p) {
 			metric, bucket := oneMetricOneBucket(target)
-			if bucket["field"] != "measurement.keyword" {
+			settings, _ := bucket["settings"].(map[string]any)
+			counting := metric["type"] == "count" || metric["type"] == "cardinality"
+			if bucket["field"] != "measurement.keyword" && (settings["interval"] != esWholeRange || !counting) {
 				continue
 			}
-			settings, _ := bucket["settings"].(map[string]any)
 			want := "1"
-			if metric["type"] == "count" || metric["type"] == "cardinality" {
+			if counting {
 				want = "0"
 				counts++
 			}
@@ -325,9 +328,11 @@ func prometheusAggregationsFallBack(t *testing.T) int {
 // that reads the last value of each field to a bucket that is there when no
 // document is, unless it counts, which the test above holds; the newest
 // document of a snapshot to the one bucket that answers its fields over no
-// document without failing, esNewest's; a value the panel adds up per name to
-// a query that names its tile over nothing; and every stat that adds its
-// values up to saying which of them leave the group over nothing.
+// document without failing, esNewest's; and a value the panel adds up per name
+// to a query that names its tile over nothing. A stat that adds every value up
+// is refused: it reads a value of nothing as 0, and one whose query answers
+// nothing at all leaves the group, which until the last round of 2.6.4 three
+// groups did and said so in their descriptions.
 func elasticsearchValuesAnswerNothing(t *testing.T) int {
 	t.Helper()
 	checked := 0
@@ -343,10 +348,8 @@ func elasticsearchValuesAnswerNothing(t *testing.T) int {
 		reduce, _ := options["reduceOptions"].(map[string]any)
 		if calcs, _ := reduce["calcs"].([]any); len(calcs) > 0 && calcs[0] == "sum" {
 			checked++
-			if desc, _ := p["description"].(string); !strings.Contains(desc, "leaves its group when the range holds no document of it") {
-				t.Errorf("elasticsearch %q adds its values up, which reads a value of nothing as 0, and does "+
-					"not say which values leave the group instead: %q", p["title"], desc)
-			}
+			t.Errorf("elasticsearch %q adds every value up, which reads a value of nothing as 0 and draws "+
+				"no tile for one whose query answers nothing; esSumPerName adds up only what it names", p["title"])
 			continue
 		}
 		for _, target := range panelTargets(p) {
@@ -401,9 +404,11 @@ func sumsPerName(p map[string]any) bool {
 
 // esNamedOverNothing holds each query of a panel that sums per name either to
 // answering its fields over no document, as esValueAnswersNothing holds a
-// query, or to a table of the newest document of each item whose every
-// column has a query of the panel that answers its name over any range, and
-// says how many values it held to either.
+// query, or, where it reads the newest document of each item, to a bucket
+// that has to hold one, as esLatestSum's does, and to a query of the panel
+// that answers the name of the tile over any range, whether the item's
+// values are a column of a table or a series each under an alias. It says how
+// many values it held to either.
 func esNamedOverNothing(t *testing.T, p map[string]any) int {
 	t.Helper()
 	named := map[string]bool{}
@@ -429,23 +434,51 @@ func esNamedOverNothing(t *testing.T, p map[string]any) int {
 		metrics, _ := target["metrics"].([]any)
 		buckets, _ := target["bucketAggs"].([]any)
 		first, _ := metrics[0].(map[string]any)
-		last, _ := buckets[len(buckets)-1].(map[string]any)
-		if first["type"] != "top_metrics" || last["type"] == "date_histogram" {
+		if first["type"] != "top_metrics" || !slices.ContainsFunc(buckets, isTerms) {
 			checked += esValueAnswersNothing(t, p["title"], target)
 			continue
 		}
-		settings, _ := first["settings"].(map[string]any)
-		for _, raw := range asList(settings["metrics"]) {
-			field, _ := raw.(string)
+		for _, raw := range buckets {
+			bucket, _ := raw.(map[string]any)
+			if settings, _ := bucket["settings"].(map[string]any); settings["min_doc_count"] != "1" {
+				t.Errorf("elasticsearch %q: the newest document of each item over %v asks for an empty %v "+
+					"bucket, and the datasource fails the whole panel on one", p["title"], bucketFieldsOf(buckets),
+					bucket["type"])
+			}
+		}
+		for _, name := range newestNames(target, first, renamed) {
 			checked++
-			if name := renamed["Top Metrics "+field]; !named[name] {
-				t.Errorf("elasticsearch %q: %s, the newest document of each item over %v, answers a range "+
-					"with no document in it with no field, and no query of the panel names its tile %q there",
-					p["title"], field, bucketFieldsOf(buckets), name)
+			if !named[name] {
+				t.Errorf("elasticsearch %q: the newest document of each item over %v answers a range with "+
+					"no document in it with nothing, and no query of the panel names its tile %q there",
+					p["title"], bucketFieldsOf(buckets), name)
 			}
 		}
 	}
 	return checked
+}
+
+// isTerms reports whether a bucket aggregation is a terms bucket, one per
+// item it finds.
+func isTerms(raw any) bool {
+	bucket, _ := raw.(map[string]any)
+	return bucket["type"] == "terms"
+}
+
+// newestNames is the tiles a query of the newest document of each item
+// answers: its alias, which names the series of every item, or, for a table,
+// the name each of its columns is renamed to.
+func newestNames(target, metric map[string]any, renamed map[string]string) []string {
+	if alias, _ := target["alias"].(string); alias != "" {
+		return []string{alias}
+	}
+	var out []string
+	settings, _ := metric["settings"].(map[string]any)
+	for _, raw := range asList(settings["metrics"]) {
+		field, _ := raw.(string)
+		out = append(out, renamed["Top Metrics "+field])
+	}
+	return out
 }
 
 // answersNoValue reports whether a query is esNameOnly's: one century-wide

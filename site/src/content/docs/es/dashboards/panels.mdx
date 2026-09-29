@@ -78,20 +78,20 @@ Graphite para una ruta que nunca ha tenido, Elasticsearch para un rango en el
 que no tiene ningún documento, y Prometheus para una consulta que no encuentra
 ninguna serie. Antes de la 2.6.2 una tarjeta así salía de su grupo en esos tres,
 y sobre un repositorio sin nada faltaban dieciocho tarjetas en Graphite y veinte
-en Elasticsearch. Queda un caso, en Elasticsearch, y los tres paneles a los
-que afecta lo dicen: un valor sumado del documento más reciente de cada
-repositorio, release o alerta, el almacenamiento de artefactos y la caché, el
-total de descargas y las alertas abiertas, sigue saliendo de su grupo cuando no
-hay tal documento, ya que el datasource falla sin más con esa agregación sobre
-nada. La tasa de éxito, la duración de la ejecución y la espera en cola junto a
-los dos totales de bytes salen también, porque ese panel suma cada valor y
-leería como 0 un valor de nada. Los recuentos de estrellas y forks del Overview
-también salían hasta la 2.6.4. Su grupo suma ahora sus valores en las propias
-transformaciones del panel, un campo por nombre con la suma de lo leído bajo él
-y sin valor donde no se leyó nada, y dos consultas que responden solo los
-nombres Stars y Forks, sobre cualquier rango, ocupan el lugar de la tabla de
-repositorios donde esta no responde nada, así que el grupo dibuja lo que
-dibujan los demás almacenes.
+en Elasticsearch. Hasta la 2.6.4 quedaba un caso, en Elasticsearch: un valor
+sumado del documento más reciente de cada repositorio, release o alerta, los
+recuentos de estrellas y forks, el almacenamiento de artefactos y la caché, el
+total de descargas y las alertas abiertas, salía de su grupo cuando no había tal
+documento, ya que el datasource falla sin más con esa agregación sobre nada, y
+la tasa de éxito, la duración de la ejecución y la espera en cola junto a los
+dos totales de bytes salían también, porque ese panel sumaba todos sus valores y
+habría leído como 0 un valor de nada. Esos cuatro grupos suman ahora sus valores
+en las propias transformaciones del panel: cada valor llega con el nombre de su
+tarjeta, una vez por repositorio, release o alerta donde se suma, los valores de
+un mismo nombre se suman entre sí, y un nombre bajo el que no se leyó nada queda
+sin valor. Una consulta que responde solo el nombre, sobre cualquier rango,
+ocupa el lugar de cada total donde nada responde, así que todos los grupos
+dibujan lo que dibujan los demás almacenes.
 
 Sobre un rango al que no llegó ningún barrido, los grupos de las instantáneas de
 la propia cuenta, de las que los almacenes SQL leen la fila más reciente del

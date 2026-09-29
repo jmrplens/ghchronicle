@@ -221,37 +221,29 @@ func runOutcomes(b *builder) []Panel {
 				grNamed("G", ciCacheSize, latestSum(rp("gh_actions_cache", "size_bytes"))),
 			},
 			GRDesc: grSlot,
-			// esTotal and not esOverRange: this stat adds its values up for the
-			// two byte totals, and a value of nothing would be added up to 0.
+			// Each value a series named by its tile, and the panel adds up the
+			// rows of each name, since a stat has one calculation for every
+			// value: the byte totals are the newest document of each
+			// repository added up, and the five before them are one value
+			// each, which is none over a range with none to read rather than
+			// the 0 a sum of every value would have drawn.
 			ES: func() []Target {
 				out := []Target{
-					esRef("A", b.esTotal(ciRun, b.mCount(), ESF)),
-					esRef("B", b.esTotal(ciRun, b.mAvg("success"), ESF, "conclusion:(success OR failure)")),
-					esRef("C", b.esTotal(ciRun, b.mCount(), ESF, "conclusion:("+cancelledRun+" OR skipped)")),
-					esRef("D", b.esTotal(ciRun, b.mPct("duration_seconds", 50), ESF)),
-					esRef("E", b.esTotal(ciJob, b.mPct("queued_seconds", 50), ESF)),
+					b.esNamedTotal("A", ciRunCount, ciRun, b.mCount(), ESF),
+					b.esNamedTotal("B", ciSuccessRate, ciRun, b.mAvg("success"), ESF, "conclusion:(success OR failure)"),
+					b.esNamedTotal("C", ciUndecidedRuns, ciRun, b.mCount(), ESF, "conclusion:("+cancelledRun+" OR skipped)"),
+					b.esNamedTotal("D", ciRunTime, ciRun, b.mPct("duration_seconds", 50), ESF),
+					b.esNamedTotal("E", ciQueueWait, ciJob, b.mPct("queued_seconds", 50), ESF),
 				}
-				out = append(out, esRefs("F", b.esLatestSum("gh_artifact_total", "live_bytes"))...)
-				return append(out, esRefs("G", b.esLatestSum("gh_actions_cache", "size_bytes"))...)
+				artifacts := b.esLatestSum("F", ciArtifactStorage, "gh_artifact_total", "live_bytes")
+				out = append(out, artifacts, b.esNameOnly(artifacts, "H", ciArtifactStorage))
+				cache := b.esLatestSum("G", ciCacheSize, "gh_actions_cache", "size_bytes")
+				return append(out, cache, b.esNameOnly(cache, "I", ciCacheSize))
 			}(),
-			ESOver: []any{
-				frameName("A", ciRunCount), frameName("B", ciSuccessRate),
-				frameName("C", ciUndecidedRuns), frameName("D", ciRunTime),
-				frameName("E", ciQueueWait), frameName("F", ciArtifactStorage),
-				frameName("G", ciCacheSize),
-				fieldThresholds(ciSuccessRate, "percentunit", fractionOf(rateThresholds)),
-			},
-			// The two byte totals are a sum over the newest reading of each
-			// series, and the five before them are single values a sum leaves
-			// alone.
-			ESOpts: Opts{"calc": "sum"},
+			ESTF:   esSumPerName(),
+			ESOver: []any{fieldThresholds(ciSuccessRate, "percentunit", fractionOf(rateThresholds))},
 			ESDesc: "In Elasticsearch the success rate is the mean of the boolean `success` " +
-				"field over those runs, as a fraction. " + esLeftOut("a value",
-				"the artifact storage and the cache are the newest document of each repository "+
-					"added up by the panel, and the datasource fails on a newest-document "+
-					"aggregation that finds nothing, so the query cannot ask for the empty one; "+
-					"and since the panel adds up every value, a success rate, a run duration or "+
-					"a queue wait of nothing would read 0, so it is not asked for either."),
+				"field over those runs, as a fraction.",
 			Opts: Opts{"thresholds": plainSteps},
 			Overrides: []any{
 				fieldThresholds(ciSuccessRate, "percent", rateThresholds),

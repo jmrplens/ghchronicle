@@ -68,19 +68,20 @@ the SQL stores draw, reading 0 or no value where they do: Graphite for a path
 it has never held, Elasticsearch for a range it holds no document in, and
 Prometheus for a query that finds no series. Before 2.6.2 such a tile left its
 group in those three, and over a repository with nothing in it eighteen tiles
-were missing from Graphite and twenty from Elasticsearch. One case is left, in
-Elasticsearch, and the three panels it touches say so: a value added up from
-the newest document of each repository, release or alert, the artifact storage
-and the cache, the download total and the open alerts, still leaves its group
-when there is no such document, since the datasource fails outright on that
-aggregation over nothing. The success rate, the run duration and the queue wait
-beside the two byte totals leave it as well, because that panel adds each value
-up and would read a value of nothing as 0. The star and fork counts of the
-Overview left it too until 2.6.4. Their group now adds its values up in the
-panel's own transformations, a field per name holding the sum of what was read
-under it and no value where nothing was, and two queries that answer only the
-names Stars and Forks, over any range, stand in for the table of repositories
-where it answers nothing, so the group draws what the other stores draw.
+were missing from Graphite and twenty from Elasticsearch. Until 2.6.4 one case
+was left, in Elasticsearch: a value added up from the newest document of each
+repository, release or alert, the star and fork counts, the artifact storage
+and the cache, the download total and the open alerts, left its group when
+there was no such document, since the datasource fails outright on that
+aggregation over nothing, and the success rate, the run duration and the queue
+wait beside the two byte totals left it as well, because that panel added
+every value up and would have read a value of nothing as 0. Those four groups
+now add their values up in the panel's own transformations: each value arrives
+under the name of its tile, once per repository, release or alert where it is
+added up, the values of one name are added together, and a name nothing was
+read under has no value. A query that answers only the name, over any range,
+stands in for each total where nothing answers, so every group draws what the
+other stores draw.
 
 Over a range no sweep reached, the groups of the account's own snapshots, which
 the SQL stores read as the newest row of the range, say what the range lacked
