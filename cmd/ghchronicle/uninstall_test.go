@@ -24,6 +24,9 @@ type teardownStub struct {
 	// when one does is read.
 	refuseDelete bool
 	deleted      []string
+	// release is the InfluxDB release /ping names, the way 3.0.0 to 3.4.0
+	// name it; empty answers as Grafana does.
+	release string
 }
 
 func (s *teardownStub) serve(t *testing.T) string {
@@ -51,6 +54,10 @@ func (s *teardownStub) serve(t *testing.T) string {
 			return
 		}
 		switch {
+		case r.URL.Path == "/ping" && s.release != "":
+			w.Header().Set("X-Influxdb-Build", "Core")
+			w.Header().Set("X-Influxdb-Version", s.release)
+			_, _ = io.WriteString(w, `{"version":"`+s.release+`"}`)
 		case strings.Contains(r.URL.Path, "/api/v3/query_sql"):
 			rows := make([]map[string]string, 0, len(s.tables))
 			for _, name := range s.tables {
@@ -211,6 +218,36 @@ func TestATableInfluxDBAlreadyDeletedIsNotReportedRemoved(t *testing.T) {
 	if !strings.Contains(said.String(), "purged by the server itself") ||
 		!strings.Contains(said.String(), "gh_discussion_comment-20260928T222330") {
 		t.Errorf("it does not say whose the deleted table is to purge:\n%s", said.String())
+	}
+}
+
+// TestAnUninstallSaysAnInfluxDBBefore32KeepsWhatItDeletes. 3.0 and 3.1 have
+// no hard deletion: every table the uninstall deletes stays, renamed, beside
+// the ones deleted already, which is worth knowing before yes, and so is the
+// request that removes one on a later release.
+func TestAnUninstallSaysAnInfluxDBBefore32KeepsWhatItDeletes(t *testing.T) {
+	t.Parallel()
+	s := &teardownStub{
+		tables:  []string{"gh_discussion_comment", "gh_discussion_comment-20260928T222330", "gh_repo"},
+		release: "3.1.0",
+	}
+	url := s.serve(t)
+	var said strings.Builder
+	if err := uninstall(t.Context(), teardownConfig(t, url), targetData, false, &said); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"note: influxdb: each table deleted here is renamed <table>-<instant> and kept for good, and the tables " +
+			"deleted already are kept for good: gh_discussion_comment-20260928T222330. InfluxDB 3 Core 3.1.0 has no " +
+			"hard deletion",
+		"curl -X DELETE '" + url + "/api/v3/configure/table?db=github&table=<table>-<instant>&hard_delete_at=now'",
+	} {
+		if !strings.Contains(said.String(), want) {
+			t.Errorf("the uninstall does not say %q:\n%s", want, said.String())
+		}
+	}
+	if strings.Contains(said.String(), "purged by the server itself") {
+		t.Errorf("it says a server with no hard deletion purges what it deleted:\n%s", said.String())
 	}
 }
 

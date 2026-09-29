@@ -43,6 +43,14 @@ type Lingerer interface {
 	Lingering() []string
 }
 
+// Keeper is a store that may keep for good what it is told to delete:
+// InfluxDB 3 before 3.2.
+type Keeper interface {
+	// KeptForGood says, when the store keeps for good every table it
+	// deletes, why, and what removes one.
+	KeptForGood(ctx context.Context) (Stay, bool)
+}
+
 // Unsupported is a sink whose store cannot be emptied from here, with the
 // reason, which is worth printing: silence would read as nothing to remove.
 type Unsupported struct {

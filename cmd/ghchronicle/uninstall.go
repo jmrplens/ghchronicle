@@ -250,13 +250,45 @@ func dataRemovals(ctx context.Context, cfg *config.Config, out io.Writer) ([]rem
 				drop: func(ctx context.Context) error { return store.Drop(ctx, item) },
 			})
 		}
-		if l, ok := store.(teardown.Lingerer); ok && len(l.Lingering()) > 0 {
-			fmt.Fprintf(out, "note: %s: deleted already, and purged by the server itself on its own schedule, 72 "+
-				"hours after the delete by default, which refuses to be asked again sooner: %s\n", store.Name(),
-				strings.Join(l.Lingering(), ", "))
-		}
+		sayLingering(ctx, store, len(items), out)
 	}
 	return found, nil
+}
+
+// sayLingering notes what a store keeps of the tables it was told to delete,
+// which Holds leaves out of the list, and, on a server that never purges what
+// it deletes, that each table this deletes stays too, under a new name, which
+// is worth knowing before yes.
+func sayLingering(ctx context.Context, store teardown.Store, deleting int, out io.Writer) {
+	var lingering []string
+	if l, ok := store.(teardown.Lingerer); ok {
+		lingering = l.Lingering()
+	}
+	if k, ok := store.(teardown.Keeper); ok {
+		if stay, forGood := k.KeptForGood(ctx); forGood {
+			sayKeptForGood(store.Name(), stay, deleting, lingering, out)
+			return
+		}
+	}
+	if len(lingering) > 0 {
+		fmt.Fprintf(out, "note: %s: deleted already, and purged by the server itself on its own schedule, 72 "+
+			"hours after the delete by default, which refuses to be asked again sooner: %s\n", store.Name(),
+			strings.Join(lingering, ", "))
+	}
+}
+
+// sayKeptForGood is the note of a store that keeps for good what it deletes.
+func sayKeptForGood(name string, stay teardown.Stay, deleting int, lingering []string, out io.Writer) {
+	var kept []string
+	if deleting > 0 {
+		kept = append(kept, "each table deleted here is renamed <table>-<instant> and kept for good")
+	}
+	if len(lingering) > 0 {
+		kept = append(kept, "the tables deleted already are kept for good: "+strings.Join(lingering, ", "))
+	}
+	if len(kept) > 0 {
+		fmt.Fprintf(out, "note: %s: %s. %s\n", name, strings.Join(kept, ", and "), stay)
+	}
 }
 
 // stateRemovals is what a sweep keeps between runs. All of it is rebuilt by

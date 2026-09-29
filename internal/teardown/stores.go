@@ -53,8 +53,9 @@ func (i *influx) Name() string { return "influxdb" }
 //
 // A table InfluxDB 3 has already deleted is left out. The server renames it
 // to <name>-<instant>, keeps listing it and answering queries of it until it
-// purges it 24 hours later, and answers a delete of it with a 409 whether or
-// not hard_delete_at is sent (measured on 3.11.2). Listed, it was "removed"
+// purges it, 72 hours later by default and never before 3.2, and answers a
+// delete of it with a 409 whether or not hard_delete_at is sent (measured on
+// 3.11.2), or, before 3.2, by renaming it once more. Listed, it was "removed"
 // on every uninstall and still there after. Lingering says which they are.
 func (i *influx) Holds(ctx context.Context) ([]string, error) {
 	names, err := i.tables(ctx)
@@ -92,6 +93,16 @@ var asideStamp = regexp.MustCompile(`^-(\d{8}[Tt]\d{6})$`)
 // Lingering is the tables of this project's that the last Holds found
 // deleted and not yet purged.
 func (i *influx) Lingering() []string { return i.lingering }
+
+// KeptForGood says, of a server that keeps every table it deletes for good,
+// why, and what removes one once it is renamed.
+func (i *influx) KeptForGood(ctx context.Context) (Stay, bool) {
+	server, err := i.Describe(ctx)
+	if err != nil || !KeepsForGood(server) {
+		return Stay{}, false
+	}
+	return InfluxStay(server, i.sink, "<table>-<instant>"), true
+}
 
 // tables is every table of the database, sorted.
 func (i *influx) tables(ctx context.Context) ([]string, error) {
