@@ -25,11 +25,14 @@ ghchronicle -config /etc/ghchronicle/config.yaml
 | `-groups`         | off           | Print the groups with the families in each, then exit                                                                                      |
 | `-backfill`       | off           | Reach as far back as each surface allows, waiting for the rate limit to reset rather than stopping                                         |
 | `-backfill-since` | none          | Bound the backfill: a date (`2024-01-01`), a duration (`720h`), days (`90d`) or years (`2y`)                                               |
-| `-backfill-status` | off          | Print how far the backfill in progress has got, then exit; it asks GitHub nothing, writes nothing, and needs no token                      |
-| `-backfill-retry` | `0`           | After a backfill ends with families left, wait this long and go back for them, until a pass records nothing new; `0` does not go back       |
+| `-backfill-status` | off          | Print how far the backfill in progress, and a migration's refill, have got, then exit; it asks GitHub nothing, writes nothing, and needs no token |
+| `-backfill-retry` | `0`           | After a backfill, or a migration's refill, ends with families left, wait this long and go back for them, until a pass records nothing new; `0` does not go back |
+| `-families`       | none          | With `-backfill`, walk only these families, comma separated, the names `-groups` prints; a name that is not a family, or the flag without `-backfill`, is refused with 2 |
 | `-publish-dashboard` | off        | Publish the Grafana dashboard and the datasource it reads from, then exit; it needs the `grafana` section, asks GitHub nothing and needs no token |
 | `-uninstall`      | none          | Remove what this put in place and exit: `dashboard`, `data`, `state`, `all`, comma separated; it lists and removes nothing without `-yes` |
-| `-yes`            | off           | Go ahead with `-uninstall` rather than only listing what it would remove                                                                   |
+| `-yes`            | off           | Go ahead with `-uninstall` or `-migrate` rather than only listing what it would do                                                         |
+| `-migrate`        | off           | Print, for every configured store, what an earlier release left there in a shape this one no longer writes and what bringing it along would take, then exit; it changes nothing without `-yes`, and with it applies every pending change and reads what it cleared again |
+| `-migrate-others` | off           | With `-migrate -yes`, also apply a change to a store holding rows of accounts this configuration does not collect, or whose rows could not be compared with it; without `-migrate` it is refused with 2 |
 | `-card`           | none          | Run one sweep and write a summary SVG to this path; that sweep runs every family, whatever the cadences say                                |
 | `-card-only`      | off           | With `-card`, write the SVG and nothing else: no sink is needed, none is written to, and the state file is left as it was                  |
 | `-card-theme`     | `auto`        | `dark`, `light`, `auto`, or `both`: the light card at `-card` and the dark one beside it with `_dark` before the extension, from one sweep |
@@ -48,8 +51,8 @@ configuration and asks GitHub which repositories the targets resolve to, which
 is the cheap way to check a change before spending quota on a sweep.
 `-backfill-status` reads the configuration to find the
 [backfill checkpoint](https://jmrp.io/docs/ghchronicle/how/backfill/#seeing-how-far-it-has-got)
-and prints how far that walk has got; it asks GitHub nothing, so it needs no
-token.
+and prints how far that walk has got, and the refill of a migration after it
+when one is in progress; it asks GitHub nothing, so it needs no token.
 
 ```sh
 ghchronicle -version
@@ -58,6 +61,62 @@ ghchronicle -card-layouts
 ghchronicle -config config.yaml -list
 ghchronicle -config config.yaml -backfill-status
 ```
+
+## What an upgrade left in the stores
+
+```sh
+ghchronicle -config config.yaml -migrate
+```
+
+`-migrate` checks every configured store against the list of changes the
+binary carries, each a measurement an earlier release wrote under a key this
+one no longer uses, and prints one block per store: what each change finds
+there, the evidence, what bringing the store along would take and what would
+be read again from GitHub. It changes nothing. The stores are asked questions,
+GitHub is asked for the repository list alone, and the state file is read and
+never written, so it exits 0 whatever it finds. Without a token it still runs
+and says what it could not compare. [Migrations](https://jmrp.io/docs/ghchronicle/install/upgrading/#migrations)
+says how each store is decided and what each line means. When something is
+pending, the plan ends with the command that applies it and with what a start
+does about it under the [`migrate`](https://jmrp.io/docs/ghchronicle/configuration/#migrate)
+setting.
+
+That command, and every other one ghchronicle prints for you to run next (the
+resume line of `-backfill-status`, the warnings of a start, the last line of
+`-setup`), names the configuration as it was given, quoted when a shell would
+read part of the path: in single quotes on Linux and macOS, and in double
+quotes on Windows, the one form PowerShell and `cmd` both read as a single
+argument.
+
+```sh
+ghchronicle -config config.yaml -migrate -yes
+```
+
+With `-yes` it prints the same plan and then applies every pending change, the
+ones marked as needing somebody's word too, reads what it cleared again from
+GitHub, and says under the plan what happened to each. Reading it again is one
+backfill of the families that write what was cleared, writing that alone into
+the stores it was cleared from; `-backfill-retry` goes back for what it leaves,
+and where a store kept a copy of the old rows, the report compares the two and
+names what GitHub no longer serves. One cut short keeps a checkpoint of its
+own, and the same command resumes it, even with nothing left to apply:
+[reading the history back](https://jmrp.io/docs/ghchronicle/install/upgrading/#reading-the-history-back).
+A store holding rows of
+accounts this configuration does not collect, or whose rows could not be
+compared with it, is held back unless `-migrate-others` is given as well. It
+needs a token and the repository list, and it takes the state file for as long
+as it runs: with the service running it refuses, naming the process, and
+changes nothing, so stop the service first, and pause a cron job running
+`-once`. With the SQL sink on standard output, the plan and the report go to
+standard error, so standard output is the SQL alone.
+What it applies is recorded as it goes, so running it again after a failure
+carries on without doing anything twice.
+
+| Exit | When                                                                                                                  |
+| ---- | --------------------------------------------------------------------------------------------------------------------- |
+| `0`  | `-migrate`, whatever it finds; `-migrate -yes` when everything pending was applied and read again, or nothing was    |
+| `1`  | `-migrate -yes` left something: a store that refused or did not answer, one held back, a refill that did not finish; or it refused to start |
+| `2`  | A command line that does not parse, `-migrate-others` without `-migrate` among them                                   |
 
 ## The three ways to run a sweep
 
@@ -75,6 +134,13 @@ than giving up.
 
 ```sh
 ghchronicle -config config.yaml -backfill -backfill-since 2y
+```
+
+`-families` narrows a backfill to the families named, into every configured
+store: [some families only](https://jmrp.io/docs/ghchronicle/how/backfill/#some-families-only).
+
+```sh
+ghchronicle -config config.yaml -backfill -families discussions,outbound
 ```
 
 ## The card, in one line

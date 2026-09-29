@@ -9,7 +9,14 @@ case "$MODE" in
   once) args+=(-once) ;;
   backfill) args+=(-backfill); [ -n "$SINCE" ] && args+=(-backfill-since "$SINCE") ;;
   card) ;;
-  *) echo "mode must be once, backfill or card, got '$MODE'" >&2; exit 2 ;;
+  # The workflow that asks for this mode is the word -migrate -yes wants:
+  # somebody chose to run it, and it is dispatched by hand.
+  migrate)
+    if [ -n "$CARD" ]; then
+      echo "mode migrate sweeps nothing, so it draws no card; leave card empty" >&2; exit 2
+    fi
+    args+=(-migrate -yes) ;;
+  *) echo "mode must be once, backfill, card or migrate, got '$MODE'" >&2; exit 2 ;;
 esac
 if [ -n "$CARD" ]; then
   # The binary refuses to create directories: it sweeps, and then the
@@ -33,4 +40,29 @@ if [ -n "$CARD" ]; then
 elif [ "$MODE" = card ]; then
   echo "mode card needs a card path" >&2; exit 2
 fi
-ghchronicle "${args[@]}"
+
+# The log goes to the step's output as it always has, and every line that
+# says a store was changed, or is left in two shapes, or owes its history,
+# becomes an annotation on the run as it is written: a warning in a log nobody
+# opens is how a store stays in two shapes for weeks, and a job cancelled or
+# timed out while a start read back what it cleared ends before any line
+# after it. Standard output and the log share the step's output either way;
+# pipefail, set above, makes the status the binary's own.
+annotate() {
+  local line title
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+    case $line in
+      *'migration pending'*) title='ghchronicle migration pending' ;;
+      *'applying a migration before the first sweep'*) title='ghchronicle migration applied at the start' ;;
+      *'migration failed'*) title='ghchronicle migration failed' ;;
+      *'refill owed'* | *'refill did not finish'* | *'refill stays owed'*) title='ghchronicle refill owed' ;;
+      *) continue ;;
+    esac
+    # A workflow command ends at a line break and reads % as an escape.
+    printf '::warning title=%s::%s\n' "$title" "${line//'%'/'%25'}"
+  done
+}
+status=0
+ghchronicle "${args[@]}" 2>&1 | annotate || status=$?
+exit "$status"

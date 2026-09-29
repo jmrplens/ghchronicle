@@ -121,7 +121,9 @@ ghchronicle -config config.yaml -backfill-status
 
 Lee el punto de control y lo imprime: cuándo empezó el recorrido, cuánto hace
 que anotó algo por última vez, cuántas familias van completas de cuántas, en qué
-familia estaba y por dónde, y la orden que lo continúa. No pregunta nada a
+familia estaba y por dónde, y la orden que lo continúa, con el
+`-backfill-since` y el `-families` con los que empezó. La relectura en curso de
+una migración se imprime después, con lo que escribe y dónde. No pregunta nada a
 GitHub ni escribe nada, así que puede lanzarse con un recorrido en marcha, y no
 necesita token: la credencial está porque una pasada le pregunta a GitHub, y
 esto no le pregunta a nadie. Si no hay ningún recorrido a medias lo dice, y
@@ -189,6 +191,37 @@ por el camino.
 ```sh
 ghchronicle -config config.yaml -backfill -backfill-since 2y
 ```
+
+## Solo algunas familias
+
+```sh
+ghchronicle -config config.yaml -backfill -families discussions,outbound
+```
+
+recorre las familias nombradas y ninguna otra, en todos los almacenes
+configurados. Es lo que necesita un almacén que perdió el historial de una
+familia: borrado a mano, o enviado a través de un Telegraf cuyo almacén se
+despejó, sin recorrer cada otra familia que aún guarda. Los nombres son las
+familias que imprime `-groups`. Uno que no es una familia, y la opción sin
+`-backfill`, se rechazan con 2, como una línea de órdenes que no se entiende;
+una familia que la configuración apaga se rechaza con 1 antes de preguntar
+nada, ni a GitHub ni a los almacenes, incluida la comprobación de migraciones
+del arranque, porque el recorrido no leería nada de ella y acabaría completo.
+
+Su punto de control es el del relleno, y registra las familias que se le
+pidieron, así que un relleno de otras familias, o de todas, lo rechaza y nombra
+la familia que difiere, y `-backfill-status` imprime la línea para retomarlo con
+el mismo `-families`.
+
+### La relectura de una migración
+
+Una migración que despejó un almacén vuelve a leer su historial con un relleno
+propio, la relectura: las familias que escriben lo despejado, escribiendo solo
+eso en los almacenes de los que se despejó; ver [volver a leer el
+historial](/ghchronicle/es/install/upgrading/#volver-a-leer-el-historial).
+Guarda su punto de control junto al del relleno, con `-refill.json` en el
+nombre, así que un relleno en curso y una relectura ni se rechazan ni se pisan,
+y `-backfill-status` imprime los dos.
 
 ## Lánzalo una vez, primero
 

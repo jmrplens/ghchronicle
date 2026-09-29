@@ -560,3 +560,52 @@ func TestAPartlyRefusedWriteIsRemembered(t *testing.T) {
 		}
 	}
 }
+
+// TestASaltForgetsOneMeasurementInOneSink: after a migration sets a table
+// aside, the ledger must let every row of that measurement through to that
+// store again, and nothing else: every other measurement there, and the same
+// measurement in every other store, is still held back as written.
+func TestASaltForgetsOneMeasurementInOneSink(t *testing.T) {
+	at := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+	ledger := LoadLedger("", 0, 0)
+	comment, repo := point("gh_discussion_comment", "a", 1, at), point("gh_repo", "a", 1, at)
+	for _, sink := range []string{"influxdb", "postgres"} {
+		_, commit := ledger.Reserve(sink, []Point{comment, repo})
+		commit()
+	}
+	ledger.Salt("influxdb", "gh_discussion_comment", "2.6.1/gh_discussion_comment/is_answer")
+	if keep, _ := ledger.Reserve("influxdb", []Point{comment, repo}); len(keep) != 1 || keep[0].Measurement != "gh_discussion_comment" {
+		t.Errorf("influxdb offered %v after the salt, want the comment alone", keep)
+	}
+	if keep, _ := ledger.Reserve("postgres", []Point{comment, repo}); len(keep) != 0 {
+		t.Errorf("postgres, which was not migrated, offered %v", keep)
+	}
+	// Once written under the salt, it is remembered under it.
+	_, commit := ledger.Reserve("influxdb", []Point{comment})
+	commit()
+	if keep, _ := ledger.Reserve("influxdb", []Point{comment}); len(keep) != 0 {
+		t.Errorf("a salted point written once was offered again: %v", keep)
+	}
+	ledger.Salt("influxdb", "gh_discussion_comment", "")
+	if keep, _ := ledger.Reserve("influxdb", []Point{comment}); len(keep) != 0 {
+		t.Errorf("an empty salt is the identity the point had before, which was written: %v", keep)
+	}
+}
+
+// TestAnUnsaltedIdentityIsWhatItWasBefore, to the bit: the ledger file of
+// every running service is keyed by these numbers, and an identity that
+// moved would have every store rewrite everything once.
+func TestAnUnsaltedIdentityIsWhatItWasBefore(t *testing.T) {
+	p := Point{
+		Measurement: "gh_discussion_comment", Tags: map[string]string{"comment": "1", "user": "octocat", "empty": ""},
+		Fields: map[string]any{"answers": 1, "is_answer": true}, Time: time.Date(2026, 9, 1, 10, 0, 0, 0, time.UTC),
+	}
+	// What 2.6.2 before the salt computed for this point, measured.
+	const was, value = uint64(0x446b3ca8ce7af8df), uint64(0x5babc7eb0a18b35b)
+	if id, v := digest("influxdb", p, ""); id != was || v != value {
+		t.Errorf("digest = %#x %#x, want %#x %#x", id, v, was, value)
+	}
+	if id, _ := digest("influxdb", p, "x"); id == was {
+		t.Error("a salt left the identity as it was")
+	}
+}

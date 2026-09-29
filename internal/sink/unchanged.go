@@ -42,6 +42,9 @@ import (
 type Ledger struct {
 	mu   sync.Mutex
 	seen map[uint64]entry
+	// salts is, per sink and measurement, what Salt mixed into the identity
+	// of that measurement's points in that sink.
+	salts map[string]map[string]string
 
 	path       string
 	horizon    time.Duration
@@ -155,6 +158,43 @@ func (l *Ledger) Len() int {
 	return len(l.seen)
 }
 
+// Salt makes the ledger forget one measurement in one sink, and that one
+// alone: every point of it there gets a new identity, which the ledger has
+// never seen, so every one is written again, while every other measurement,
+// and the same measurement in every other sink, keeps the identity it had.
+//
+// A migration sets the table aside and reads its history again, and a ledger
+// that remembered what the old table held would hold the new one back from
+// the store: the rows written since the release that changed the shape are
+// the ones it remembers, and the same ones the refill offers. Entries cannot
+// be taken out by measurement, since an identity is a hash the measurement
+// cannot be read back out of, and a new file format would make every store
+// rewrite everything once, which on InfluxDB 3 Core is the file count the
+// ledger exists to avoid. So the migration's name is mixed into the identity
+// instead, the forgotten entries age out with the horizon, and nothing else
+// is written twice.
+//
+// The salt is the same for as long as the migration is recorded as applied
+// there, which is every start after it: an empty salt changes nothing.
+func (l *Ledger) Salt(sink, measurement, salt string) {
+	if l == nil {
+		return
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.salts == nil {
+		l.salts = map[string]map[string]string{}
+	}
+	if l.salts[sink] == nil {
+		l.salts[sink] = map[string]string{}
+	}
+	if salt == "" {
+		delete(l.salts[sink], measurement)
+		return
+	}
+	l.salts[sink][measurement] = salt
+}
+
 // Reserve splits points into the ones that carry something new and a commit
 // function that records them.
 //
@@ -176,8 +216,9 @@ func (l *Ledger) Reserve(sink string, points []Point) (keep []Point, commit func
 	changes := make([]change, 0, len(points))
 
 	l.mu.Lock()
+	salts := l.salts[sink]
 	for _, p := range points {
-		id, value := digest(sink, p)
+		id, value := digest(sink, p, salts[p.Measurement])
 		prev, ok := l.seen[id]
 		if ok && prev.value == value {
 			if prev.day != day {
@@ -274,13 +315,20 @@ func (l *Ledger) trimLocked() {
 
 // digest hashes a point's identity and its value separately. Identity is what
 // a store keys a row by, plus the sink, so two destinations never share an
-// answer. Value is every field, in the form the line protocol would write, so
-// a float that renders identically counts as unchanged.
-func digest(sink string, p Point) (id, value uint64) {
+// answer, plus the salt when there is one (see Salt). Value is every field,
+// in the form the line protocol would write, so a float that renders
+// identically counts as unchanged.
+func digest(sink string, p Point, salt string) (id, value uint64) {
 	h := fnv.New64a()
 	_, _ = h.Write([]byte(sink))
 	_, _ = h.Write([]byte{0})
 	_, _ = h.Write([]byte(p.Measurement))
+	if salt != "" {
+		// Every tag follows the measurement after a 0, so a salted identity
+		// is never the bytes of an unsalted one.
+		_, _ = h.Write([]byte{1})
+		_, _ = h.Write([]byte(salt))
+	}
 	keys := make([]string, 0, len(p.Tags))
 	for k, v := range p.Tags {
 		if v != "" {

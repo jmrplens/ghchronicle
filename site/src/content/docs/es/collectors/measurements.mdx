@@ -185,7 +185,10 @@ filas nuevas llevan la cadena vacía en `is_answer`. El fichero SQL no puede
 conocer esa clave, así que, reproducido contra una tabla así, sus sentencias de
 `gh_discussion_comment` se rechazan mientras el resto del fichero se carga,
 hasta que se borre la tabla. El exportador de Prometheus no conserva nada entre
-reinicios y cuenta cada comentario una sola vez.
+reinicios y cuenta cada comentario una sola vez. `-migrate` dice cuáles de los
+almacenes configurados guardan las dos formas, bajo
+`2.6.1/gh_discussion_comment/is_answer`: ver
+[Migraciones](/ghchronicle/es/install/upgrading/#migraciones).
 
 ### De una fila a una consulta
 
@@ -735,7 +738,9 @@ la más antigua. Hasta la 2.5.2 era una fila por entrada, y todas las entradas
 de una caché en una ref tenían las mismas etiquetas y el mismo día, así que el
 almacén se quedaba con la última que se escribía: el 2026-09-26 las quince
 cachés de CodeQL en main de jmrplens/jmrplens, 57,9 MB entre todas, quedaron
-guardadas como una de 3,8 MB. El listado se lee en páginas de cien entradas,
+guardadas como una de 3,8 MB. Ninguna API lista las cachés de un día pasado,
+así que esos días se quedan como están, y `-migrate` solo los anota, bajo
+`2.6.0/gh_actions_cache_entry/sum`. El listado se lee en páginas de cien entradas,
 hasta diez, donde antes se paraba en la primera: el 2026-09-27 dos
 repositorios de la cuenta tenían 118 y 232 entradas. Se lee de la creada más
 recientemente a la más antigua, un orden que un acierto de caché no cambia.
@@ -770,7 +775,13 @@ escribe a veces le da a la medida dos profundidades de ruta en Graphite, y los
 paneles indexan sus nodos desde una única tabla fija. `alert_state` en los dos
 ítems y `resolution` en el de code scanning son campos, porque una alerta se
 fecha al abrirse y los dos cambian al cerrarse; `resolution` vale `open` hasta
-entonces, para que la columna exista antes de que se cierre ninguna alerta.
+entonces, para que la columna exista antes de que se cierre ninguna alerta. Una
+compilación anterior a la 1.0.0 etiquetaba los dos ítems con `state`, y el de
+code scanning también con `reason`, así que un almacén que escribió guarda esas
+filas junto a las de hoy: `-migrate` las encuentra, bajo
+`1.0.0/gh_dependabot_alert_item/state` y
+`1.0.0/gh_code_scanning_alert_item/state`, en los almacenes a los que se les
+puede preguntar.
 
 Los campos son lo contrario: `cve`, `cwe`, `first_patched`, `epss`,
 `epss_percentile` y `seconds_to_detect` se escriben solo cuando el aviso los

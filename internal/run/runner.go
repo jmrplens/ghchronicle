@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"time"
 
 	"github.com/jmrplens/ghchronicle/v2/internal/collect"
@@ -34,6 +35,25 @@ type Runner struct {
 	// BackfillSince bounds a backfill by date. Zero means as far as the API
 	// goes, however long that takes.
 	BackfillSince time.Time
+
+	// Only is the families this run collects when it is not every family the
+	// configuration runs: a backfill of the families -families names, and
+	// the refill of a migration, which reads the families that write the
+	// measurement it cleared and no other. Nil is every family. A family the
+	// configuration switches off stays off whatever this says.
+	Only map[string]bool
+	// Keep is, per sink by its name, the measurements emit hands that sink; a
+	// sink it does not name is handed nothing. Nil hands every measurement to
+	// every sink.
+	//
+	// The refill of a migration writes back only what the migration cleared.
+	// A family still asks GitHub everything it always asks, and every other
+	// measurement it collects is in the stores already, so writing those
+	// again is a file per partition per write in InfluxDB 3 Core for rows it
+	// holds. Per sink, because two stores can be cleared of different
+	// measurements, and a store still holding one in its old shape must not
+	// be handed that measurement's whole history in the new shape beside it.
+	Keep map[string]map[string]bool
 
 	// Progress is where this backfill writes down what it has already
 	// delivered, so that a stop costs one repository instead of the walk. Nil
@@ -106,6 +126,12 @@ type Runner struct {
 	// said at Debug; otherwise a ledger that is kept read empty, and that is
 	// worth an Info line.
 	RefillEveryStart bool
+	// AfterSweep, when set, is called after every sweep Serve runs, on the
+	// goroutine that runs the sweeps, so that what it changes in State is
+	// never changed under a sweep. The command purges what a migration set
+	// aside once it falls due with it: a service that runs for weeks would
+	// otherwise keep every copy until its next restart.
+	AfterSweep func(ctx context.Context)
 	// cacheLoaded is whether CacheFile has been read, which happens once, at
 	// the first sweep. cacheSaved is when it was last written, and
 	// cacheDirty whether a family has run since.
@@ -333,17 +359,7 @@ func (r *Runner) discoverRepos(ctx context.Context, now time.Time) error {
 	if r.repos != nil && now.Sub(r.reposAt) < discoverInterval-r.slack() {
 		return nil
 	}
-	found, err := collect.Discover(ctx, r.API, &collect.Filter{
-		User: r.Cfg.Targets.User, Orgs: r.Cfg.Targets.Orgs, Repos: r.Cfg.Targets.Repos,
-		Exclude: r.Cfg.Targets.Exclude, IncludeForks: r.Cfg.Targets.IncludeForks,
-		// A backfill is the one walk that wants the whole history, and an
-		// archived repository has one: its pull requests, releases and runs
-		// are as much the account's as a live repository's, they just never
-		// move again, which is exactly why a sweep leaves them out. Forks
-		// stay as configured either way.
-		IncludeArchived: r.Cfg.Targets.IncludeArchived || r.Backfill,
-		IncludePrivate:  r.Cfg.Targets.PrivateIncluded(),
-	})
+	found, err := collect.Discover(ctx, r.API, DiscoveryFilter(r.Cfg, r.Backfill))
 	if err != nil {
 		r.noteFamily(discoverFamily, 0, 1, 0)
 		r.noteFamilyFailure(discoverFamily, err)
@@ -353,6 +369,22 @@ func (r *Runner) discoverRepos(ctx context.Context, now time.Time) error {
 	r.cacheDirty = true
 	r.Log.Info("repositories discovered", "count", len(r.repos), "archived_aside", len(r.archived))
 	return nil
+}
+
+// DiscoveryFilter is which repositories a sweep, or a backfill, of cfg
+// covers.
+func DiscoveryFilter(cfg *config.Config, backfill bool) *collect.Filter {
+	return &collect.Filter{
+		User: cfg.Targets.User, Orgs: cfg.Targets.Orgs, Repos: cfg.Targets.Repos,
+		Exclude: cfg.Targets.Exclude, IncludeForks: cfg.Targets.IncludeForks,
+		// A backfill is the one walk that wants the whole history, and an
+		// archived repository has one: its pull requests, releases and runs
+		// are as much the account's as a live repository's, they just never
+		// move again, which is exactly why a sweep leaves them out. Forks
+		// stay as configured either way.
+		IncludeArchived: cfg.Targets.IncludeArchived || backfill,
+		IncludePrivate:  cfg.Targets.PrivateIncluded(),
+	}
 }
 
 // accountFamilies runs the families that ask about the account rather than
@@ -489,6 +521,10 @@ var perRepoFamilies = []string{
 	"deployments", "policyfiles", "deps",
 }
 
+// PerRepository says whether a family runs once per repository, so that
+// every row it writes names one of the repositories the configuration covers.
+func PerRepository(family string) bool { return slices.Contains(perRepoFamilies, family) }
+
 // batchOnlyFamilies collect entirely in familyBatch and have no per-repository
 // part, so a failed batch is the whole family failing rather than one
 // repository of many.
@@ -502,7 +538,7 @@ func (r *Runner) repoFamilies(ctx context.Context, now time.Time) error {
 	for _, family := range perRepoFamilies {
 		every, enabled := r.Cfg.Interval(family)
 		due := enabled && r.due(family, every, now)
-		if !enabled || (!r.prime && !due) || r.held[family] {
+		if !enabled || !r.runs(family) || (!r.prime && !due) || r.held[family] {
 			continue
 		}
 		// A family the interrupted walk finished is not run again. Its rows
@@ -585,6 +621,26 @@ func (r *Runner) repoFamilies(ctx context.Context, now time.Time) error {
 		r.markRun(family, due, now)
 	}
 	return nil
+}
+
+// runs says whether this run collects a family at all: see Only.
+func (r *Runner) runs(family string) bool { return r.Only == nil || r.Only[family] }
+
+// kept is what of points a sink is handed: see Keep. The slice given back is
+// the one given when nothing is left out, so a run that keeps everything
+// copies nothing.
+func (r *Runner) kept(sinkName string, points []sink.Point) []sink.Point {
+	if r.Keep == nil {
+		return points
+	}
+	keep := r.Keep[sinkName]
+	out := make([]sink.Point, 0, len(points))
+	for _, p := range points {
+		if keep[p.Measurement] {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // markRun records that a family ran, except in the primed first sweep of the
@@ -1310,7 +1366,7 @@ func (r *Runner) family(ctx context.Context, name string, now time.Time, run fun
 		return
 	}
 	every, enabled := r.Cfg.Interval(name)
-	if !enabled {
+	if !enabled || !r.runs(name) {
 		return
 	}
 	sizing := name == "totals" && r.sizeFirst
@@ -1498,6 +1554,12 @@ func (r *Runner) emit(ctx context.Context, family string, points []sink.Point, a
 	}
 	delivered := true
 	for _, s := range r.Sinks {
+		batch := r.kept(s.Name(), points)
+		if len(batch) == 0 {
+			// Nothing of this family is this sink's to take, which is not a
+			// sink that failed to take it.
+			continue
+		}
 		// A sink that skips unchanged points reports how many, so the log line
 		// says what reached the store rather than what was offered to it.
 		var filter *sink.Unchanged
@@ -1505,7 +1567,7 @@ func (r *Runner) emit(ctx context.Context, family string, points []sink.Point, a
 		if u, ok := s.(*sink.Unchanged); ok {
 			filter, before = u, u.Dropped()
 		}
-		accepted, err := s.Write(ctx, points)
+		accepted, err := s.Write(ctx, batch)
 		if rejected, ok := errors.AsType[*sink.RejectedError](err); ok {
 			// Everything parseable was written. The lines themselves are
 			// reported by the sink through OnReject.
@@ -1523,7 +1585,7 @@ func (r *Runner) emit(ctx context.Context, family string, points []sink.Point, a
 		if err != nil {
 			r.Log.Error("sink write failed", append([]any{
 				"sink", s.Name(), "family", family,
-				"points", len(points), "err", err,
+				"points", len(batch), "err", err,
 			}, attrs...)...)
 			delivered = false
 			continue
@@ -1531,7 +1593,7 @@ func (r *Runner) emit(ctx context.Context, family string, points []sink.Point, a
 		// Counted in the sink's own unsigned type rather than converted into
 		// an int, so neither figure in the line below can come from a
 		// conversion that wraps.
-		offered, skipped := uint64(len(points)), uint64(0)
+		offered, skipped := uint64(len(batch)), uint64(0)
 		if filter != nil {
 			// The counter is cumulative, so the delta is what this write
 			// skipped, and one write can skip no more points than it was
@@ -1584,9 +1646,15 @@ func (r *Runner) Serve(ctx context.Context) error {
 	r.serving = true
 	tick, from := r.tick()
 	r.Log.Info("ghchronicle running", "tick", tick.String(), "tick_from", from)
-	if err := r.Once(ctx); err != nil {
-		r.Log.Error("sweep failed", "err", err)
+	sweep := func() {
+		if err := r.Once(ctx); err != nil {
+			r.Log.Error("sweep failed", "err", err)
+		}
+		if r.AfterSweep != nil && ctx.Err() == nil {
+			r.AfterSweep(ctx)
+		}
 	}
+	sweep()
 	t := time.NewTicker(tick)
 	defer t.Stop()
 	for {
@@ -1594,9 +1662,7 @@ func (r *Runner) Serve(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-t.C:
-			if err := r.Once(ctx); err != nil {
-				r.Log.Error("sweep failed", "err", err)
-			}
+			sweep()
 		}
 	}
 }

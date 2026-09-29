@@ -118,6 +118,35 @@ func (s *SQL) Write(_ context.Context, points []Point) (int, error) {
 	return written, nil
 }
 
+// Drop writes DROP TABLE IF EXISTS for a measurement into the stream, and
+// forgets the table, so that the next point of it declares the table again
+// after the drop. A migration uses it: replayed in order, the target loses the
+// table in the old shape and gains it in the new one. Measured with psql
+// against PostgreSQL 18.6, an INSERT after the DROP with no CREATE TABLE
+// between them is refused.
+func (s *SQL) Drop(measurement string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.schema == nil {
+		s.schema = newSQLSchema()
+	}
+	if s.file != nil {
+		if err := s.file.open(); err != nil {
+			return err
+		}
+	}
+	// Forgotten before the statement goes, since a rotation on the way
+	// forgets everything and the table has to be declared again either way.
+	delete(s.schema.tables, measurement)
+	if err := s.emit("DROP TABLE IF EXISTS " + ident(measurement) + ";"); err != nil {
+		return err
+	}
+	if s.w != nil {
+		return s.w.Flush()
+	}
+	return nil
+}
+
 // sqlShape is the union of what a batch carries for one measurement. The
 // union rather than the first point, because the first sweep of a family is
 // one batch and a column missing from the first row is usually present in the

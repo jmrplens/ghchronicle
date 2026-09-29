@@ -1033,3 +1033,30 @@ func TestACardOnlySweepLeavesTheStateFileAsItFoundIt(t *testing.T) {
 		})
 	}
 }
+
+// TestAfterSweepFollowsEverySweepTheLoopRuns, the first and each tick's, on
+// the loop's own goroutine: what it changes in the state is never changed
+// under a sweep.
+func TestAfterSweepFollowsEverySweepTheLoopRuns(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		r, log := tickRunner(t, 0)
+		calls := 0
+		r.AfterSweep = func(context.Context) {
+			calls++
+			if got := strings.Count(log.String(), `msg="sweep finished"`); got != calls {
+				t.Errorf("call %d came after %d sweeps", calls, got)
+			}
+		}
+		ctx, cancel := context.WithCancel(t.Context())
+		done := make(chan error, 1)
+		go func() { done <- r.Serve(ctx) }()
+		time.Sleep(2*time.Minute + time.Second)
+		synctest.Wait()
+		cancel()
+		<-done
+		if calls != 3 {
+			t.Errorf("called %d times over three sweeps", calls)
+		}
+	})
+}

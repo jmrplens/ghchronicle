@@ -33,6 +33,7 @@ heartbeat: # cada cuánto despierta el bucle, para una prueba
 log: # nivel, formato y un fichero rotatorio opcional
 state_file: # lo que recuerda un reinicio
 backfill: # el límite, al ejecutar con -backfill
+migrate: # lo que hace un arranque con lo que una actualización dejó en los almacenes
 grafana: # dónde se publica el dashboard, cuando se pide
 ```
 
@@ -126,7 +127,7 @@ La reserva se escala por cubo; ver [límites de la API](/ghchronicle/es/api/).
 state_file: /var/lib/ghchronicle/state.json
 ```
 
-Ocho cosas, y borrar el fichero cuesta una distinta por cada una:
+Nueve cosas, y borrar el fichero cuesta una distinta por cada una:
 
 - `last_run`, cuándo corrió cada familia por última vez. Sin él todas las
   familias vencen a la vez, así que la pasada siguiente es completa, salvo que
@@ -163,14 +164,37 @@ Ocho cosas, y borrar el fichero cuesta una distinta por cada una:
   513 KB en cada pasada horaria que registró el proxy de producción contra la
   misma cuenta el 2026-09-27, un tamaño que crece a lo largo del día con lo que
   se fusiona.
+- `stores`, para cada almacén en el que escribe una ejecución, adónde apunta,
+  la versión que escribió en él primero, la que lo hizo por última vez, las
+  [migraciones](/ghchronicle/es/install/upgrading/#migraciones) que se le han
+  aplicado, las copias de filas antiguas que una migración apartó allí y el
+  historial que una migración despejó allí y aún no ha vuelto a leer. Sin él un
+  fichero SQL, un Graphite o un Telegraf se toman por de la versión en marcha,
+  así que lo que dejó en ellos una versión anterior ya no se muestra, y un
+  almacén despejado y no releído parece uno que nunca guardó la forma antigua,
+  así que nada vuelve a leer su historial hasta que lo haga un
+  `-backfill -families` de las familias que nombraba la relectura.
 
-Siete de las ocho cuestan solo cuota, porque lo que se vuelve a recoger se
+Siete de las nueve cuestan solo cuota, porque lo que se vuelve a recoger se
 indexa por medida, etiquetas y marca de tiempo y sobrescribe lo que ya está
-guardado. `last_head` es la que pierde algo: los cambios de dependencias entre
-la cabeza que tenía y la siguiente se leen de un rango que nadie puede nombrar
-una vez que la cabeza ha desaparecido.
+guardado. `last_head` pierde algo: los cambios de dependencias entre la cabeza
+que tenía y la siguiente se leen de un rango que nadie puede nombrar una vez
+que la cabeza ha desaparecido. También `stores`: qué versión escribió primero
+en un almacén al que no se le puede preguntar cuál es la clave de sus filas, y
+una relectura que una migración aún debe, son preguntas que nada puede
+responder después.
 
-Una pasada con `-card-only` no escribe ninguna de las ocho. Sus puntos llegan a
+Un fichero que está y no se puede leer ni analizar no se toma por uno nuevo:
+una ejecución que escribe en los almacenes se detiene y lo nombra, porque leído
+como nuevo olvidaría una relectura aún debida, y su primer guardado pondría un
+fichero nuevo en su lugar. Una ejecución con otro usuario, root casi siempre,
+es lo que lo deja ilegible; devuélveselo al usuario con el que corre el
+colector. Una ejecución que guarda el fichero conserva lo que otro proceso
+registró de los almacenes desde que ella lo leyó, así que dos ejecuciones que
+se solapan, un `-once` de cron a la vez que un `-migrate -yes`, no deshacen
+cada una los registros de los almacenes de la otra.
+
+Una pasada con `-card-only` no escribe ninguna de las nueve. Sus puntos llegan a
 [la tarjeta](/ghchronicle/es/card/) y a ningún almacén, así que una marca suya
 haría que la siguiente recogida se saltara una familia, o estrechara una
 lectura, cuyos datos fueron a parar a una imagen y a ningún otro sitio. El
@@ -315,6 +339,42 @@ aparece cuando arranca un relleno, se borra cuando el recorrido llega al final,
 y una pasada normal ni lo escribe ni lo lee. Ver [pararlo, y
 retomarlo](/ghchronicle/es/how/backfill/#pararlo-y-retomarlo).
 
+## `migrate`
+
+```yaml
+migrate: auto
+```
+
+Lo que hace una ejecución que escribe en los almacenes, antes de su primera
+pasada, con un almacén que una versión anterior dejó con una forma que esta ya
+no escribe. `-migrate` imprime lo que cada almacén configurado guarda de cada
+cambio así; ver [Migraciones](/ghchronicle/es/install/upgrading/#migraciones).
+
+| Valor  | Qué hace un arranque                                                                                                |
+| ------ | ------------------------------------------------------------------------------------------------------------------- |
+| `auto` | El valor por omisión. Aplica por su cuenta un cambio pendiente que no pierde nada, lo dice en `WARN`, vuelve a leer lo que despejó, y lo que una ejecución anterior despejó y no terminó de leer, y avisa de todos los demás en cada arranque |
+| `warn` | No aplica nada ni vuelve a leer nada, y avisa de cada cambio pendiente, y de cada almacén al que aún se le debe su historial, en cada arranque |
+
+Un cambio no pierde nada cuando se cumplen las tres cosas: GitHub todavía sirve
+toda la historia, así que volver a leerla trae de vuelta cada fila que guarda
+el almacén; las filas antiguas se apartan al menos 24 horas en vez de borrarse,
+que es lo que hacen InfluxDB 3, PostgreSQL y Elasticsearch; y todas las filas
+del almacén son de esta configuración, lo que se le pregunta al almacén. No hay
+valor que aplique el resto por su cuenta. Una ejecución de una sola vez,
+`-once` o `-backfill`, sobre un fichero de estado nuevo tampoco aplica nada por
+su cuenta: esa es cada ejecución de la Action sin un fichero de estado
+restaurado, cuyo registro de una relectura aún debida se va con su runner.
+Cada aviso nombra las dos órdenes, `-migrate` para el plan y `-migrate -yes`
+para aplicarlo, con el servicio parado. Cualquier otro valor se rechaza al
+arrancar.
+
+El servicio también tiene un bloqueo junto al fichero de estado,
+`<nombre>-lock`, mientras corre, que es lo que impide que `-migrate -yes`, y
+`-uninstall -yes` de los datos o del estado, cambien los almacenes bajo sus
+pies. No hay nada que configurar: sigue a
+`state_file`, el sistema operativo lo suelta acabe como acabe el proceso, y el
+fichero que queda solo nombra el último proceso que lo tuvo.
+
 ## Cuando está mal, lo dice al arrancar
 
 La configuración se valida antes de hacer la primera llamada, y los mensajes
@@ -329,6 +389,7 @@ nombran la clave y lo que necesita.
 | `every.families.<name>: unknown collector`                            | El nombre no es una familia. El mensaje lista las que existen      |
 | `sinks.influxdb: url and bucket are required`                         | Cada destino valida sus propias claves obligatorias y dice cuáles  |
 | `sinks.sql.dialect: "mysql" is not postgres, the only dialect so far` | El valor no es uno de los aceptados, y el mensaje los lista        |
+| `migrate: "off" is not auto or warn`                                  | Lo mismo, para `migrate`                                           |
 
 <Aside type="note" title="Una cadencia para una familia inexistente es fatal">
   `every` se comprueba contra la lista de colectores conocidos al arrancar en

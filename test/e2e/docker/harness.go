@@ -545,9 +545,15 @@ func (s *Stack) Psql(ctx context.Context, statement string) (string, error) {
 // every statement that failed, which would make this suite blind to the one
 // thing it exists to check.
 func (s *Stack) LoadSQL(ctx context.Context, statements io.Reader) (string, error) {
+	return s.LoadSQLInto(ctx, postgresDatabase, statements)
+}
+
+// LoadSQLInto is LoadSQL into another database of the same server, for a
+// test that keeps its tables where the suite's own dashboards never look.
+func (s *Stack) LoadSQLInto(ctx context.Context, database string, statements io.Reader) (string, error) {
 	args := []string{
 		"compose", "-p", project, "-f", composeFile, "exec", "-T", "postgres",
-		"psql", "--username", postgresUser, "--dbname", postgresDatabase,
+		"psql", "--username", postgresUser, "--dbname", database,
 		"--quiet", "--variable", "ON_ERROR_STOP=1", "--file", "-",
 	}
 	cmd := exec.CommandContext(ctx, dockerBin, args...)

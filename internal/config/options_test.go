@@ -172,6 +172,7 @@ func TestEveryChoiceOfferedLoads(t *testing.T) {
 		},
 		"log.level":  func(v string) string { return "sinks:\n  stdout: true\nlog:\n  level: " + v + "\n" },
 		"log.format": func(v string) string { return "sinks:\n  stdout: true\nlog:\n  format: " + v + "\n" },
+		"migrate":    func(v string) string { return "sinks:\n  stdout: true\nmigrate: " + v + "\n" },
 	}
 	var checked int
 	for _, o := range options {

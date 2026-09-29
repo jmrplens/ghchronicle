@@ -149,6 +149,31 @@ one called other does the same here as in the SQL dashboards: the busiest over
 the whole range are named, and other is every series less those, point by
 point, drawn only where something is left over.
 
+## What a migration does here
+
+Graphite cannot be cleared from here. Nothing on carbon's ingest port deletes a
+path, and graphite-web deletes none that has no tags: **measured against
+graphite-statsd 1.1.10-5**, `/metrics/delete` answers 404 and `/tags/delSeries`
+answers `true` and leaves the series where it was. What a release left in
+another shape is decided by the state file's record of the release that first
+wrote the store, and applying the change is `-migrate -yes` printing, once, the
+commands for the Graphite host, and recording the change as applied, since
+whether they were run is something only whoever runs them knows:
+
+```sh
+find <storage>/whisper/github/discussion_comment -mindepth 11 -name '*.wsp' -delete
+find <storage>/whisper/github/discussion_comment -type d -empty -delete
+```
+
+`<storage>` is carbon's storage directory, `/opt/graphite/storage` in the
+official image, and `github` is the prefix. A path is a node per tag and then
+the field, so the old shape of a measurement that lost a tag sits one level
+deeper than the new one, and `-mindepth` reaches that level and nothing above
+it. Measured in that image: the command took the two files of the old shape and
+left the new shape's and every other measurement's. The files are the host's
+and the order does not matter, since the two shapes are different files. A
+start never applies this on its own.
+
 ## Where to go next
 
 - [Choosing a store](/ghchronicle/sinks/) compares Graphite with the others,

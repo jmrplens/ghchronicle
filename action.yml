@@ -30,7 +30,7 @@ inputs:
     required: false
     default: ${{ github.repository_owner }}
   mode:
-    description: "`once` for one sweep, `backfill` to reach as far back as GitHub allows, `card` to only render the SVG."
+    description: "`once` for one sweep, `backfill` to reach as far back as GitHub allows, `card` to only render the SVG, `migrate` to apply what an upgrade left in the stores (`-migrate -yes`)."
     required: false
     default: once
   backfill-since:

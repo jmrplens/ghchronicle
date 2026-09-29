@@ -28,11 +28,14 @@ ghchronicle -config /etc/ghchronicle/config.yaml
 | `-groups`         | apagada       | Imprime los grupos con las familias de cada uno, y sale                                                                                   |
 | `-backfill`       | apagada       | Llega tan atrás como permita cada superficie, esperando a que se reponga el límite en vez de parar                                        |
 | `-backfill-since` | ninguno       | Acota el relleno: una fecha (`2024-01-01`), una duración (`720h`), días (`90d`) o años (`2y`)                                             |
-| `-backfill-status` | apagada      | Imprime hasta dónde ha llegado el relleno en curso, y sale; no pregunta nada a GitHub, no escribe nada y no necesita token                 |
-| `-backfill-retry` | `0`           | Cuando un relleno acaba con familias pendientes, espera esto y vuelve a por ellas, hasta que una pasada no anote nada nuevo; `0` no vuelve  |
+| `-backfill-status` | apagada      | Imprime hasta dónde han llegado el relleno en curso y la relectura de una migración, y sale; no pregunta nada a GitHub, no escribe nada y no necesita token |
+| `-backfill-retry` | `0`           | Cuando un relleno, o la relectura de una migración, acaba con familias pendientes, espera esto y vuelve a por ellas, hasta que una pasada no anote nada nuevo; `0` no vuelve |
+| `-families`       | ninguno       | Con `-backfill`, recorre solo estas familias, separadas por comas, los nombres que imprime `-groups`; un nombre que no es una familia, o la opción sin `-backfill`, se rechaza con 2 |
 | `-publish-dashboard` | off        | Publica el dashboard de Grafana y el datasource del que lee, y sale; necesita la sección `grafana`, no le pregunta nada a GitHub y no necesita token |
 | `-uninstall`      | ninguno       | Quita lo que esto puso y sale: `dashboard`, `data`, `state`, `all`, separados por comas; lista y no quita nada sin `-yes`                  |
-| `-yes`            | off           | Sigue adelante con `-uninstall` en vez de solo listar lo que quitaría                                                                      |
+| `-yes`            | off           | Sigue adelante con `-uninstall` o `-migrate` en vez de solo listar lo que haría                                                            |
+| `-migrate`        | off           | Imprime, para cada almacén configurado, lo que una versión anterior dejó allí con una forma que esta ya no escribe y lo que haría falta para ponerlo al día, y sale; sin `-yes` no cambia nada, y con él aplica cada cambio pendiente y vuelve a leer lo que despejó |
+| `-migrate-others` | off           | Con `-migrate -yes`, aplica también un cambio a un almacén que guarda filas de cuentas que esta configuración no recoge, o cuyas filas no se pudieron comparar con ella; sin `-migrate` se rechaza con 2 |
 | `-card`           | ninguno       | Hace una pasada y escribe un SVG de resumen en esta ruta; esa pasada recoge todas las familias, digan lo que digan las cadencias          |
 | `-card-only`      | apagada       | Con `-card`, escribe el SVG y nada más: no hace falta ningún destino, no se escribe en ninguno y el fichero de estado se queda como estaba |
 | `-card-theme`     | `auto`        | `dark`, `light`, `auto` o `both`: la tarjeta clara en `-card` y la oscura a su lado con `_dark` antes de la extensión, en una sola pasada |
@@ -51,8 +54,9 @@ configuración y le pregunta a GitHub en qué repositorios se resuelven los
 objetivos, que es la forma barata de comprobar un cambio antes de gastar cuota
 en una pasada. `-backfill-status` lee la configuración para encontrar el
 [punto de control del relleno](/ghchronicle/es/how/backfill/#ver-hasta-dónde-ha-llegado)
-e imprime hasta dónde ha llegado ese recorrido; no le pregunta nada a GitHub,
-así que no necesita token.
+e imprime hasta dónde ha llegado ese recorrido, y después la relectura de una
+migración cuando hay una en curso; no le pregunta nada a GitHub, así que no
+necesita token.
 
 ```sh
 ghchronicle -version
@@ -61,6 +65,62 @@ ghchronicle -card-layouts
 ghchronicle -config config.yaml -list
 ghchronicle -config config.yaml -backfill-status
 ```
+
+## Lo que una actualización dejó en los almacenes
+
+```sh
+ghchronicle -config config.yaml -migrate
+```
+
+`-migrate` contrasta cada almacén configurado con la lista de cambios que lleva
+el binario, cada uno una medida que una versión anterior escribió con una clave
+que esta ya no usa, e imprime un bloque por almacén: lo que cada cambio
+encuentra allí, la prueba, lo que haría falta para ponerlo al día y lo que se
+volvería a leer de GitHub. No cambia nada. A los almacenes se les hacen
+preguntas, a GitHub solo se le pide la lista de repositorios, y el fichero de
+estado se lee y nunca se escribe, así que sale con 0 encuentre lo que
+encuentre. Sin token funciona igual y dice lo que no pudo comparar.
+[Migraciones](/ghchronicle/es/install/upgrading/#migraciones) explica cómo se
+decide cada almacén y qué significa cada línea. Cuando hay algo pendiente, el
+plan termina con la orden que lo aplica y con lo que hace un arranque con el
+ajuste [`migrate`](/ghchronicle/es/configuration/#migrate).
+
+Esa orden, y cualquier otra que ghchronicle imprime para que la ejecutes
+después (la línea de reanudar de `-backfill-status`, los avisos de un arranque,
+la última línea de `-setup`), nombra la configuración tal como se le dio, entre
+comillas cuando un shell leería parte de la ruta: comillas simples en Linux y
+macOS, y dobles en Windows, la única forma que PowerShell y `cmd` leen como un
+solo argumento.
+
+```sh
+ghchronicle -config config.yaml -migrate -yes
+```
+
+Con `-yes` imprime el mismo plan y después aplica cada cambio pendiente,
+también los marcados como necesitados de la palabra de alguien, vuelve a leer
+de GitHub lo que despejó, y dice bajo el plan qué pasó con cada uno. Volver a
+leerlo es un relleno histórico de las familias que escriben lo despejado,
+escribiendo solo eso en los almacenes de los que se despejó; `-backfill-retry`
+vuelve a por lo que deja, y donde un almacén guardó una copia de las filas
+antiguas, el informe compara las dos y nombra lo que GitHub ya no sirve. Una
+relectura cortada guarda un punto de control propio, y la misma orden la
+retoma, aunque no quede nada por aplicar: [volver a leer el
+historial](/ghchronicle/es/install/upgrading/#volver-a-leer-el-historial). Un almacén
+que guarda filas de cuentas que esta configuración no recoge, o cuyas filas no
+se pudieron comparar con ella, se deja sin aplicar salvo que se dé también
+`-migrate-others`. Necesita un token y la lista de repositorios, y se queda el
+fichero de estado mientras corre: con el servicio en marcha se niega, nombrando
+el proceso, y no cambia nada, así que para antes el servicio, y pausa un cron
+que ejecute `-once`. Con el destino SQL en la salida estándar, el plan y el
+informe van a la salida de errores, así que la salida estándar es solo el
+SQL. Lo que aplica se registra sobre la marcha, así que
+volver a ejecutarlo tras un fallo sigue sin hacer nada dos veces.
+
+| Salida | Cuándo                                                                                                                |
+| ------ | --------------------------------------------------------------------------------------------------------------------- |
+| `0`    | `-migrate`, encuentre lo que encuentre; `-migrate -yes` cuando todo lo pendiente se aplicó y se volvió a leer, o no había nada |
+| `1`    | `-migrate -yes` dejó algo: un almacén que se negó o no respondió, uno que se dejó sin aplicar, una relectura que no terminó; o se negó a empezar |
+| `2`    | Una línea de órdenes que no se puede leer, entre ellas `-migrate-others` sin `-migrate`                               |
 
 ## Las tres formas de hacer una pasada
 
@@ -78,6 +138,13 @@ reponga un presupuesto agotado en vez de rendirse.
 
 ```sh
 ghchronicle -config config.yaml -backfill -backfill-since 2y
+```
+
+`-families` limita un relleno a las familias nombradas, en todos los almacenes
+configurados: [solo algunas familias](/ghchronicle/es/how/backfill/#solo-algunas-familias).
+
+```sh
+ghchronicle -config config.yaml -backfill -families discussions,outbound
 ```
 
 ## La tarjeta, en una línea

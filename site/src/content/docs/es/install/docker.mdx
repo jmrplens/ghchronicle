@@ -114,18 +114,20 @@ verdadera.
 
 ## Qué tiene que ser escribible
 
-El fichero de configuración se monta de solo lectura. Cinco cosas no:
+El fichero de configuración se monta de solo lectura. Seis cosas no:
 
 | Ruta                 | Necesaria para                                                                         |
 | -------------------- | -------------------------------------------------------------------------------------- |
 | `state_file`         | Siempre. Sin una ruta persistente el recorrido de estrellas se repite en cada reinicio |
 | `<nombre>-cache.bin` | Siempre. La caché, que vive junto al fichero de estado y no tiene ajuste propio        |
 | `sinks.dedupe_file`  | El servicio permanente, con un destino que lo lleve. Una ejecución `-once` no abre ninguno |
+| `<nombre>-lock`      | El servicio permanente, que lo mantiene mientras corre, y `-migrate -yes`              |
 | `sinks.file.path`    | Solo con el destino de fichero                                                         |
 | `log.file`           | Solo con un fichero de log configurado                                                 |
 
-Los tres primeros viven por omisión en el mismo directorio, así que un solo
-directorio montado los cubre, y tiene que ser un directorio. Cada uno de los
+Los tres primeros viven por omisión en el mismo directorio, y el candado
+también, así que un solo directorio montado los cubre, y tiene que ser un
+directorio. Cada uno de los
 tres se escribe a su lado y se renombra en su sitio, para que nadie lea nunca
 medio fichero, y sobre un fichero montado solo no se puede renombrar: medido
 con la imagen 2.6.1 construida desde su Dockerfile, un fichero de estado
@@ -239,6 +241,39 @@ demás destinos son salientes.
 
   </TabItem>
 </Tabs>
+
+## Tras una actualización
+
+Descarga la nueva imagen y vuelve a crear el contenedor. Con el valor por
+omisión, [`migrate: auto`](/ghchronicle/es/configuration/#migrate), su arranque
+aplica por su cuenta, antes de su primera pasada, cada cambio de la nueva
+versión que no pierde nada, y avisa del resto en cada arranque con las dos
+órdenes que lo aplican: mira
+[Migraciones](/ghchronicle/es/install/upgrading/#migraciones). El contenedor
+acepta las mismas opciones que el binario, así que esas órdenes corren en un
+contenedor de un solo uso del mismo servicio, con su volumen, su entorno y su
+usuario, mientras el servicio está parado:
+
+```sh
+docker compose pull ghchronicle
+docker compose up -d ghchronicle
+docker compose logs ghchronicle | grep 'migration pending'
+docker compose stop ghchronicle
+docker compose run --rm ghchronicle -config /config.yaml -migrate
+docker compose run --rm ghchronicle -config /config.yaml -migrate -yes
+docker compose start ghchronicle
+```
+
+El primer `run` imprime el plan y no cambia nada; el segundo lo aplica y vuelve
+a leer lo que despejó. Los dos montan el volumen que monta el servicio, así que
+encuentran el candado que este mantiene junto al fichero de estado: con el
+servicio aún en marcha, `-migrate -yes` se niega, nombra el proceso con el
+número que le da el contenedor del propio servicio, y no cambia nada. Medido con
+dos contenedores sobre un mismo volumen con nombre: un `flock` que tenía uno se
+le negó al otro, y se le concedió en cuanto el primero se fue. Un contenedor de
+una sola pasada que lanza un planificador, más abajo, no tiene ningún bloqueo
+mientras hace su pasada, así que pausa el planificador mientras duran las dos
+ejecuciones.
 
 ## Una pasada y salir
 

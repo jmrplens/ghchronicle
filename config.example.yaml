@@ -330,6 +330,24 @@ every:
 # backfill:
 #   since: 2y
 
+# What a run that writes to the stores does, before its first sweep, about a
+# store an earlier release left in a shape this one no longer writes: a
+# measurement whose rows were keyed by a tag that is now a field, so an item
+# read on both sides of the change is two rows. -migrate prints what each
+# configured store holds of it and changes nothing.
+#
+# auto, the default, brings a store along on its own only when nothing can be
+# lost by it: GitHub still serves the whole history, the old rows are set
+# aside for 24 hours rather than deleted (InfluxDB 3, PostgreSQL,
+# Elasticsearch), and every row is this configuration's. It says so at WARN,
+# per store, and reads what it cleared back from GitHub before the first sweep,
+# as it does what an earlier run cleared and did not finish reading. Anything
+# else, and everything under warn, is a warning at every start naming the two
+# commands: -migrate for the plan, and -migrate -yes to apply it, with the
+# service stopped. No value applies the rest on its own.
+#
+# migrate: auto
+
 # What a sweep remembers between runs: when each family last ran, which
 # repositories have already had their one-off full stargazer walk and which
 # their one whole read of the daily star history, the commit each

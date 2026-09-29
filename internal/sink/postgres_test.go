@@ -8,6 +8,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // What the connecting sink decides, which is everything worth reading and
@@ -374,5 +377,86 @@ func TestTheSinkNamesItselfAndTakesADefaultBatch(t *testing.T) {
 	// before its first write still closes its sinks.
 	if err := NewPostgres("x", 0).Close(); err != nil {
 		t.Errorf("Close() on a sink that never dialed: %v", err)
+	}
+}
+
+// refusingSender answers the first batches it is sent with a PostgreSQL
+// error, and takes the rest.
+type refusingSender struct {
+	refuse []error
+	sent   int
+}
+
+func (r *refusingSender) SendBatch(_ context.Context, b *pgx.Batch) pgx.BatchResults {
+	r.sent++
+	if len(r.refuse) > 0 {
+		err := r.refuse[0]
+		r.refuse = r.refuse[1:]
+		return closedResults{err}
+	}
+	return closedResults{}
+}
+
+// closedResults is a batch's results that end with err.
+type closedResults struct{ err error }
+
+func (c closedResults) Exec() (pgconn.CommandTag, error) { return pgconn.CommandTag{}, c.err }
+func (c closedResults) Query() (pgx.Rows, error)         { return nil, c.err }
+func (c closedResults) QueryRow() pgx.Row                { return nil }
+func (c closedResults) Close() error                     { return c.err }
+
+// TestATableDroppedBehindTheSinkIsDeclaredAgain: the sink remembers every
+// table it declared, so a table another connection dropped or renamed made
+// every later write of it fail with 42P01, taking the rest of the batch
+// along, until a restart (measured on 18.6, three writes of three). The
+// batch now forgets its tables and goes again, once.
+func TestATableDroppedBehindTheSinkIsDeclaredAgain(t *testing.T) {
+	t.Parallel()
+	points := probePoints(time.Date(2026, 9, 19, 12, 0, 0, 0, time.UTC))
+	p := NewPostgres("postgres://ignored", 100)
+	db := &fakeSchema{}
+	rows, err := p.write(t.Context(), db, &refusingSender{}, points)
+	if err != nil || rows == 0 {
+		t.Fatalf("first write: %d, %v", rows, err)
+	}
+	gone := &pgconn.PgError{Code: "42P01", Message: `relation "gh_repo" does not exist`}
+	sender := &refusingSender{refuse: []error{gone}}
+	before := len(db.sent)
+	n, err := p.write(t.Context(), db, sender, points)
+	if err != nil || n != rows {
+		t.Fatalf("after the drop: %d, %v, want the batch written", n, err)
+	}
+	if sender.sent != 2 || len(db.sent) == before || !strings.HasPrefix(db.sent[before], `CREATE TABLE IF NOT EXISTS "gh_repo"`) {
+		t.Errorf("sent %d batches and declared %v, want the table declared again and the batch sent again",
+			sender.sent, db.sent[before:])
+	}
+
+	// Once, and only for that refusal: a table that cannot be made is a
+	// failure to report, and so is any other refusal.
+	sender = &refusingSender{refuse: []error{gone, gone}}
+	if _, err = p.write(t.Context(), db, sender, points); !undefinedTable(err) || sender.sent != 2 {
+		t.Errorf("a table still missing after the retry: %v after %d sends", err, sender.sent)
+	}
+	sender = &refusingSender{refuse: []error{&pgconn.PgError{Code: "23505"}}}
+	if _, err = p.write(t.Context(), db, sender, points); err == nil || sender.sent != 1 {
+		t.Errorf("another refusal was retried: %v after %d sends", err, sender.sent)
+	}
+}
+
+// TestForgetMakesTheNextWriteDeclareTheTable: the migration that set the
+// table aside in the same process says so, and the write that follows does
+// not have to fail first.
+func TestForgetMakesTheNextWriteDeclareTheTable(t *testing.T) {
+	t.Parallel()
+	points := probePoints(time.Date(2026, 9, 19, 12, 0, 0, 0, time.UTC))
+	p := NewPostgres("postgres://ignored", 100)
+	db := &fakeSchema{}
+	if _, err := db.declared(t, p, points); err != nil {
+		t.Fatal(err)
+	}
+	p.Forget("gh_repo")
+	again, err := db.declared(t, p, points)
+	if err != nil || len(again) == 0 || !strings.HasPrefix(again[0], `CREATE TABLE IF NOT EXISTS "gh_repo"`) {
+		t.Errorf("after Forget the write declared %v, %v", again, err)
 	}
 }

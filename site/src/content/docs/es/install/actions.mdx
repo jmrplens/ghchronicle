@@ -1,6 +1,6 @@
 ---
 title: GitHub Actions
-description: "ghchronicle como GitHub Action: la Action compuesta, sus tres modos y las dos cosas que un runner alojado no conserva."
+description: "ghchronicle como GitHub Action: la Action compuesta, sus cuatro modos y las dos cosas que un runner alojado no conserva."
 searchTitle: ghchronicle como GitHub Action
 defaultColumns:
   - table: Entrada
@@ -27,7 +27,7 @@ cadena de herramientas de Go: descarga un binario de release y lo llama.
 | `token`           | obligatoria              | Un token personal. El `GITHUB_TOKEN` automático no basta                                                                                              |
 | `config`          | `""`                     | Ruta a un fichero de configuración. Omítela para usar valores por defecto a partir de `user`, cuyo estado dura una ejecución y no se puede guardar en caché |
 | `user`            | el dueño del repositorio | La cuenta que recoger cuando no se da fichero de configuración                                                                                        |
-| `mode`            | `once`                   | `once`, `backfill` o `card`                                                                                                                           |
+| `mode`            | `once`                   | `once`, `backfill`, `card` o `migrate`                                                                                                                |
 | `backfill-since`  | `""`                     | Límite para `backfill`: una fecha, `90d`, `2y` o una duración de Go. Vacío es sin límite                                                              |
 | `card`            | `""`                     | Ruta del SVG que escribir. Vacío significa sin tarjeta                                                                                                |
 | `card-layout`     | `summary`                | Uno de los trece diseños registrados                                                                                                                   |
@@ -39,7 +39,7 @@ cadena de herramientas de Go: descarga un binario de release y lo llama.
 | `include-private` | `false`                  | `true` cuenta los repositorios privados cuando no se da fichero de configuración. Ver el aviso más abajo |
 | `version`         | `latest`                 | La release que instalar: `latest` para la más nueva, o una release con o sin su `v`, así que `__VERSION__` y `v__VERSION__` son la misma. La etiqueta mayor `v2` es lo que toma `uses:`, no una release, y se rechaza |
 
-## Los tres modos
+## Los cuatro modos
 
 <Tabs syncKey="action-mode">
   <TabItem label="once">
@@ -142,7 +142,61 @@ cadena de herramientas de Go: descarga un binario de release y lo llama.
     ha quedado con parte del beneficio.
 
   </TabItem>
+  <TabItem label="migrate">
+    Pone al día los almacenes en los que escribe la configuración después de
+    una actualización: ejecuta `-migrate -yes`, que aplica cada cambio que [el
+    plan](/ghchronicle/es/install/upgrading/#migraciones) encuentra pendiente,
+    también los que necesitan la palabra de alguien, y vuelve a leer lo que
+    despejó. Ejecútalo a mano, una vez, después de leer lo que dice `-migrate`
+    sobre la misma configuración.
+
+    ```yaml
+    name: Migrate
+    on:
+      workflow_dispatch:
+
+    jobs:
+      migrate:
+        runs-on: ubuntu-latest
+        timeout-minutes: 60
+        steps:
+          - uses: actions/checkout@v7
+          - uses: jmrplens/ghchronicle@v2
+            with:
+              token: ${{ secrets.GHCHRONICLE_TOKEN }}
+              mode: migrate
+              config: .github/ghchronicle.yaml
+    ```
+
+    No admite tarjeta. Un almacén que guarda filas de cuentas que esta
+    configuración no recoge, o cuyas filas no se pudieron comparar con ella, se
+    deja sin aplicar y el paso falla, porque solo `-migrate-others` lo despeja,
+    y esa es una decisión para tomar en una terminal, no en un workflow. Sin un
+    fichero de estado [restaurado entre ejecuciones](#dos-cosas-que-un-runner-alojado-no-conserva),
+    cada ejecución de la Action empieza con uno nuevo, así que un almacén al que
+    no se le puede preguntar, un fichero SQL, un Graphite o lo que haya detrás
+    de un Telegraf, no tiene historia aquí y nunca se da por necesitado de un
+    cambio; con uno restaurado, esos siguen su registro como en una máquina. Un
+    job que agotó su tiempo mientras volvía a leer la historia no deja nada que
+    el siguiente pueda retomar, porque `actions/cache` no guarda nada de un job
+    que no terminó bien: ejecuta después `mode: backfill` con la misma
+    configuración.
+
+  </TabItem>
 </Tabs>
+
+En `once` y `backfill`, un arranque comprueba los almacenes igual y avisa de lo
+pendiente. Sobre un fichero de estado nuevo, que es cada ejecución sin uno
+restaurado, no aplica nada por su cuenta ni siquiera con `migrate: auto`: el
+fichero de estado se va con el runner, y con él el registro de que aún se debe
+una relectura, así que una relectura que falló o un job cancelado a medias
+dejaría un almacén despejado y nada que lo dijera. Con un fichero de estado
+restaurado aplica lo que es seguro aplicar sin supervisión, como una máquina.
+La Action convierte cada línea que dice que un cambio está pendiente, que se
+aplicó uno al arrancar, que uno falló o que se debe una relectura en una
+anotación de la ejecución en cuanto se escribe la línea, así que se ve en la
+página de resumen del workflow y no solo en su registro, también en un job
+cancelado a medias.
 
 ## Una tarjeta en el README de tu perfil
 

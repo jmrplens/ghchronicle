@@ -10,9 +10,10 @@ the shorter, repository-side version of it.
 ## What this is, in one paragraph
 
 One static Go binary with no runtime dependencies. Its direct dependencies are
-`gopkg.in/yaml.v3`, the PostgreSQL driver `github.com/jackc/pgx/v5`, and
-`golang.org/x/term` (over `golang.org/x/sys`) so that `-setup` can read a
-secret without echoing it; `go.mod` is the list. It sweeps the GitHub
+`gopkg.in/yaml.v3`, the PostgreSQL driver `github.com/jackc/pgx/v5`,
+`golang.org/x/term` so that `-setup` can read a secret without echoing it, and
+`golang.org/x/sys`, which `x/term` builds on and which takes the lock beside the
+state file (`flock` on Unix, `LockFileEx` on Windows); `go.mod` is the list. It sweeps the GitHub
 API on a schedule and writes each observation as a point stamped with the date
 the thing happened, not the date it was collected. That single rule is what
 makes re-collection converge instead of accumulating, and most of the design
@@ -30,6 +31,10 @@ internal/render     the SVG card
 internal/config     YAML with ${VAR} expansion (and ~ in paths), per-family cadences
 internal/run        the sweep scheduler, its state file, the cache file beside
                     it, and the turns the slow families take
+internal/teardown   what -uninstall and a migration do to each store, found by
+                    asking the store
+internal/migrate    every change to what a stored row is keyed by, and what
+                    -migrate and a start do about it
 internal/dashboards the dashboard specification, shared by the generators
                     and by the binary that publishes it
 test/e2e            the binary against a fake GitHub, and against real stores
@@ -101,7 +106,11 @@ it in both languages where it is a page.
 `sink.promRules`, a Loki rendering if it is an event, its row on the
 measurements page, and the counts the site states in prose:
 `site/scripts/gen-stats.mjs` holds each of them to the code, and a count it has
-no word for in `NUMBER_WORDS` fails until one is added.
+no word for in `NUMBER_WORDS` fails until one is added. Its tag keys go in
+`internal/migrate/identity.json`, written by
+`go test ./internal/migrate -run TestEveryChangeOfIdentityIsRegistered -update`
+once the fake GitHub answers it; the same holds for every measurement of a new
+collector.
 
 **A new field on an existing measurement** is a field and never a tag: a new
 tag gives every row written after it an identity the rows already stored do
@@ -111,6 +120,23 @@ a field for the same reason. One the
 collector writes only under a condition goes in `conditionalColumns`
 (`internal/dashboards/conditional_columns_test.go`) when a SQL panel reads it;
 the test fails until it is there.
+
+**A change to a measurement's tag keys**, a tag that becomes a field or one
+that is removed, means a new entry in `migrate.Registry`
+(`internal/migrate/registry.go`), with an ID of its own: the release, the tags
+only the old shape carries, and every family that writes the measurement, so
+`-migrate` can find the old shape in a store and say what bringing it along
+takes. `TestEveryChangeOfIdentityIsRegistered` sweeps the fake GitHub, compares
+every measurement's tag keys with `internal/migrate/identity.json`, and refuses
+to rewrite that file with `-update` while a tag that went away has no entry
+that is not yet pinned in `internal/migrate/testdata/registry.json`; a pinned
+entry, one a release may have shipped, never changes, and `-update` pins every
+entry it accepts. `TestEveryMigrationNamesEveryFamilyThatWritesIt` sweeps it
+one family at a time and fails on an entry whose families are not the ones
+that write it, and `TestEveryFamilyWritesAMeasurementInOneShape` on two
+families that write one measurement with different tag keys. A tag renamed is
+a tag removed and one added, and a tag added to an existing measurement is
+refused outright, for the reason in the paragraph above.
 
 **A panel one store draws differently from the others** means the reason in
 that store's own description of the panel, and an entry in `dashboardsDiffer`
@@ -145,7 +171,24 @@ its exact wire format, a struct in `config.Sinks` with a validation message
 that says what is required, a branch in `buildSinks`, a commented block in
 `config.example.yaml`, a page under `site/src/content/docs/sinks/` with its
 Spanish twin, and a store in `internal/dashboards/stores.go` if Grafana can
-query it.
+query it. It also means its place in `storesOf` (`internal/migrate/stores.go`):
+whether `-migrate` asks the store, follows the state file's record of it, or
+has nothing to do there and says why, and the destination, never a
+credential, a record of it is kept against. `TestEverySinkIsAStoreThePlannerKnows`
+fails on a sink left out. A sink whose store keeps rows needs a way to be
+brought along, a `teardown.Clearer` or an entry in `storeWays`
+(`cmd/ghchronicle/migrate.go`), and its page a section saying what a migration
+does there.
+
+**A step that deletes or sets aside data**, in a migration or in `-uninstall`,
+means three tests: one that it touches only what it must, with the same
+measurement in another database, schema or prefix, another measurement beside
+it and a name that only starts like it, all left as they were; one that the
+dry run, `-migrate` without `-yes` or `-uninstall` without it, sends the store
+nothing but reads and changes no file; and a run against the real store in
+the containerised suite (`test/e2e/docker`), at the version its compose file
+pins. The name it acts on is exact, the measurement or the copy it made, and
+never a pattern.
 
 **A new setting or Action input** means `config.example.yaml` and the
 configuration pages, or `action.yml` and the inputs table of

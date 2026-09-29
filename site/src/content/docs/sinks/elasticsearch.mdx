@@ -91,7 +91,9 @@ The sink creates no index template. Dynamic mapping gives every string field a
 
 If you want explicit mappings, create the index templates before the first
 write. Nothing in the sink depends on them; only the panels' choice of
-`.keyword` does.
+`.keyword` does. [`-migrate`](#what-a-migration-does-here) reads the mapping
+before it asks whose rows an index holds, so a template that maps strings as
+`keyword`, with no `.keyword` sub-field, is read from the field itself.
 
 ## The dashboard
 
@@ -112,6 +114,52 @@ Overview and Every repository, ever count an archived repository the default
 filter sets aside from its documents of the last seven days, where the SQL
 stores ask whether the collector still writes it, so a range that ended more
 than a week ago leaves those repositories out.
+
+## What a migration does here
+
+When a release changes what a measurement's documents are keyed by,
+[`-migrate`](/ghchronicle/install/upgrading/#migrations) finds the documents
+of the old shape by counting the ones that carry the old tag, and applying the
+change sets the index aside in three steps. **Measured against Elasticsearch
+9.5.3**:
+
+1. The index stops taking writes, through `PUT <index>/_block/write`.
+2. It is cloned to `<index>-<instant>`, the instant in UTC and in lower case,
+   as an index name has to be, for example
+   `ghchronicle-gh_discussion_comment-20261001t091004`, and the clone has to
+   hold as many documents as the index before anything else happens.
+3. The index is deleted, and the sink's next write creates it again, with a
+   mapping of its own.
+
+Before the change is applied, the plan asks whose rows the index holds and
+which repositories they belong to, with a terms aggregation on whatever field
+the mapping makes aggregatable: the `.keyword` sub-field dynamic mapping gives a
+string, or the field itself where a template maps it as `keyword`. The buckets
+have to add up to every document that holds the field, or the answer is not
+taken: measured on 9.5.3, an aggregation on `user.keyword` over an index whose
+template mapped `user` as `keyword` answered no buckets and no error, which
+read as an index holding nobody else's rows, and a value past the sub-field's
+`ignore_above` is in no bucket either. A document without the field is a row
+that names nobody, which the plan says as such.
+
+A step that fails before the delete takes the write block off again, so a
+cluster that refused the clone goes on taking the sink's writes, and the
+change stays pending with the cluster's reason. A delete that fails is looked
+at again before anything is undone: measured through a proxy that answered 502
+to a delete the cluster carried out, the index was gone, so the clone, the one
+copy of its documents, is kept and the change recorded as applied; only an
+index still there has its block taken off and its clone deleted. The API key needs the
+`manage` and `delete_index` privileges on the prefix's indices; a key that can
+only write is refused that way.
+
+The clone keeps the write block, and ghchronicle deletes it once it has been
+kept 24 hours: after a sweep of the service, at the next start of any run, or
+at the next `-migrate -yes`. Until then undoing the change is deleting the new
+index and cloning the copy back under its name. Every query of the shipped
+dashboard names its index whole, `_index:ghchronicle-gh_discussion_comment`,
+so no panel reads the clone: a panel's query over `ghchronicle-*` counted the
+one new document and not the clone's three. A Kibana data view over the same
+pattern without that filter does read it, for the day it is kept.
 
 ## Where to go next
 

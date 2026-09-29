@@ -507,7 +507,9 @@ func rows(points []Point) (out []Point, taken int) {
 			out = append(out, p)
 			continue
 		}
-		fields := make(map[string]any, len(out[i].Fields)+len(p.Fields))
+		// The larger of the two is a size hint no sum can overflow, and the
+		// union is rarely larger: the two are one row's fields read twice.
+		fields := make(map[string]any, max(len(out[i].Fields), len(p.Fields)))
 		maps.Copy(fields, out[i].Fields)
 		maps.Copy(fields, p.Fields)
 		out[i].Fields = fields

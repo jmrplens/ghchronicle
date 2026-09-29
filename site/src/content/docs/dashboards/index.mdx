@@ -193,12 +193,18 @@ ghchronicle -config config.yaml -uninstall all          # says what would go
 ghchronicle -config config.yaml -uninstall all -yes     # and then goes
 ```
 
-| Target      | What goes                                                                |
-| ----------- | ------------------------------------------------------------------------ |
-| `dashboard` | The dashboards it published, and the datasources it created              |
-| `data`      | Every table in the store whose name starts with `gh_`                    |
-| `state`     | The state file, the dedupe ledger, the cache and the backfill checkpoint |
-| `all`       | The three above                                                          |
+| Target      | What goes                                                                                                                  |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `dashboard` | The dashboards it published, and the datasources it created                                                                |
+| `data`      | Every table in the store whose name starts with `gh_`                                                                      |
+| `state`     | The state file, the dedupe ledger, the cache, the backfill and refill checkpoints and the lock file beside the state file |
+| `all`       | The three above                                                                                                            |
+
+With `-yes`, `data` and `state` take the lock beside the state file first, and
+refuse, naming the process, while the service or a `-migrate -yes` holds it:
+what they remove is what that process goes on writing, and the lock file is
+among the state files, so removed under a running service it would let the
+next `-migrate -yes` run beside it.
 
 A datasource named in `grafana.datasource.uid` or `grafana.datasource.loki_uid`
 is never removed, and neither is a Loki datasource it adopted: each was

@@ -33,6 +33,7 @@ heartbeat: # how often the sweep loop wakes, for a test run
 log: # level, format, and an optional rotating file
 state_file: # what a restart remembers
 backfill: # the bound, when run with -backfill
+migrate: # what a start does about what an upgrade left in the stores
 grafana: # where the dashboard is published, when asked
 ```
 
@@ -123,7 +124,7 @@ The reserve is scaled per bucket; see [rate limits](/ghchronicle/api/).
 state_file: /var/lib/ghchronicle/state.json
 ```
 
-Eight things, and deleting the file costs a different one for each:
+Nine things, and deleting the file costs a different one for each:
 
 - `last_run`, when each family last ran. Without it every family is due at once,
   so the next sweep is a full one, except that the service starts the families
@@ -157,14 +158,34 @@ Eight things, and deleting the file costs a different one for each:
   the counts query and one page of the walk, two points, and 468 to 513 KB for
   each hourly pass the production proxy logged against the same account on
   2026-09-27, a size that grows through the day with what is merged.
+- `stores`, for each store a run writes to, where it points, the release that
+  first wrote it, the release that last did, the
+  [migrations](/ghchronicle/install/upgrading/#migrations) applied to it, the
+  copies of old rows a migration set aside there, and the history a migration
+  cleared there and has not read back yet. Without it a SQL file, a Graphite or
+  a Telegraf is taken to be the running release's own, so what an earlier
+  release left in it is no longer shown, and a store cleared and not read back
+  looks like one that never held the old shape, so nothing reads its history
+  back until a `-backfill -families` of the families the refill named does.
 
-Seven of the eight cost only quota, because what is collected again is keyed by
+Seven of the nine cost only quota, because what is collected again is keyed by
 measurement, tags and timestamp and overwrites what is already stored.
-`last_head` is the one that loses something: the dependency changes between the
-head it held and the next one are read from a range that nothing can name once
-the head is gone.
+`last_head` loses something: the dependency changes between the head it held
+and the next one are read from a range that nothing can name once the head is
+gone. So does `stores`: which release first wrote a store that cannot be asked
+what its rows are keyed by, and a refill a migration still owes, are questions
+nothing can answer afterwards.
 
-A run with `-card-only` writes none of the eight. Its points reach [the
+A file that is there and cannot be read or parsed is not taken for a new one:
+a run that writes to the stores stops and names it, since read as new it would
+forget a refill still owed, and its first save would put a new file in its
+place. A run as another user, root most often, is what leaves it unreadable;
+give it back to the user the collector runs as. A run that saves the file
+keeps what another process recorded of the stores since it read it, so two
+runs that overlap, a `-once` from cron across a `-migrate -yes`, do not undo
+each other's records of the stores.
+
+A run with `-card-only` writes none of the nine. Its points reach [the
 card](/ghchronicle/card/) and no store, so a mark it left behind would make the
 next collection skip a family, or narrow a read, whose data went into a picture
 and nowhere else. It reads the file as any other run does.
@@ -303,6 +324,40 @@ a backfill starts, it is removed when the walk reaches the end, and a sweep
 neither writes nor reads it. See [stopping one, and picking it up
 again](/ghchronicle/how/backfill/#stopping-one-and-picking-it-up-again).
 
+## `migrate`
+
+```yaml
+migrate: auto
+```
+
+What a run that writes to the stores does, before its first sweep, about a
+store an earlier release left in a shape this one no longer writes. `-migrate`
+prints what each configured store holds of every such change; see
+[Migrations](/ghchronicle/install/upgrading/#migrations).
+
+| Value  | What a start does                                                                                                   |
+| ------ | ------------------------------------------------------------------------------------------------------------------- |
+| `auto` | The default. Applies on its own a pending change that loses nothing, says so at `WARN`, reads back what it cleared, and what an earlier run cleared and did not finish reading, and warns about every other one at every start |
+| `warn` | Applies nothing and reads nothing back, and warns about every pending change, and every store still owed its history, at every start |
+
+A change loses nothing when all three hold: GitHub still serves the whole
+history, so reading it again brings back every row the store holds; the old
+rows are set aside for at least 24 hours rather than deleted, which InfluxDB 3,
+PostgreSQL and Elasticsearch do; and every row in the store is this
+configuration's, which the store is asked. There is no value that applies the
+rest on its own. A one-shot run, `-once` or `-backfill`, on a new state file
+applies nothing on its own either: that is every run of the Action without a
+state file restored, whose record of a refill still owed goes with its runner.
+Each warning names the two commands, `-migrate` for the plan and
+`-migrate -yes` to apply it, with the service stopped. Any other value is
+refused at start-up.
+
+The service also holds a lock beside the state file, `<name>-lock`, for as long
+as it runs, which is what keeps `-migrate -yes`, and `-uninstall -yes` of the
+data or the state, from changing the stores under it. There is nothing to configure: it follows `state_file`, the operating
+system lets go of it however the process ends, and the file left behind only
+names the last process that held it.
+
 ## When it is wrong, it says so at start-up
 
 Configuration is validated before the first call is made, and the messages name
@@ -317,6 +372,7 @@ the key and what it needs.
 | `every.families.<name>: unknown collector`                            | The name is not a family. The message lists the ones that exist       |
 | `sinks.influxdb: url and bucket are required`                         | Each sink validates its own required keys and says which              |
 | `sinks.sql.dialect: "mysql" is not postgres, the only dialect so far` | The value is not one of the accepted ones, and the message lists them |
+| `migrate: "off" is not auto or warn`                                  | The same, for `migrate`                                               |
 
 <Aside type="note" title="A cadence for a family that does not exist is fatal">
   `every` is checked against the list of known collectors at start-up rather

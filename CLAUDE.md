@@ -7,8 +7,10 @@ Context for AI agents working in this repository.
 `ghchronicle` collects every metric GitHub exposes about an account and writes
 each observation as a point dated when the thing happened. Go, single static
 binary. Its direct dependencies are `gopkg.in/yaml.v3`, the PostgreSQL driver
-`github.com/jackc/pgx/v5`, and `golang.org/x/term` (over `golang.org/x/sys`)
-so that `-setup` can read a secret without echoing it; `go.mod` is the list.
+`github.com/jackc/pgx/v5`, `golang.org/x/term` so that `-setup` can read a
+secret without echoing it, and `golang.org/x/sys`, which `x/term` builds on and
+which takes the lock beside the state file (`flock` on Unix, `LockFileEx` on
+Windows); `go.mod` is the list.
 
 The reason it exists: GitHub keeps almost nothing. Traffic is a rolling
 fourteen days, the event feed is the last three hundred events of the past
@@ -41,8 +43,12 @@ internal/run        the sweep scheduler, its state file, the cache file that
 internal/grafana    the little Grafana client, and the panel run both the
                     dashboard checker and the containerised suite use
 internal/httpx      a connection pool per client, never http.DefaultTransport's
-internal/teardown   what -uninstall drops from each store, found by asking the
-                    store. Destructive by design, and the caller confirms
+internal/teardown   what -uninstall drops from each store, and what a migration
+                    asks it and sets aside there, found by asking the store.
+                    Destructive by design, and the caller confirms
+internal/migrate    the registry of every change to what a stored row is keyed
+                    by, the plan -migrate prints, what a start applies on its
+                    own, the refill, and the purge of what was set aside
 test/e2e            builds the binary and runs it against a fake GitHub
 test/e2e/docker     the same binary against the real stores in Docker, and the
                     five dashboards against those; behind the dockere2e tag
@@ -108,9 +114,61 @@ column from either PostgreSQL sink, so every insert of that measurement is
 refused until the table is dropped or altered by hand; only a tag first seen
 within one process or one file becomes a plain column outside the key. A tag
 dropped stays in the key, holding ''. Dropping `is_answer` left the stores with
-`gh_discussion_comment` in two shapes until it is dropped and backfilled;
-the planning panels read one row per comment across both, and a migration
-tool is issue #96.
+`gh_discussion_comment` in two shapes until they are brought along (the next
+rule); the planning panels read one row per comment across both, for a store
+nobody has brought along yet.
+
+**A change to what a row is keyed by is a migration.** A point's identity is
+its measurement, its tags and its time, so a release that removes a tag, or
+moves one into the fields, leaves every row already stored beside the new ones
+for ever, in every store that keeps rows. A tag renamed, or added, is refused
+outright: the registry can name a tag that went away and has no way yet to find
+the rows that lack one. A removal owes, in the same change, a new entry
+in `migrate.Registry` (`internal/migrate/registry.go`): an ID
+`<release>/<measurement>/<what>`, which state files keep and which is never
+renamed or reused; the first release that writes the new shape; the tags only
+the old shape carries (`OldTags`, what a store is asked about and what makes
+Graphite's old paths one node deeper); every family that writes the
+measurement; the tag that says whose rows they are; the tag that says who wrote
+a row (`Author`) where an account-wide family writes the measurement beside a
+per-repository one; the tags that name one item; and whether GitHub still
+serves the whole history (`Whole`, which lets a
+store be cleared and read again) or today's state only (`Current`, a note that
+changes nothing). A value that changed with the identity kept is `Value`, a
+note too. Three tests hold it. `TestEveryChangeOfIdentityIsRegistered` sweeps
+the fake GitHub and compares every measurement's tag keys with
+`internal/migrate/identity.json`: a tag that went away with no entry fails, and
+`-update` refuses to rewrite the file until there is one; a tag added to an
+existing measurement fails outright. Only an entry not yet pinned in
+`internal/migrate/testdata/registry.json` explains a removal, and a pinned one
+never changes: a state file that recorded its ID settled it for good, so a
+second tag added to a shipped entry's `OldTags` would never be asked about.
+`-update` pins every entry it accepts. `TestEveryMigrationNamesEveryFamilyThatWritesIt`
+sweeps it one family at a time and fails on an entry whose families are not
+exactly the writers, which is what the manual refill of 2.6.1 got wrong: it
+read `outbound` and not `discussions`; `TestEveryFamilyWritesAMeasurementInOneShape`
+fails when two families write one measurement with different tag keys, which
+the union in `identity.json` cannot see. `TestTheRegistryHoldsTogether` holds
+each entry to its own rules. Nothing else is owed: `-migrate` plans every entry
+against every store and changes nothing, `-migrate -yes` applies it, and a
+start under `migrate: auto`, the default, applies on its own only what loses
+nothing, which is GitHub serving the whole history, the old rows set aside for
+at least 24 hours (InfluxDB 3's own soft delete, 72 hours by default, a rename
+in PostgreSQL, a clone in Elasticsearch) and every row in the store this
+configuration's, which the store is asked, repositories as well as accounts
+whenever a family reads per repository. A one-shot run on a new state file
+applies nothing on its own: the Action's state file goes with its runner, and
+only the state file says a refill is still owed. The refill is recorded as owed
+before a store is touched, and taken back only when the store says a failure
+left it as it was. A store that
+can be asked decides whether it holds the old shape, and the state file's
+`stores` record decides for the SQL file, Graphite and Telegraf. Every
+destructive step names exactly one measurement, or the copy it made, in the
+database, bucket, schema or prefix the sink writes to, never a pattern, and
+has a test that it touches nothing else, one that the dry run changes nothing,
+and a run against the real store in the containerised suite. The 2.0.0
+renaming of the repository tags is not in the registry, on purpose: a 1.x
+store is recreated, and the registry starts at what a 2.x store can hold.
 
 **Unavailable is not a failure.** `ghapi.UnavailableError` (403/404: the
 feature is switched off) and `ghapi.NotReadyError` (202: GitHub is still
@@ -260,7 +318,11 @@ is missing, because PostgreSQL takes an ACCESS EXCLUSIVE lock before it checks
 IF NOT EXISTS, and one ALTER per field queued every restart behind whatever
 Grafana was reading. Do not simplify it back. Its upsert conflicts on the key
 the table has, read from the catalog, not on the one this release would
-declare.
+declare. A table dropped or renamed behind it answers 42P01, and the sink then
+forgets the tables of that batch, declares them again and sends the batch once
+more: without that, every write of the measurement failed until a restart and
+took the rest of its batch along (measured on 18.6), which a migration setting
+the table aside would meet every time.
 
 ## What GitHub will not give a personal account
 
@@ -364,6 +426,7 @@ go run ./cmd/probe owner/name          # try collectors against one repository
 GHC_DUMP=<family> go run ./cmd/probe   # print that family's line protocol
 go run ./cmd/ghchronicle -config config.yaml -list
 go run ./cmd/ghchronicle -config config.yaml -once
+go run ./cmd/ghchronicle -config config.yaml -migrate   # what an upgrade left in the stores; changes nothing
 ```
 
 The targets name their packages (`PKGS` in the Makefile) rather than `./...`,
@@ -411,8 +474,11 @@ cadence table of `configuration/cadences.mdx` repeats, the English `why`
 verbatim, pinned by `documented_test.go`; a row in the cost table of
 `api/cost.mdx`; a rule in `sink.promRules` (leaving it out means the exporter
 skips it, which is the safe default); a Loki rendering if it is an event; a
-fixture and a test in `internal/collect`; a row on the measurements page; and a
-panel in `internal/dashboards` with a query set per store.
+fixture and a test in `internal/collect`; a row on the measurements page; a
+panel in `internal/dashboards` with a query set per store; and the tag keys of
+each measurement it writes in `internal/migrate/identity.json`, written by
+`go test ./internal/migrate -run TestEveryChangeOfIdentityIsRegistered -update`
+once the fake answers it.
 
 It also means an end-to-end fixture, a route for it in `test/e2e/fakegh`, and
 an entry in that package's `Measurements`. The family list both suites schedule
@@ -426,7 +492,7 @@ dashboard panels rejected for naming something that does not exist.
 what turn that into one failure naming the family.
 
 A new measurement in an existing family owes the same `promRules` entry, Loki
-rendering and measurements row. A new field on an existing measurement is a
+rendering, measurements row and line in `identity.json`. A new field on an existing measurement is a
 field, never a tag (see above), and one written only under a condition goes in
 `conditionalColumns` (`internal/dashboards/conditional_columns_test.go`) if a
 SQL panel reads it.
@@ -436,7 +502,14 @@ its exact wire format, a struct in `config.Sinks` with a validation message
 that says what is required, a branch in `buildSinks`, a commented block in
 `config.example.yaml`, a page under `site/src/content/docs/sinks/` with its
 Spanish twin beside it, and a store in `internal/dashboards/stores.go` if it
-can be queried by Grafana.
+can be queried by Grafana. It also means its place in `storesOf`
+(`internal/migrate/stores.go`): whether a migration asks the store, follows
+the state file's record of it, or has nothing to do there and says why, and
+the destination, never a credential, that a record is kept against;
+`TestEverySinkIsAStoreThePlannerKnows` fails on a sink left out. A store that
+keeps rows needs its way to be brought along too, a `teardown.Clearer` or an
+entry in `storeWays` (`cmd/ghchronicle/migrate.go`), and a section on its page
+saying what a migration does there.
 
 `docs/` is generated, never hand-edited either. The English pages of the site
 are the source, `site/scripts/gen-docs.mjs` writes every file under `docs/` from

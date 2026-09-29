@@ -1,0 +1,92 @@
+ghchronicle 2.6.2: what this release would change in the stores this configuration writes
+
+influxdb  url=http://influx:8181 org=default bucket=github  (InfluxDB 3 Core 3.11.2)
+  pending     1.0.0/gh_code_scanning_alert_item/state
+              rows of gh_code_scanning_alert_item carry state and reason as tags: 40 rows, the oldest dated 2023-11-14
+              why: a build before 1.0.0 tagged each code scanning alert with its state and the reason it closed, so an alert fixed after it was first read is two rows at one instant
+              set aside: InfluxDB renames the table gh_code_scanning_alert_item-<time> and keeps it queryable until it purges it itself, 72 hours later by default
+              read again: security, since 2023-11-14, writing gh_code_scanning_alert_item only
+              not coming back: the rows of 1 repository this configuration no longer covers: octocat/gone
+              needs your word: reading it again does not bring back every row it holds (see not coming back), and those are gone once the set-aside is purged
+  not needed  1.0.0/gh_dependabot_alert_item/state: no row of gh_dependabot_alert_item carries state
+  note        2.6.0/gh_actions_cache_entry/sum
+              the store holds gh_actions_cache_entry: 90 rows, the oldest dated 2023-11-14
+              why: rows dated before 2.6.0 hold one entry of each cache and ref, not their sum; no API lists a past day's caches, so they are kept as they are
+              nothing is changed
+  pending     2.6.1/gh_discussion_comment/is_answer
+              rows of gh_discussion_comment carry is_answer as a tag: 3 rows, the oldest dated 2023-11-14
+              why: is_answer was a tag, so a comment read before and after its acceptance is two rows at one instant
+              set aside: InfluxDB renames the table gh_discussion_comment-<time> and keeps it queryable until it purges it itself, 72 hours later by default
+              read again: discussions and outbound, since 2023-11-14, writing gh_discussion_comment only
+              safe to apply unattended: GitHub serves the whole history, the old rows are set aside for at least 24 hours, and every row is this configuration's
+
+loki
+  nothing to migrate: a stream is its job, kind and configured labels, and a tag change moves none of them
+
+telegraf  url=http://telegraf:8186/telegraf
+  not needed  1.0.0/gh_code_scanning_alert_item/state: no release wrote this shape, and only a store that can be asked could show one a build before 1.0.0 left
+  not needed  1.0.0/gh_dependabot_alert_item/state: no release wrote this shape, and only a store that can be asked could show one a build before 1.0.0 left
+  note        2.6.0/gh_actions_cache_entry/sum
+              written before the state file kept a record of which release first wrote it, so it may hold rows written before 2.6.0; this store cannot be asked
+              why: rows dated before 2.6.0 hold one entry of each cache and ref, not their sum; no API lists a past day's caches, so they are kept as they are
+              nothing is changed
+  pending     2.6.1/gh_discussion_comment/is_answer
+              written before the state file kept a record of which release first wrote it, so it may hold rows written before 2.6.1; this store cannot be asked
+              why: is_answer was a tag, so a comment read before and after its acceptance is two rows at one instant
+              drop gh_discussion_comment in the store behind Telegraf, then read discussions and outbound again through it with -backfill -families discussions,outbound
+              needs your word: ghchronicle cannot reach the store behind Telegraf
+
+graphite  addr=graphite:2003 prefix=github
+  not needed  1.0.0/gh_code_scanning_alert_item/state: no release wrote this shape, and only a store that can be asked could show one a build before 1.0.0 left
+  not needed  1.0.0/gh_dependabot_alert_item/state: no release wrote this shape, and only a store that can be asked could show one a build before 1.0.0 left
+  note        2.6.0/gh_actions_cache_entry/sum
+              written before the state file kept a record of which release first wrote it, so it may hold rows written before 2.6.0; this store cannot be asked
+              why: rows dated before 2.6.0 hold one entry of each cache and ref, not their sum; no API lists a past day's caches, so they are kept as they are
+              nothing is changed
+  pending     2.6.1/gh_discussion_comment/is_answer
+              written before the state file kept a record of which release first wrote it, so it may hold rows written before 2.6.1; this store cannot be asked
+              why: is_answer was a tag, so a comment read before and after its acceptance is two rows at one instant
+              on the Graphite host, remove the old paths, one node deeper than the new ones:
+                find <storage>/whisper/github/discussion_comment -mindepth 11 -name '*.wsp' -delete
+                find <storage>/whisper/github/discussion_comment -type d -empty -delete
+              read again: discussions and outbound, with no bound, writing gh_discussion_comment only
+              needs your word: only whoever runs the Graphite host can remove its files
+
+sql  path=<dir>/points.sql
+  not needed  1.0.0/gh_code_scanning_alert_item/state: no release wrote this shape, and only a store that can be asked could show one a build before 1.0.0 left
+  not needed  1.0.0/gh_dependabot_alert_item/state: no release wrote this shape, and only a store that can be asked could show one a build before 1.0.0 left
+  note        2.6.0/gh_actions_cache_entry/sum
+              written before the state file kept a record of which release first wrote it, so it may hold rows written before 2.6.0; this store cannot be asked
+              why: rows dated before 2.6.0 hold one entry of each cache and ref, not their sum; no API lists a past day's caches, so they are kept as they are
+              nothing is changed
+  pending     2.6.1/gh_discussion_comment/is_answer
+              written before the state file kept a record of which release first wrote it, so it may hold rows written before 2.6.1; this store cannot be asked
+              why: is_answer was a tag, so a comment read before and after its acceptance is two rows at one instant
+              write DROP TABLE IF EXISTS "gh_discussion_comment"; into the file, ahead of the rows read again
+              read again: discussions and outbound, with no bound, writing gh_discussion_comment only
+              needs your word: the DROP reaches whatever the file is replayed into, where nothing is kept aside
+
+postgres  host=db port=5432 database=gh  (PostgreSQL 18.6)
+  pending     1.0.0/gh_code_scanning_alert_item/state
+              rows of gh_code_scanning_alert_item carry state and reason as tags: 40 rows, the oldest dated 2023-11-14
+              why: a build before 1.0.0 tagged each code scanning alert with its state and the reason it closed, so an alert fixed after it was first read is two rows at one instant
+              set aside: the table is renamed gh_code_scanning_alert_item-<time>, and dropped 24 hours later
+              read again: security, since 2023-11-14, writing gh_code_scanning_alert_item only
+              not coming back: the rows of 1 repository this configuration no longer covers: octocat/gone
+              needs your word: reading it again does not bring back every row it holds (see not coming back), and those are gone once the set-aside is purged
+  not needed  1.0.0/gh_dependabot_alert_item/state: no row of gh_dependabot_alert_item carries state
+  note        2.6.0/gh_actions_cache_entry/sum
+              the store holds gh_actions_cache_entry: 90 rows, the oldest dated 2023-11-14
+              why: rows dated before 2.6.0 hold one entry of each cache and ref, not their sum; no API lists a past day's caches, so they are kept as they are
+              nothing is changed
+  pending     2.6.1/gh_discussion_comment/is_answer
+              rows of gh_discussion_comment carry is_answer as a tag: 3 rows, the oldest dated 2023-11-14
+              why: is_answer was a tag, so a comment read before and after its acceptance is two rows at one instant
+              set aside: the table is renamed gh_discussion_comment-<time>, and dropped 24 hours later
+              read again: discussions and outbound, since 2023-11-14, writing gh_discussion_comment only
+              needs your word: it holds rows of hubot, which this configuration does not collect; set aside, they come back only when the configuration that collects them reads them again
+
+elasticsearch  url=http://es:9200 prefix=ghchronicle
+  unreachable it did not answer, so what it holds is not known: 401 Unauthorized: missing authentication
+
+7 pending, 5 noted, elasticsearch did not answer. Nothing was changed.

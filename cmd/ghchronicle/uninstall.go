@@ -9,9 +9,11 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/jmrplens/ghchronicle/v2/internal/config"
 	"github.com/jmrplens/ghchronicle/v2/internal/grafana"
+	"github.com/jmrplens/ghchronicle/v2/internal/run"
 	"github.com/jmrplens/ghchronicle/v2/internal/teardown"
 )
 
@@ -37,6 +39,15 @@ func uninstall(ctx context.Context, cfg *config.Config, list string, confirmed b
 	if err != nil {
 		return err
 	}
+	lock := &run.Lock{}
+	if confirmed && (wanted[targetData] || wanted[targetState]) {
+		held, lockErr := holdForUninstall(cfg)
+		if lockErr != nil {
+			return lockErr
+		}
+		lock = held
+		defer func() { _ = lock.Release() }()
+	}
 	var found []removal
 	if wanted[targetDashboard] {
 		grafanaSide, failed := dashboardRemovals(ctx, cfg)
@@ -53,9 +64,43 @@ func uninstall(ctx context.Context, cfg *config.Config, list string, confirmed b
 		found = append(found, storeSide...)
 	}
 	if wanted[targetState] {
-		found = append(found, stateRemovals(cfg)...)
+		found = append(found, stateRemovals(cfg, lock)...)
 	}
 	return carryOut(ctx, found, confirmed, out)
+}
+
+// holdForUninstall takes the lock beside the state file for the length of an
+// uninstall that removes tables or the state file, and refuses while another
+// process holds it.
+//
+// Removing either under a running service is removing what it goes on
+// writing, and the lock file is among the state files: unlinked while the
+// service held it, a -migrate -yes after it took a new one and ran beside the
+// service, which is what the lock is there to stop. A lock file that is not
+// there is one nobody holds, and is not made here, which would leave one
+// behind after an uninstall of the tables alone.
+func holdForUninstall(cfg *config.Config) (*run.Lock, error) {
+	path := cfg.LockFile()
+	if path == "" || !fileThere(path) {
+		return &run.Lock{}, nil
+	}
+	lock, err := run.TakeLock(path, run.HeldByUninstall, version, time.Now())
+	if held, isHeld := run.IsHeld(err); isHeld {
+		return nil, fmt.Errorf("%w; nothing was removed. That process writes the stores and the state file "+
+			"this would remove: stop it, or let it finish, and run this again", held)
+	}
+	// A lock file that cannot be opened at all is not held by anybody this
+	// could ask, and is no reason to refuse what was asked for.
+	if lock == nil {
+		lock = &run.Lock{}
+	}
+	return lock, nil
+}
+
+// fileThere says whether a file can be found at path.
+func fileThere(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 // removal is one thing to take away, with the words that name it and the call
@@ -205,30 +250,60 @@ func dataRemovals(ctx context.Context, cfg *config.Config, out io.Writer) ([]rem
 				drop: func(ctx context.Context) error { return store.Drop(ctx, item) },
 			})
 		}
+		if l, ok := store.(teardown.Lingerer); ok && len(l.Lingering()) > 0 {
+			fmt.Fprintf(out, "note: %s: deleted already, and purged by the server itself on its own schedule, 72 "+
+				"hours after the delete by default, which refuses to be asked again sooner: %s\n", store.Name(),
+				strings.Join(l.Lingering(), ", "))
+		}
 	}
 	return found, nil
 }
 
 // stateRemovals is what a sweep keeps between runs. All of it is rebuilt by
 // running again; what it costs to lose is one full pass over the API.
-func stateRemovals(cfg *config.Config) []removal {
+//
+// The lock file goes last, once this uninstall has let go of it. Windows
+// will not remove a file Go holds open, in the process asking as in any
+// other, so removed while held it was the one state file an uninstall there
+// never took away. Removed before the others anywhere else, it would let a
+// -migrate -yes started in between lock a new one and change the stores
+// while the rest of the state was still being removed.
+func stateRemovals(cfg *config.Config, lock *run.Lock) []removal {
 	var found []removal
+	var lockFile *removal
 	for _, path := range statePaths(cfg) {
 		if _, err := os.Stat(path); err != nil {
 			continue
 		}
-		found = append(found, removal{
+		item := removal{
 			what: "the state file " + path,
 			drop: func(_ context.Context) error { return os.Remove(path) },
-		})
+		}
+		// Compared clean: the glob that found it cleans what it returns, and
+		// on Windows turns a configured forward slash into a backslash.
+		if cfg.LockFile() != "" && filepath.Clean(path) == filepath.Clean(cfg.LockFile()) {
+			item.drop = func(_ context.Context) error {
+				// A close that fails leaves nothing held either way, and the
+				// remove says whether the file went.
+				_ = lock.Release()
+				return os.Remove(path)
+			}
+			lockFile = &item
+			continue
+		}
+		found = append(found, item)
+	}
+	if lockFile != nil {
+		found = append(found, *lockFile)
 	}
 	return found
 }
 
-// statePaths is every file a sweep leaves behind. The dedupe ledger and the
-// backfill checkpoint sit beside the state file under names derived from it,
-// which is why finding them is a matter of looking rather than of asking the
-// config for three paths it only holds one of.
+// statePaths is every file a sweep leaves behind. The dedupe ledger, the
+// cache file, the backfill and refill checkpoints and the lock sit beside the
+// state file under names derived from it, which is why finding them is a
+// matter of looking rather than of asking the config for paths it only holds
+// one of.
 func statePaths(cfg *config.Config) []string {
 	state := cfg.StateFile
 	if state == "" {

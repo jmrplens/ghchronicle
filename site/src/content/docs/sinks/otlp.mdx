@@ -105,6 +105,12 @@ service:
 With that pipeline, keep `raw: false`: the exporter at the far end is
 Prometheus, and the constraint follows the data rather than the protocol.
 
+## Nothing to migrate
+
+The sink pushes today's values, in the shape of the release that runs it, so
+[`-migrate`](/ghchronicle/install/upgrading/#migrations) has nothing to do
+here. What the receiver keeps of an old series ends where the new one begins.
+
 ## Where to go next
 
 - [Choosing a store](/ghchronicle/sinks/) compares OpenTelemetry with the others,

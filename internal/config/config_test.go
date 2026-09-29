@@ -364,6 +364,7 @@ sinks:
 		"the derived dedupe_file": {c.Sinks.DedupeFile, home + "/.ghchronicle/state-written.bin"},
 		"the derived cache file":  {c.CacheFile(), home + "/.ghchronicle/state-cache.bin"},
 		"the derived checkpoint":  {c.BackfillProgressFile(), home + "/.ghchronicle/state-progress.json"},
+		"the refill's checkpoint": {c.RefillProgressFile(), home + "/.ghchronicle/state-refill.json"},
 		"log.file":                {c.Log.File, "/srv/ghc/ghchronicle.log"},
 		"sinks.file.path":         {c.Sinks.File.Path, home + "/points.lp"},
 		"sinks.sql.path":          {c.Sinks.SQL.Path, "/srv/ghc/points.sql"},
@@ -462,5 +463,53 @@ func TestATildeWithNoHomeIsRefusedNamingTheKey(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), key+": ") || !strings.Contains(err.Error(), "home directory") {
 			t.Errorf("%s with no home: err = %v, want it refused naming the key", key, err)
 		}
+	}
+}
+
+// TestMigrateIsAutoUnlessToldToWarn: an empty migrate is auto, the two
+// words are taken as written, and anything else is refused naming both,
+// because a misspelled word read as the default would let a start change a
+// store its reader meant to leave alone.
+func TestMigrateIsAutoUnlessToldToWarn(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "x")
+	for _, tc := range []struct {
+		body, want string
+		own        bool
+	}{
+		{"", MigrateAuto, true},
+		{"migrate: auto\n", MigrateAuto, true},
+		{"migrate: warn\n", MigrateWarn, false},
+	} {
+		c, err := Load(write(t, "targets: {user: jmrplens}\nsinks: {stdout: true}\n"+tc.body))
+		if err != nil {
+			t.Fatalf("%q: %v", tc.body, err)
+		}
+		if c.Migrate != tc.want || c.MigratesOnItsOwn() != tc.own {
+			t.Errorf("%q: migrate = %q, on its own = %v, want %q and %v",
+				tc.body, c.Migrate, c.MigratesOnItsOwn(), tc.want, tc.own)
+		}
+	}
+	for _, word := range []string{"off", "always", "yes"} {
+		_, err := Load(write(t, "targets: {user: jmrplens}\nsinks: {stdout: true}\nmigrate: "+word+"\n"))
+		if err == nil || !strings.Contains(err.Error(), `migrate: "`+word+`" is not auto or warn`) {
+			t.Errorf("migrate: %s = %v, want it refused naming auto and warn", word, err)
+		}
+	}
+}
+
+// TestTheLockLivesBesideTheStateFile: the lock is named after the state
+// file, like every other file a run keeps, so two configurations that keep
+// separate state files never wait for each other.
+func TestTheLockLivesBesideTheStateFile(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "x")
+	c, err := Load(write(t, "targets: {user: jmrplens}\nsinks: {stdout: true}\nstate_file: /var/lib/g/state.json\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := c.LockFile(); got != "/var/lib/g/state-lock" {
+		t.Errorf("LockFile = %q, want /var/lib/g/state-lock", got)
+	}
+	if got := (&Config{}).LockFile(); got != "" {
+		t.Errorf("with no state file LockFile = %q, want none", got)
 	}
 }

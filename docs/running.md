@@ -1291,11 +1291,15 @@ almost nothing: an outbound TCP socket and one writable directory.
 the right ownership on start, so the state file has somewhere to live without a
 manual `mkdir` and a `chown` that someone will forget after a reinstall.
 
-Three files live there, not one. Beside `state.json` the sweep keeps its write
+Four files live there, not one. Beside `state.json` the sweep keeps its write
 ledger, `state-written.bin` by default, which is what stops an unchanged point
 being written again, and its cache, `state-cache.bin`, which is what lets a
-restart ask GitHub only for what changed; `ReadWritePaths` covers the
-directory, so all three are already allowed. Put the state file or the ledger
+restart ask GitHub only for what changed; and the service holds `state-lock`
+for as long as it runs, which is how `-migrate -yes` knows not to change the
+stores under it. A backfill, or the reading back of a
+[migration](https://jmrp.io/docs/ghchronicle/install/upgrading/#migrations), that stops half way
+leaves its checkpoint there too. `ReadWritePaths` covers the directory, so all
+of them are already allowed. Put the state file or the ledger
 somewhere else and that path needs adding here, and the cache follows the state
 file wherever it goes. Losing the ledger costs one sweep of rewriting:
 [only what changed is written](https://jmrp.io/docs/ghchronicle/sinks/#only-what-changed-is-written);
@@ -1320,6 +1324,7 @@ losing the cache, one sweep at full price:
       - state.json created by the service
       - state-written.bin the write ledger, beside it
       - state-cache.bin the cache, beside it too
+      - state-lock held by the service while it runs
 
 3. Write the environment file, and nothing else in it.
 
@@ -1364,13 +1369,16 @@ level=INFO msg="rate budget" bucket=core remaining=4477 limit=5000
 day](https://jmrp.io/docs/ghchronicle/configuration/logging/#what-the-log-says-on-a-good-day) has
 every routine line.
 
-Two warnings are worth an alert:
+Three warnings are worth an alert:
 
 - **`rate limit reserve reached`** means a family was skipped to protect the
   budget. Once is fine; every sweep means the cadences are too fast for the
   number of repositories.
 - **`family failed everywhere, not marking it as run`** means every repository
   failed for one family, so it will be retried rather than treated as done.
+- **`migration pending`**, at every start after an upgrade, means a store still
+  holds rows in a shape this release no longer writes, and the start left
+  them: see [after an upgrade](https://jmrp.io/docs/ghchronicle/install/systemd/#after-an-upgrade).
 
 ```sh
 journalctl -u ghchronicle -f
@@ -1382,6 +1390,44 @@ journalctl -u ghchronicle -p warning --since today
 > `systemd-analyze security ghchronicle` scores the unit and names anything the
 > sandbox is not covering. It is the fastest way to see that an edit quietly
 > removed a restriction.
+
+### After an upgrade
+
+Replace the binary and restart the service. Under the default
+[`migrate: auto`](https://jmrp.io/docs/ghchronicle/configuration/#migrate), the start checks every
+store against the changes the new release carries and, before its first sweep,
+applies on its own each one that loses nothing, saying so at `WARN`. A change
+it leaves is a `WARN` at every start, naming the store, the reason and the two
+commands: [what a start does about
+it](https://jmrp.io/docs/ghchronicle/install/upgrading/#what-a-start-does-about-it).
+
+Run those as the service's own user and with its environment file, with the
+service stopped, since `-migrate -yes` refuses to run beside it:
+
+```sh
+sudo systemctl stop ghchronicle
+sudo systemd-run --uid=ghchronicle --gid=ghchronicle --pipe --wait --collect \
+  --property=EnvironmentFile=/etc/ghchronicle/ghchronicle.env \
+  /usr/local/bin/ghchronicle -config /etc/ghchronicle/config.yaml -migrate
+sudo systemd-run --uid=ghchronicle --gid=ghchronicle --pipe --wait --collect \
+  --property=EnvironmentFile=/etc/ghchronicle/ghchronicle.env \
+  /usr/local/bin/ghchronicle -config /etc/ghchronicle/config.yaml -migrate -yes
+sudo systemctl start ghchronicle
+```
+
+The first prints the plan and changes nothing; the second applies it and reads
+back what it cleared. `systemd-run` reads the environment file as root, as the
+unit does, so it stays mode 600, and runs the binary as `ghchronicle`: measured
+on systemd 257, a command started that way saw the token of a file only root
+could read and ran as the user named. Run by root instead, `-migrate -yes`
+saves the files it rewrites beside the state file as root's, mode 600,
+`state.json` among them, and the service, which runs as `ghchronicle`, then
+stops at its start and names the file rather than start from a new one, which
+would forget a refill still owed: `chown ghchronicle:ghchronicle` it back.
+
+With `-once` run from cron rather than a service, comment the line out for the
+length of the two commands: a `-once` holds no lock while it sweeps, so nothing
+stops it running beside `-migrate -yes`.
 
 ### cron instead of a service
 
@@ -1891,18 +1937,19 @@ signature at all, so for them that answer is the true one.
 
 ### What has to be writable
 
-The config file is mounted read-only. Five things are not:
+The config file is mounted read-only. Six things are not:
 
 | Path                | Needed for                                                                        |
 | ------------------- | --------------------------------------------------------------------------------- |
 | `state_file`        | Always. Without a persistent path the stargazer walk repeats on every restart     |
 | `<name>-cache.bin`  | Always. The cache, which sits beside the state file and has no setting of its own |
 | `sinks.dedupe_file` | The long-running service, with a sink that keeps it. A `-once` run opens none     |
+| `<name>-lock`       | The long-running service, which holds it while it runs, and `-migrate -yes`       |
 | `sinks.file.path`   | Only with the file sink                                                           |
 | `log.file`          | Only with a log file configured                                                   |
 
-The first three live in the same directory by default, so one mounted
-directory covers them, and it has to be a directory. Each of the three is
+The first three live in the same directory by default, and so does the lock,
+so one mounted directory covers them, and it has to be a directory. Each of the three is
 written beside itself and renamed into place, so a reader never sees half a
 file, and a file mounted on its own cannot be renamed over: measured with the
 2.6.1 image built from its Dockerfile, a state file bind-mounted alone was
@@ -2011,6 +2058,36 @@ other sink is outbound.
   The collector reaches the database by service name, so
   `sinks.influxdb.url` is `http://influxdb:8181`.
 
+### After an upgrade
+
+Pull the new image and recreate the container. Under the default
+[`migrate: auto`](https://jmrp.io/docs/ghchronicle/configuration/#migrate), its start applies on its
+own, before its first sweep, every change the new release carries that loses
+nothing, and warns about the rest at every start with the two commands that
+apply them: see [Migrations](https://jmrp.io/docs/ghchronicle/install/upgrading/#migrations). The
+container takes the same flags as the binary, so those run in a one-off
+container of the same service, with its volume, its environment and its user,
+while the service is stopped:
+
+```sh
+docker compose pull ghchronicle
+docker compose up -d ghchronicle
+docker compose logs ghchronicle | grep 'migration pending'
+docker compose stop ghchronicle
+docker compose run --rm ghchronicle -config /config.yaml -migrate
+docker compose run --rm ghchronicle -config /config.yaml -migrate -yes
+docker compose start ghchronicle
+```
+
+The first `run` prints the plan and changes nothing; the second applies it and
+reads back what it cleared. Both mount the volume the service mounts, so they
+find the lock it holds beside the state file: with the service still running,
+`-migrate -yes` refuses, naming the process by the number the service's own
+container gives it, and changes nothing. Measured with two containers on one
+named volume: a `flock` one of them held was refused to the other, and granted
+once the first had gone. A one-shot container a scheduler runs, below, holds
+no lock while it sweeps, so pause the scheduler for the length of the two runs.
+
 ### One sweep, then exit
 
 The container takes the same flags as the binary, so a scheduler can run it
@@ -2030,7 +2107,7 @@ collects every family.
 
 ## GitHub Actions
 
-Running ghchronicle as a GitHub Action: the composite Action, its three modes, and the two things a hosted runner does not keep.
+Running ghchronicle as a GitHub Action: the composite Action, its four modes, and the two things a hosted runner does not keep.
 
 Source: <https://jmrp.io/docs/ghchronicle/install/actions/>
 
@@ -2052,7 +2129,7 @@ it downloads a release binary and calls it.
 | `token`           | required             | A personal access token. The automatic `GITHUB_TOKEN` is not enough                                               |
 | `config`          | `""`                 | Path to a configuration file. Omit to run with defaults built from `user`, whose state lasts one run and cannot be cached |
 | `user`            | the repository owner | The account to collect when no config file is given                                                               |
-| `mode`            | `once`               | `once`, `backfill` or `card`                                                                                      |
+| `mode`            | `once`               | `once`, `backfill`, `card` or `migrate`                                                                           |
 | `backfill-since`  | `""`                 | Bound for `backfill`: a date, `90d`, `2y` or a Go duration. Empty means no bound                                  |
 | `card`            | `""`                 | Path of the SVG to write. Empty means no card                                                                     |
 | `card-layout`     | `summary`            | One of the thirteen registered layouts                                                                                 |
@@ -2064,7 +2141,7 @@ it downloads a release binary and calls it.
 | `include-private` | `false`              | `true` counts private repositories when no config file is given. See the warning below |
 | `version`         | `latest`             | The release to install: `latest` for the newest, or a release with or without its `v`, so `2.6.2` and `v2.6.2` are the same one. The major tag `v2` is what `uses:` takes, not a release, and is refused |
 
-### The three modes
+### The four modes
 
 - **once**
 
@@ -2165,6 +2242,58 @@ it downloads a release binary and calls it.
   Give it a generous `timeout-minutes`: an unbounded backfill parks at every
   rate limit reset, and a job that is killed half way has spent the quota and
   kept part of the benefit.
+
+- **migrate**
+
+  Brings the stores the configuration writes along after an upgrade: it runs
+  `-migrate -yes`, which applies every change [the
+  plan](https://jmrp.io/docs/ghchronicle/install/upgrading/#migrations) finds pending, the ones
+  that need somebody's word too, and reads what it cleared again. Run it by
+  hand, once, after reading what `-migrate` says about the same
+  configuration.
+
+  ```yaml
+  name: Migrate
+  on:
+    workflow_dispatch:
+
+  jobs:
+    migrate:
+      runs-on: ubuntu-latest
+      timeout-minutes: 60
+      steps:
+        - uses: actions/checkout@v7
+        - uses: jmrplens/ghchronicle@v2
+          with:
+            token: ${{ secrets.GHCHRONICLE_TOKEN }}
+            mode: migrate
+            config: .github/ghchronicle.yaml
+  ```
+
+  It takes no card. A store holding rows of accounts this configuration does
+  not collect, or whose rows could not be compared with it, is held back and
+  the step fails, since only `-migrate-others` clears it, and that is a
+  decision to take at a terminal, not in a workflow. Without a state file
+  [restored between runs](https://jmrp.io/docs/ghchronicle/install/actions/#two-things-a-hosted-runner-does-not-keep), every
+  run of the Action starts from a new one, so a store that cannot be asked, a
+  SQL file, a Graphite or whatever is behind a Telegraf, has no history here
+  and is never taken to need a change; with one restored, those follow its
+  record as they would on a host. A job that timed out while reading the
+  history again leaves nothing the next job can resume from, since
+  `actions/cache` saves nothing for a job that did not succeed: run
+  `mode: backfill` for the same configuration after it.
+
+In `once` and `backfill`, a start checks the stores the same way and warns
+about what is pending. On a new state file, which is every run without one
+restored, it applies nothing on its own even under `migrate: auto`: the state
+file goes with the runner, and with it the record that a refill is still owed,
+so a refill that failed or a job cancelled half way would leave a store cleared
+and nothing saying so. With a state file restored it applies what is safe to
+apply unattended, as a host does. The Action turns every line that says a
+change is pending, one was applied at the start, one failed or a refill is
+owed into an annotation on the run as the line is written, so it shows on the
+workflow's summary page rather than only in its log, a job cancelled half way
+included.
 
 ### A card in your profile README
 
@@ -2337,6 +2466,338 @@ The dashboards are generated from the binary, so publish them again after an
 upgrade, with `-publish-dashboard` or `grafana.publish_on_start`: see [letting
 the binary do it](https://jmrp.io/docs/ghchronicle/dashboards/#letting-the-binary-do-it).
 
+### Migrations
+
+A release sometimes changes what a stored row is keyed by. A tag that becomes a
+field is the usual case: every row written before the change is a series the
+rows written after it are not, so the store keeps both for ever, and a count
+over them grows by one for every item read on both sides of the change. The
+binary carries the list of every such change a store written by a 2.x release
+can still hold, each under an ID that names the release and the measurement,
+such as `2.6.1/gh_discussion_comment/is_answer`, and `-migrate` checks every
+configured store against it:
+
+```sh
+ghchronicle -config /etc/ghchronicle/config.yaml -migrate
+```
+
+It prints one block per store and one line per change, and changes nothing: the
+stores are asked questions, GitHub is asked for the repository list alone, and
+the state file is read and never written. A store that can be asked decides for
+itself; one that cannot is decided by what the state file remembers of it.
+
+| Store                                | What decides                                                                                                       |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| InfluxDB 3                           | Whether the old tag is a tag column of the live table, asked of the catalog. A table InfluxDB has set aside is listed under another name and is not asked |
+| InfluxDB 2                           | Whether any row carries the old tag. The tag keys stay listed after a delete, so they are not asked                 |
+| PostgreSQL                           | Whether any row holds a value in the old tag's column, in the schema the sink writes to                             |
+| Elasticsearch                        | A count of the documents that carry the old tag. The mapping keeps a field after its documents are gone             |
+| SQL file, Graphite, Telegraf         | The release the state file records as the first to write the store                                                  |
+| Loki, Prometheus, OTLP, file, stdout | Nothing: none of them keeps a row whose identity a release could change                                             |
+
+Each line starts with what the check found:
+
+- `not needed`: the store holds nothing of the old shape.
+- `pending`: it holds the old shape, or, for a store that cannot be asked, may
+  hold it. The lines under it say why, what bringing it along would do there,
+  which families would read the measurement again and from when, and what
+  would not come back: the rows of repositories the configuration no longer
+  covers, and of families it has switched off. For the comments, those are
+  other people's comments on such a repository: the account's own come back
+  through `outbound` wherever they are. The last line says whether applying it
+  needs nobody's word: GitHub still serves the whole history, so every row the
+  store holds would come back, the old rows would be set aside for at least 24
+  hours rather than deleted, and every row in the store is this
+  configuration's. A store shared with another collector, one holding rows the
+  refill would not bring back, one whose rows could not be compared with the
+  configuration, an InfluxDB 2, whose only way is a delete, and every store
+  that cannot be asked need somebody's word, and the line says which reason
+  applies. A row that names no account belongs to a configuration of
+  organisations alone, which writes no user: it is this configuration's only
+  when this one has no `targets.user` either.
+- `note`: the rows are there and nothing can put them right, so the plan says
+  what they mean and changes nothing.
+- `frozen`: nothing this configuration runs writes the measurement any more,
+  so its rows are history and are left as they are.
+- `applied`: the state file records the change as applied to this store, and
+  the store, where it can be asked, agrees.
+- `unreachable`: the store did not answer, so nothing about it is known.
+
+#### What a start does about it
+
+Every run that writes to the stores, the service, `-once`, `-backfill` and a
+card drawn beside the stores, checks them the same way before its first sweep,
+and what it does next is the [`migrate`](https://jmrp.io/docs/ghchronicle/configuration/#migrate)
+setting's:
+
+- `auto`, the default, applies on its own every pending change marked safe to
+  apply unattended, and nothing else. It says so first, at `WARN`, with what it
+  found, why the change exists and what it does in that store, including where
+  the old rows are set aside; then it reads the measurement again from GitHub
+  and only then sweeps.
+- `warn` applies nothing.
+
+A one-shot run, `-once` or `-backfill`, on a new state file applies nothing on
+its own under `auto` either, and warns instead. That is every run of the Action
+that does not restore its state file with `actions/cache`, whose state file goes
+with its runner, and with it the record that a refill is still owed: a refill
+that failed, or a job cancelled half way, would leave the store cleared and
+nothing anywhere saying so. The next run on a host, which has a state file by
+then, or `-migrate -yes`, applies it.
+
+A pending change a start does not apply is a `WARN` at every start, named by
+store, with the reason it was left and the two commands, copied from the
+configuration the run was given. One line in the log, wrapped here:
+
+```text
+level=WARN msg="migration pending" sink=graphite measurement=gh_discussion_comment
+  migration=2.6.1/gh_discussion_comment/is_answer why="is_answer was a tag, ..."
+  not_applied="only whoever runs the Graphite host can remove its files"
+  plan="ghchronicle -config /etc/ghchronicle/config.yaml -migrate"
+  apply="ghchronicle -config /etc/ghchronicle/config.yaml -migrate -yes"
+  first="stop this service: -migrate -yes refuses to run beside it"
+```
+
+There is no setting that applies the rest on its own: a change that could lose
+rows waits for somebody to read the plan and give the word. A note is said once
+at `INFO` and then at `DEBUG`, since nothing will ever change it, and so is a
+change whose measurement nothing the configuration runs writes any more. A
+store that does not answer within 30 seconds is a `WARN` too, and the sweep
+goes on without waiting longer.
+
+What a start finds not needed, and what it has applied, it records, and the
+next start takes the record's word for it: once every change is settled for a
+store, a start does not ask that store anything. `-migrate` does not take that
+word and asks again every time.
+
+#### Applying it by hand
+
+```sh
+systemctl stop ghchronicle
+ghchronicle -config /etc/ghchronicle/config.yaml -migrate -yes
+systemctl start ghchronicle
+```
+
+Run it as the user the service runs as, with the environment the service has:
+it saves the state file and the files beside it, and a file root saves is one
+the service can no longer read. A run that finds the state file there and
+cannot read it, or cannot parse it, stops and names it rather than starting
+from a new one, which would forget a refill still owed: give the file back to
+the service's user. [systemd](https://jmrp.io/docs/ghchronicle/install/systemd/#after-an-upgrade)
+and [Docker](https://jmrp.io/docs/ghchronicle/install/docker/#after-an-upgrade) show how.
+
+Pause a cron job or a timer that runs `-once` as well, and let a `-backfill`
+that is running finish first. Neither holds the lock while it sweeps, and a SQL
+file two processes write at once is not one psql can replay. Their state file
+is safe either way: a run that saves it keeps what another process recorded of
+the stores since it read it, so a `-once` that ran across `-migrate -yes` does
+not put back the record it read before.
+
+`-migrate -yes` prints the same plan and then applies every pending change, the
+unsafe ones too, since `-yes` is the word the plan asked for. Each one is
+recorded in the state file as it is applied, so a stop half way costs nothing
+the next run cannot pick up: what was applied is not done twice. A line under
+the plan says what happened to each:
+
+- `applied`: done. Where the old rows are kept, it names them; where somebody
+  else has to act, on a Graphite host or behind a Telegraf, it prints the
+  commands to run there.
+- `failed`: the store refused, with its reason. The others still go ahead.
+- `held back`: the store holds rows of accounts this configuration does not
+  collect, or whose rows it holds could not be compared with this
+  configuration, and the line says which and why. Set aside, another's rows
+  come back only when whoever collects them reads them again, so this takes
+  `-migrate-others` as well as `-yes`.
+- `unreachable`: the store did not answer, so nothing was done there.
+- `refill`: what was read back from GitHub, from when and into which stores,
+  or why reading it back did not finish: see [reading the history
+  back](https://jmrp.io/docs/ghchronicle/install/upgrading/#reading-the-history-back).
+- `reconciled`: each copy of the old rows compared with what came back, and
+  the items GitHub no longer serves.
+
+It exits 0 when everything pending was applied and read again, and 1 when
+anything was left, with the sentence that says how to go on. It refuses before
+it changes anything, and exits 1, with no GitHub token or no repository list,
+since nothing it clears could be read again, and while another process holds
+the state file: the service holds it for as long as it runs, beside the state
+file as `<name>-lock`, and `-migrate -yes` names that process rather than
+changing the stores it writes. A service started while `-migrate -yes` runs
+waits for it to finish, and a second service on the same state file is refused.
+
+In the GitHub Action, `mode: migrate` runs `-migrate -yes`: see [the
+inputs](https://jmrp.io/docs/ghchronicle/install/actions/#inputs).
+
+#### What applying does in each store
+
+| Store                                                                         | What applying does                                                                                                        |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| [InfluxDB 3](https://jmrp.io/docs/ghchronicle/sinks/influxdb/#what-a-migration-does-here)         | Deletes the one table, which InfluxDB keeps as `<measurement>-<instant>`, queryable, and purges itself 72 hours later     |
+| InfluxDB 2                                                                    | Deletes every row of the measurement in the bucket. Nothing is kept, so a start never does it on its own                  |
+| [PostgreSQL](https://jmrp.io/docs/ghchronicle/sinks/postgres/#what-a-migration-does-here)         | Renames the table `<measurement>-<instant>` in the sink's schema; ghchronicle drops it 24 hours later                     |
+| [Elasticsearch](https://jmrp.io/docs/ghchronicle/sinks/elasticsearch/#what-a-migration-does-here) | Blocks writes to the index, clones it to `<index>-<instant>` and deletes it; ghchronicle deletes the clone 24 hours later |
+| SQL file                                                                      | Writes `DROP TABLE IF EXISTS` for the measurement into the file, ahead of the rows written after it                       |
+| Graphite                                                                      | Prints the commands that remove the old paths on the Graphite host                                                        |
+| Telegraf                                                                      | Says what to do in the store behind it                                                                                    |
+
+Each store touches that one measurement and nothing else: the table, index or
+paths named exactly, in the database, bucket, schema or prefix the sink writes
+to. A measurement that looks like it, another collector's tables and another
+prefix's indices are never reached. A store that can be asked is only changed
+once it has been asked and found holding the old shape, and a dry run sends it
+nothing but questions.
+
+Where a store keeps the old rows aside, the plan names each copy under the
+store, with a `kept aside` line saying when it was set aside and when it goes,
+and the state file keeps it until then. ghchronicle purges its own copies once
+they have been kept 24 hours: the service after a sweep, any run at its next
+start, and `-migrate -yes` whenever it runs. A run on a new state file, every
+run of the Action that does not restore one among them, asks PostgreSQL and
+Elasticsearch for copies named the way a migration names them, since its state
+file cannot name them. InfluxDB 3 purges its own on a schedule of its own, which
+is read back from the system table of its `_internal` database: 72 hours after
+the delete by default (measured on 3.11.2 and 3.11.5), and it keeps the name in
+its catalog for its delete grace period after that, 24 hours by default. Until
+a copy goes, undoing the change is on each store's page.
+
+A store that was cleared is written again whole. The [write
+ledger](https://jmrp.io/docs/ghchronicle/sinks/#only-what-changed-is-written) forgets the
+measurement in that store alone, every other measurement and every other store
+keeping what it remembers, and the [cache file](https://jmrp.io/docs/ghchronicle/configuration/#the-cache-beside-it)
+forgets what it claims about the families that write the measurement, their
+refusals and, when `actions` is among them, the workflow runs whose jobs it had
+written, so the sweeps after it ask everything a first sweep asks.
+
+#### Reading the history back
+
+A store that was cleared holds none of the measurement's history until it is
+read again from GitHub. Right after applying, the same run reads it back with
+one backfill of its own, the refill: the families that write the measurement,
+`discussions` and `outbound` for the comments, `security` for the alert items,
+and no other; writing that measurement alone; into the stores that were cleared
+and no other.
+
+```text
+  refill      read discussions and outbound again, since 2023-11-14, writing gh_discussion_comment to
+              elasticsearch, influxdb and postgres
+```
+
+- **Only what was cleared.** A family asks GitHub everything it always asks,
+  and only the measurement cleared is written; the rest of what the family
+  collects is in the stores already. Each store gets what was cleared in that
+  store, so a store still holding a measurement in its old shape is never
+  handed that measurement's history beside it.
+- **Only where it was cleared.** InfluxDB, PostgreSQL, Elasticsearch, the SQL
+  file, after its `DROP`, and Graphite, at the new depth. Never Loki, the
+  Prometheus exporter, OTLP, the file sink or stdout, which were not cleared
+  and would hold every row of the refill a second time, nor a Telegraf, whose
+  store is somebody else's: the plan names the `-backfill -families` that sends
+  the history through it once that store has been cleared.
+- **As far back as the store held.** The day of the oldest row the store held,
+  read before it was cleared: a bound later than that would lose the
+  difference for good once the copy is purged. A store that cannot say how far
+  back its rows go, the SQL file, Graphite, or an InfluxDB 3 Core that would
+  not count them (below), is read back with no bound: what applying takes
+  there is every row whatever its date, and `backfill.since` bounds what a
+  backfill reaches, not what a store holds. One refill for several stores
+  reads back as far as the furthest.
+- **Waiting, as a backfill waits.** It has a GitHub client of its own that
+  waits for a spent rate limit to turn over, where a sweep skips, and
+  `-backfill-retry` goes back for what it leaves as it does for a backfill.
+  The containerised suite's whole `-migrate -yes`, clearing InfluxDB 3.11.2,
+  PostgreSQL 18.6 and Elasticsearch 9.5.3 and reading the comments back from
+  the fake GitHub, takes about 2 seconds; on the author's account, the
+  `outbound` walk it needs took 33 seconds when 2.6.1's was done by hand.
+
+The refill is owed before a store is touched, and the state file records it
+then, under the store's `refill` key: a store cleared and not read back looks,
+to anyone who asks it, exactly like one that never held the old shape, and only
+that record says the history is still to come. A clear that failed and left
+the store as it was, which the store says, takes the debt back; one whose
+answer did not arrive, a proxy's 502 or a timeout, is looked at again, and when
+the store cannot say whether it was carried out the refill stays owed, which at
+worst reads the history once for nothing. It goes when the refill reaches the
+end of every family. A refill cut
+short, by a stop, a store that refused a write or GitHub not answering, keeps a
+checkpoint of its own beside the state file, named with `-refill.json`, apart
+from a backfill's so neither refuses or overwrites the other, and is resumed
+from there: by `-migrate -yes` run again, even with nothing left to apply, and
+by any start under `migrate: auto`. Under `migrate: warn` a start says it is
+owed, at every start, with the command. `-backfill-status` prints how far it has
+got, and `-migrate` lists it under its store as `refill owed`.
+
+##### What the service does meanwhile
+
+Under `migrate: auto` the service applies what is safe and reads it back after
+its sinks are built and before its first sweep, so its sweeps start when the
+refill ends. The Prometheus exporter is up in that time and holds
+nothing until the first sweep, as after any restart. A service stopped during
+the refill exits at once, keeping what it wrote, and its next start carries on.
+The write ledger remembers what the refill wrote, so the first sweep after it
+does not send those rows again. Under `migrate: warn` nothing is read back and
+the service sweeps as it always did, writing this release's shape beside the
+old one, and `-migrate -yes` refuses to run beside it.
+
+##### What GitHub no longer serves
+
+A refill brings back what GitHub still serves for the targets configured now.
+When the refill ends, each store that kept a copy of the old rows and can be
+asked, InfluxDB 3, PostgreSQL and Elasticsearch, compares the copy with the
+table, item by item: the `comment` of each comment, the `full_name` and
+`number` of each alert. What the copy holds and the table does not is what
+GitHub no longer served, a repository deleted or no longer covered, a comment
+deleted, an alert whose feature was switched off; the report and the log name a
+few, and those rows stay only in the copy until it is purged. From the
+containerised suite, whose seeded comment the fake GitHub does not serve:
+
+```text
+  reconciled  gh_discussion_comment in postgres: 1 item in gh_discussion_comment-20260928T234418, 6 now; 1 GitHub
+              no longer serves, whose rows are only in the copy until it is purged: 1
+```
+
+Carrying them over is left to the reader, from the copy, while it is there: for
+an item whose old shape was two rows at one instant, which of the two was right
+is not something a program can tell offline. Measured read-only against
+production's InfluxDB 3.11.5, the copy InfluxDB kept of the table dropped by
+hand for 2.6.1 held 114 comments, and the table read back 121, none of the 114
+missing.
+
+#### InfluxDB 3 Core's query file limit
+
+InfluxDB 3 Core refuses a query that would open more Parquet files than its
+`--query-file-limit`, 432 by default, and a table a sweep writes every ten
+minutes is past that in days. The check reads the catalog, which opens no file,
+so it still finds the old shape in such a table, and a table with no old tag is
+not counted at all. What it cannot do there is count the rows, which leaves the
+refill with no bound, nor read whose rows the table holds, which leaves the
+change needing your word and `-migrate -yes` holding it back for
+`-migrate-others`; the plan quotes the server's refusal. Measured on 3.11.2
+with the limit lowered to 3: before this, the same table was `unreachable` at
+every start and `-migrate -yes` could not apply it at all. Raising the limit on
+the server, for the length of the migration, lets it answer everything.
+
+#### What the state file remembers of each store
+
+The `stores` key of [the state file](https://jmrp.io/docs/ghchronicle/configuration/#state_file)
+keeps, for every store a run writes to, where it points, the release that first
+wrote it and the release that last did. A first start, on a state file with no
+history, records the running release as the first writer of every store, so a
+fresh install has nothing to migrate. The first start after an upgrade from
+2.6.1 or earlier records the first writer as unknown, which for a SQL file, a
+Graphite or a Telegraf reads as older than any change, so those show each
+change of a 2.x release as pending, or as a note where nothing can put it
+right, until it is applied. A sink pointed at another store starts a new
+record, and the one it leaves is kept while it still owes a refill or names a
+copy there, said at every start and by `-migrate` as `owed there`, and taken
+back if the sink points there again. A URL written another way, with a
+trailing slash, a capital or the default port, is the same store. A state file
+deleted after an upgrade takes the record with it, and the stores that cannot
+be asked are then taken to be the running release's; a refill still owed goes
+with it too, and nothing reads that history back until a `-backfill -families`
+of the families it names does.
+
+A change made before 1.0.0, the `state` and `reason` tags of the alert items,
+was never written by a release, so only a store that can be asked can show it.
+
 ### From 2.5.x to 2.6.x
 
 #### The first start pays in full, once
@@ -2447,9 +2908,21 @@ and since holds the measurement in two shapes until the measurement is dropped
 and filled again with a [backfill](https://jmrp.io/docs/ghchronicle/how/backfill/). The dashboards
 read both shapes, one row per comment, and [the measurements
 page](https://jmrp.io/docs/ghchronicle/collectors/measurements/#how-to-read-the-tables) says what
-each store keeps and how to drop it. A tool that makes the change for you is
-planned for a later release, in
-[issue #96](https://github.com/jmrplens/ghchronicle/issues/96).
+each store keeps and how to drop it. `-migrate` says which of the configured
+stores still hold the old shape, under
+`2.6.1/gh_discussion_comment/is_answer`: see [Migrations](https://jmrp.io/docs/ghchronicle/install/upgrading/#migrations).
+
+What the old shape still costs a reader is an answer accepted and taken back
+since: its old row says accepted, so both comment panels read it accepted
+until the store is brought along. Measured in the containerised suite with an
+answer taken back on the fake GitHub, in InfluxDB 3.11.2, PostgreSQL 18.6,
+Elasticsearch 9.5.3, Graphite 1.1.10-5 and the SQL file replayed into
+PostgreSQL: Answers elsewhere and Discussion answers read it accepted, one row
+for the comment, before the upgrade in every store; not accepted, still one
+row, in the first three after a start under `migrate: auto`, which leaves
+Graphite and the SQL file to their operator; and not accepted in all five after
+`-migrate -yes`, once the Graphite commands had run and the file had been
+replayed from where it was.
 
 #### A path setting is expanded
 

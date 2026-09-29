@@ -168,6 +168,43 @@ type Scope struct {
 	// by the ghc:"secret" tag rather than by a list kept here, so a credential
 	// added to a sink later cannot arrive in this file: see scopeSinks.
 	Sinks map[string]string `json:"sinks"`
+	// Measurements is, per sink, the measurements the walk writes to it, for
+	// a walk that writes less than everything it collects: the refill of a
+	// migration. Absent is every measurement to every sink, which is every
+	// backfill, and every checkpoint written before the field existed.
+	//
+	// Part of the scope for the reason Sinks is: "written" means these rows
+	// reached these stores, and a resume writing a measurement the first half
+	// did not would skip every repository the first half recorded, leaving
+	// that measurement's history in the store with the first half missing.
+	Measurements map[string][]string `json:"measurements,omitempty"`
+}
+
+// Narrowed is the scope of a walk of only the families named, nil for every
+// one s holds, and, when keep is not nil, writing only the measurements it
+// names to only the sinks it names. A family the configuration switches off
+// is walked by no run, so naming one does not put it in the scope.
+func (s Scope) Narrowed(families []string, keep map[string][]string) Scope {
+	if families != nil {
+		s.Families = slices.DeleteFunc(slices.Clone(s.Families), func(f string) bool {
+			return !slices.Contains(families, f)
+		})
+	}
+	if keep == nil {
+		return s
+	}
+	sinks := map[string]string{}
+	s.Measurements = map[string][]string{}
+	for name, measurements := range keep {
+		if settings, configured := s.Sinks[name]; configured {
+			sinks[name] = settings
+		}
+		sorted := slices.Clone(measurements)
+		slices.Sort(sorted)
+		s.Measurements[name] = slices.Compact(sorted)
+	}
+	s.Sinks = sinks
+	return s
 }
 
 // ScopeOf is the scope of the backfill cfg describes, bounded by since, which
@@ -363,6 +400,10 @@ func (s Scope) Differs(other Scope) string {
 	if s.Since != other.Since {
 		return fmt.Sprintf("the date bound was %s and is now %s", bound(s.Since), bound(other.Since))
 	}
+	if !sameWrites(s.Measurements, other.Measurements) {
+		return fmt.Sprintf("the walk wrote %s when it began and writes %s now",
+			writes(s.Measurements), writes(other.Measurements))
+	}
 	for _, name := range targetKeys(s.Sinks, other.Sinks) {
 		was, had := s.Sinks[name]
 		now, has := other.Sinks[name]
@@ -376,6 +417,30 @@ func (s Scope) Differs(other Scope) string {
 		}
 	}
 	return ""
+}
+
+// sameWrites says whether two walks write the same measurements to the same
+// sinks. Nil, every measurement to every sink, is only the same as nil.
+func sameWrites(a, b map[string][]string) bool {
+	if (a == nil) != (b == nil) {
+		return false
+	}
+	return maps.EqualFunc(a, b, slices.Equal[[]string])
+}
+
+// writes names what a walk writes, for a refusal.
+func writes(m map[string][]string) string {
+	if m == nil {
+		return "every measurement to every sink"
+	}
+	parts := make([]string, 0, len(m))
+	for _, name := range slices.Sorted(maps.Keys(m)) {
+		parts = append(parts, strings.Join(m[name], ",")+" to "+name)
+	}
+	if len(parts) == 0 {
+		return "nothing"
+	}
+	return strings.Join(parts, " and ")
 }
 
 // targetKeys is every key of both maps, sorted: a key one side is missing is a

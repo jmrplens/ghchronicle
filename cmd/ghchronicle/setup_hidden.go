@@ -13,7 +13,7 @@ import (
 // whatever window it was typed into, and in the history of whatever recorded
 // that session. The alternative was shelling out to `stty -echo`, which is not
 // a thing Windows has. This package depends only on golang.org/x/sys, which
-// the module requires anyway for the Windows end-to-end test.
+// the binary requires anyway for the lock beside the state file.
 func readHidden(in *os.File) (string, error) {
 	typed, err := term.ReadPassword(int(in.Fd()))
 	return string(typed), err

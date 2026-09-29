@@ -324,10 +324,35 @@ func (c *capture) Accepted() []capturedRequest {
 // Count is how many requests have arrived, for a waitFor condition.
 func (c *capture) Count() int { return len(c.Requests()) }
 
-// Body is every accepted body joined, for the parsers.
+// Writes returns the accepted requests that are not reads. A run asks a
+// store it can query what shape its measurements are in before the first
+// sweep, with GET, and what the parsers read is what the sinks wrote.
+func (c *capture) Writes() []capturedRequest {
+	out := []capturedRequest{}
+	for _, r := range c.Accepted() {
+		if r.Method != http.MethodGet {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// Reads returns the requests that are, which a test holds to asking and
+// never changing anything.
+func (c *capture) Reads() []capturedRequest {
+	out := []capturedRequest{}
+	for _, r := range c.Requests() {
+		if r.Method == http.MethodGet {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// Body is every accepted write's body joined, for the parsers.
 func (c *capture) Body() string {
 	var b strings.Builder
-	for _, r := range c.Accepted() {
+	for _, r := range c.Writes() {
 		b.Write(r.Body)
 		b.WriteString("\n")
 	}

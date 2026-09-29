@@ -9,11 +9,13 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -22,6 +24,7 @@ import (
 	"github.com/jmrplens/ghchronicle/v2/internal/collect"
 	"github.com/jmrplens/ghchronicle/v2/internal/config"
 	"github.com/jmrplens/ghchronicle/v2/internal/ghapi"
+	"github.com/jmrplens/ghchronicle/v2/internal/migrate"
 	"github.com/jmrplens/ghchronicle/v2/internal/render"
 	"github.com/jmrplens/ghchronicle/v2/internal/run"
 	"github.com/jmrplens/ghchronicle/v2/internal/sink"
@@ -152,6 +155,12 @@ type options struct {
 	// the alternative is a typo that empties a store.
 	uninstall string
 	yes       bool
+	// migrate prints what this release would change in every configured
+	// store, and changes nothing; with yes it applies every pending change,
+	// and with migrateOthers also the ones in a store holding rows of
+	// accounts this configuration does not collect.
+	migrate       bool
+	migrateOthers bool
 	// publishDashboard reconciles the Grafana datasource and dashboard for
 	// every store this writes to, then exits. Like backfillStatus it asks
 	// GitHub nothing, so it needs no token.
@@ -162,8 +171,12 @@ type options struct {
 	// retry is how long a backfill waits before going back for the families a
 	// pass left behind. Zero never goes back, which is what it did before
 	// this existed.
-	retry    time.Duration
-	since    string
+	retry time.Duration
+	since string
+	// families is -families as given, and only the names it lists: a
+	// backfill of those families and no other.
+	families string
+	only     []string
 	card     string
 	theme    string
 	layout   string
@@ -202,7 +215,15 @@ func parseFlags(args []string, stderr io.Writer) (options, error) {
 		"remove what this put in place and exit: "+strings.Join(uninstallTargets, ", ")+
 			", comma separated; prints the list and removes nothing without -yes")
 	fs.BoolVar(&o.yes, "yes", false,
-		"go ahead with -uninstall rather than only listing what it would remove")
+		"go ahead with -uninstall or -migrate rather than only listing what it would do")
+	fs.BoolVar(&o.migrate, "migrate", false,
+		"print, for every configured store, what an earlier release left there in a shape this one no longer "+
+			"writes and what bringing it along would take, then exit; changes nothing without -yes, and with "+
+			"it applies every pending change and reads the history it cleared again")
+	fs.BoolVar(&o.migrateOthers, strings.TrimPrefix(flagOthers, "-"), false,
+		"with -migrate -yes, also apply a change to a store that holds rows of accounts this configuration "+
+			"does not collect, which come back only when whoever collects them reads them again, or whose "+
+			"rows could not be compared with it")
 	fs.BoolVar(&o.publishDashboard, "publish-dashboard", false,
 		"publish the Grafana dashboard and the datasource it reads from, then exit; "+
 			"needs the grafana section of the config and asks GitHub nothing")
@@ -210,6 +231,9 @@ func parseFlags(args []string, stderr io.Writer) (options, error) {
 		"print how far the backfill in progress has got, and exit; asks GitHub nothing and writes nothing")
 	fs.DurationVar(&o.retry, "backfill-retry", 0,
 		"after a backfill ends with families left, wait this long and go back for them, until a pass records nothing new; zero does not go back")
+	fs.StringVar(&o.families, "families", "",
+		"with -backfill, walk only these families, comma separated; -groups lists them. Its checkpoint is refused by "+
+			"a backfill of other families, and theirs by it")
 	fs.StringVar(&o.card, "card", "", "run one sweep and write a summary SVG to this path")
 	fs.StringVar(&o.theme, "card-theme", "auto",
 		"card theme: dark, light, auto, or both to write the light card at -card and the dark one beside it with _dark before the extension")
@@ -232,8 +256,52 @@ func parseFlags(args []string, stderr io.Writer) (options, error) {
 	fs.BoolVar(&o.layouts, "card-layouts", false, "list the card layouts and their fields, then exit")
 	fs.BoolVar(&o.groups, "groups", false, "list the metric groups and the families in each, then exit")
 	fs.BoolVar(&o.cardOnly, "card-only", false, "with -card, write the SVG and nothing else")
-	err := fs.Parse(args[1:])
-	return o, err
+	if err := fs.Parse(args[1:]); err != nil {
+		return o, err
+	}
+	// A command line that asks for something no run does is refused the way
+	// one that does not parse is, rather than run as if the flag were not
+	// there: -migrate-others on a sweep would say nothing and change nothing.
+	if o.migrateOthers && !o.migrate {
+		err := errors.New(flagOthers + " goes with -migrate -yes")
+		fmt.Fprintln(stderr, err)
+		return o, err
+	}
+	var err error
+	if o.only, err = onlyFamilies(o); err != nil {
+		fmt.Fprintln(stderr, err)
+		return o, err
+	}
+	return o, nil
+}
+
+// onlyFamilies reads -families: every name a family, each once, and only
+// beside -backfill, which is the one run that walks some families and not
+// others on purpose. A name that is not a family is refused rather than
+// walked as nothing, which is what a misspelled one would otherwise be: a
+// backfill that finishes at once having read none of what it was asked for.
+func onlyFamilies(o options) ([]string, error) {
+	if strings.TrimSpace(o.families) == "" {
+		if o.families != "" {
+			return nil, errors.New("-families names no family")
+		}
+		return nil, nil
+	}
+	if !o.backfill {
+		return nil, errors.New("-families goes with -backfill")
+	}
+	var out []string
+	for name := range strings.SplitSeq(o.families, ",") {
+		name = strings.TrimSpace(name)
+		if !slices.Contains(config.Families(), name) {
+			return nil, fmt.Errorf("-families: %q is not a family; -groups lists them", name)
+		}
+		if !slices.Contains(out, name) {
+			out = append(out, name)
+		}
+	}
+	slices.Sort(out)
+	return out, nil
 }
 
 // exitProcess is every exit execute takes, so a test can drive execute through
@@ -271,7 +339,7 @@ func execute(args []string, stdout, stderr io.Writer) {
 
 	cfg, err := config.LoadWith(o.path, config.Relax{
 		NoSinks: o.cardOnly,
-		NoToken: o.backfillStatus || o.publishDashboard || o.uninstall != "",
+		NoToken: o.needsNoToken(),
 	})
 	if err != nil {
 		fatal(stderr, err)
@@ -295,13 +363,27 @@ func execute(args []string, stdout, stderr io.Writer) {
 		return
 	}
 
-	// A one-shot run exits when the sweep does, so an exporter it starts would
-	// serve nobody, and starting one collides with the port a long-running
-	// instance already holds. The push sinks all still run.
-	oneShot := o.once || o.backfill || o.card != ""
-	sinks, ledger, err := buildSinks(cfg, logger, oneShot)
+	// Before anything is read from the state file, so that a service that
+	// waited for a migration starts from what the migration left.
+	lock, goOn := holdIfServing(ctx, cfg, !o.oneShot(), logger, stderr)
+	if !goOn {
+		return
+	}
+	defer func() { _ = lock.Release() }()
+	state, err := openState(cfg, &o)
 	if err != nil {
 		fatal(stderr, err)
+		return
+	}
+	sinks, ledger, err := buildSinks(cfg, logger, o.oneShot())
+	if err != nil {
+		fatal(stderr, err)
+		return
+	}
+	if o.migrate {
+		// Only -migrate -yes gets this far: the dry run was answered above,
+		// and builds no sink.
+		migrateAndClose(ctx, migration{cfg: cfg, api: api, sinks: sinks, log: logger}, o, stdout, stderr)
 		return
 	}
 
@@ -315,13 +397,28 @@ func execute(args []string, stdout, stderr io.Writer) {
 	publishOnStart(ctx, cfg, o, logger)
 
 	runner := newRunner(cfg, api, sinks, logger, &o)
+	runner.State = state
 	runner.Refill, runner.RefillEveryStart = ledgerForgot(cfg, ledger)
+	stampStores(ctx, runner, cfg, &o, migration{api: api, sinks: sinks, ledger: ledger, log: logger, retry: o.retry})
 	switch {
 	case o.backfill:
 		err = runBackfill(ctx, runner, cfg, accumulator, &o, logger)
 	case o.once || o.card != "":
 		err = runSweep(ctx, runner, accumulator, &o, logger)
+	case ctx.Err() != nil:
+		// A service stopped while a migration read back what it cleared,
+		// which can take minutes: what it wrote is in the stores and its
+		// checkpoint says where it got to, so the next start resumes it, and
+		// the first sweep would be one the stop has already cut. A one-shot
+		// run goes on to its sweep or its walk, which say how a stop left
+		// them.
 	default:
+		// A service runs for weeks, so what a migration set aside is purged
+		// between its sweeps once it has been kept its day, rather than at
+		// the next restart. Nothing is asked of a store until a copy is due.
+		runner.AfterSweep = func(ctx context.Context) {
+			purging(migration{cfg: cfg, state: runner.State, log: logger}, false).Run(ctx)
+		}
 		// Serve ends when the context does, and a stop asked for by a signal
 		// is a clean exit, not a failure.
 		if err = runner.Serve(ctx); err != nil && ctx.Err() != nil {
@@ -337,6 +434,62 @@ func execute(args []string, stdout, stderr io.Writer) {
 	if err != nil {
 		fatal(stderr, err)
 	}
+}
+
+// stampStores brings the state file's record of each store up to date before
+// the first sweep marks anything, which is what lets it tell a first start
+// from an upgrade, and then brings along what an upgrade left in them. A
+// card-only run writes to no store and saves no state, so it records nothing
+// and has nothing to bring along. m carries the run's API client, sinks,
+// ledger and logger; the rest is filled in here.
+func stampStores(ctx context.Context, runner *run.Runner, cfg *config.Config, o *options, m migration) {
+	if o.cardOnly {
+		return
+	}
+	m.cfg, m.state, m.configPath, m.fresh = cfg, runner.State, o.path, runner.State.Fresh()
+	for _, w := range migrate.Stamp(runner.State, cfg, version) {
+		m.log.Warn(w)
+	}
+	// Before anything is written: a migration applied by an earlier run has
+	// to be forgotten by this run's ledger too.
+	saltLedger(m.ledger, runner.State)
+	migrateOnStart(ctx, m, !o.oneShot())
+}
+
+// openState is the state file this run reads, once the command line is held
+// to the configuration, which is what a run needs before it builds a sink.
+//
+// A backfill of a family the configuration switches off is refused here,
+// before the start asks GitHub or the stores anything about migrations or
+// applies one, since the walk would read none of it. A run that writes to the
+// stores refuses a state file it cannot read, which is where a migration
+// records the history it still owes them (see run.OpenState); a card-only run
+// writes to none and saves nothing, so it reads what it can as every release
+// did.
+func openState(cfg *config.Config, o *options) (*run.State, error) {
+	if err := walkable(cfg, o.only); err != nil {
+		return nil, err
+	}
+	if o.cardOnly && o.card != "" {
+		return run.LoadState(cfg.StateFile), nil
+	}
+	return run.OpenState(cfg.StateFile)
+}
+
+// oneShot says the run ends after what it was asked to do rather than
+// serving. Such a run starts no exporter, since it would serve nobody and its
+// port collides with the one a long-running instance holds, and it does not
+// hold the state file: the push sinks still all run.
+func (o *options) oneShot() bool {
+	return o.once || o.backfill || o.card != "" || o.migrate
+}
+
+// needsNoToken says whether the run asked for can do without a GitHub token:
+// the runs that report on a configuration or on its stores ask GitHub nothing
+// they cannot do without, and -migrate, which asks for the repository list,
+// says in its plan what it could not compare when there is no token.
+func (o *options) needsNoToken() bool {
+	return o.backfillStatus || o.publishDashboard || o.uninstall != "" || o.migrate
 }
 
 // readCommandLine parses args and answers the flags that print and stop. It
@@ -357,13 +510,13 @@ func readCommandLine(args []string, stdout, stderr io.Writer) (options, bool) {
 	return o, !printOnly(&o, stdout)
 }
 
-// newRunner is the sweep scheduler for the run the command line asked for.
+// newRunner is the sweep scheduler for the run the command line asked for,
+// with no state: execute hands it the one openState read.
 func newRunner(cfg *config.Config, api *ghapi.Client, sinks []sink.Sink,
 	logger *slog.Logger, o *options,
 ) *run.Runner {
 	return &run.Runner{
-		Cfg: cfg, API: api, Sinks: sinks,
-		State: run.LoadState(cfg.StateFile), Log: logger,
+		Cfg: cfg, API: api, Sinks: sinks, Log: logger,
 		// Every kind of run reads it, and every kind but a card-only one and
 		// a backfill writes it back: see run.Runner's CacheFile.
 		CacheFile: cfg.CacheFile(),
@@ -535,6 +688,11 @@ func reported(ctx context.Context, o options, cfg *config.Config,
 	case o.uninstall != "":
 		// Nor this one, which takes away rather than collects.
 		err = uninstall(ctx, cfg, o.uninstall, o.yes, stdout)
+	case o.migrate && !o.yes:
+		// This one asks GitHub for the repository list alone, and the
+		// stores what they hold. With -yes it changes them, which takes the
+		// sinks and is not a report.
+		err = migratePlan(ctx, cfg, api, o.path, stdout, time.Now())
 	case o.list:
 		err = listRepositories(ctx, api, cfg, stdout)
 	default:
@@ -664,12 +822,27 @@ func reportBackfill(cfg *config.Config, configPath string, stdout io.Writer, now
 	if !inProgress {
 		fmt.Fprintln(stdout, "no backfill in progress")
 		fmt.Fprintf(stdout, "  the checkpoint one leaves behind is not there: %s\n", shownPath(path))
-		return nil
+	} else {
+		fmt.Fprintln(stdout, "backfill in progress")
+		reportWalk(progress, path, config.CommandLine(configPath, resumeFlags(cfg, progress.Scope)...), stdout, now)
 	}
+	// The refill of a migration keeps a checkpoint of its own, and is said
+	// only when there is one: most runs never have a refill to make.
+	path = cfg.RefillProgressFile()
+	if progress, inProgress, err = run.ReadProgress(path); err != nil || !inProgress {
+		return err
+	}
+	fmt.Fprintln(stdout, "refill in progress, reading back what a migration cleared")
+	fmt.Fprintf(stdout, "  writing      %s\n", writtenBy(progress.Scope.Measurements))
+	reportWalk(progress, path, config.CommandLine(configPath, flagMigrate, flagYes)+
+		", or the next start under migrate: auto", stdout, now)
+	return nil
+}
 
+// reportWalk is the lines a checkpoint says about its walk.
+func reportWalk(progress *run.Progress, path, resume string, stdout io.Writer, now time.Time) {
 	left := progress.Unfinished()
 	families, inFlight, repos := progress.Where()
-	fmt.Fprintln(stdout, "backfill in progress")
 	fmt.Fprintf(stdout, "  started      %s (%s ago)\n",
 		progress.Started.Format(time.RFC3339), since(progress.Started, now))
 	fmt.Fprintf(stdout, "  last written %s ago\n", since(progress.Updated, now))
@@ -682,8 +855,31 @@ func reportBackfill(cfg *config.Config, configPath string, stdout io.Writer, now
 	}
 	fmt.Fprintf(stdout, "  written by   %s\n", progress.WrittenBy)
 	fmt.Fprintf(stdout, "  checkpoint   %s\n", path)
-	fmt.Fprintf(stdout, "  resume       ghchronicle -config %s -backfill\n", configPath)
-	return nil
+	fmt.Fprintf(stdout, "  resume       %s\n", resume)
+}
+
+// resumeFlags is what resumes a backfill's checkpoint: -backfill, and what
+// the walk was asked for that the configuration alone does not ask, since a
+// resume under anything else is refused as another walk.
+func resumeFlags(cfg *config.Config, scope run.Scope) []string {
+	flags := []string{"-backfill"}
+	if scope.Since != strings.TrimSpace(cfg.Backfill.Since) && scope.Since != "" {
+		flags = append(flags, "-backfill-since", scope.Since)
+	}
+	if every := run.ScopeOf(cfg, "").Families; !slices.Equal(scope.Families, every) &&
+		len(scope.Families) > 0 && len(scope.Families) < len(every) {
+		flags = append(flags, "-families", strings.Join(scope.Families, ","))
+	}
+	return flags
+}
+
+// writtenBy names what a refill writes where.
+func writtenBy(measurements map[string][]string) string {
+	parts := make([]string, 0, len(measurements))
+	for _, store := range slices.Sorted(maps.Keys(measurements)) {
+		parts = append(parts, strings.Join(measurements[store], ",")+" to "+store)
+	}
+	return quotedList(parts)
 }
 
 // since is how long ago an instant was, rounded to the second, and never
@@ -751,13 +947,18 @@ func runBackfill(ctx context.Context, runner *run.Runner, cfg *config.Config,
 	if err != nil {
 		return err
 	}
+	scope := run.ScopeOf(cfg, bound)
+	if o.only != nil {
+		// walkable has refused a family this configuration switches off,
+		// before the start: see execute.
+		runner.Only, scope = set(o.only), scope.Narrowed(o.only, nil)
+		logger.Info("backfill of some families only", "families", strings.Join(o.only, ","))
+	}
 	// Opened before anything is collected, because the one thing it can say is
 	// that this walk must not be resumed, and a refusal is only worth
 	// something before the quota is spent. The bound goes in as it was
 	// spelled, not as it just resolved: see run.Scope.
-	if runner.Progress, err = run.OpenProgress(
-		cfg.BackfillProgressFile(), version, run.ScopeOf(cfg, bound), time.Now(),
-	); err != nil {
+	if runner.Progress, err = run.OpenProgress(cfg.BackfillProgressFile(), version, scope, time.Now()); err != nil {
 		return err
 	}
 	if runner.BackfillSince.IsZero() {
@@ -790,6 +991,29 @@ func runBackfill(ctx context.Context, runner *run.Runner, cfg *config.Config,
 			"complete_before_this_process", len(runner.Progress.Complete))
 	}
 	return writeCards(accumulator, files, o, logger)
+}
+
+// set is a list as a set.
+func set(names []string) map[string]bool {
+	out := make(map[string]bool, len(names))
+	for _, n := range names {
+		out[n] = true
+	}
+	return out
+}
+
+// walkable refuses a family -families names that this configuration switches
+// off. A backfill runs only what the configuration collects, so such a family
+// would be walked as nothing and the backfill would end at once, complete,
+// having read none of it.
+func walkable(cfg *config.Config, families []string) error {
+	for _, f := range families {
+		if _, enabled := cfg.Interval(f); !enabled {
+			return fmt.Errorf("-families: this configuration switches %s off, so a backfill would read none of it; "+
+				"give it a cadence under every.families to walk it", f)
+		}
+	}
+	return nil
 }
 
 // runSweep runs one sweep and, when one was asked for, draws the card from

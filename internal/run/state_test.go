@@ -317,3 +317,108 @@ func runsInADay(r *Runner, tick time.Duration, families []string) map[string]int
 	}
 	return runs
 }
+
+// TestASaveKeepsWhatAnotherProcessRecordedOfTheStores: a one-shot run reads
+// the state file when it starts and saves it when it ends, with no lock in
+// between, and a -migrate -yes that ran meanwhile recorded the migration it
+// applied and the refill it still owes. Before, the one-shot's save put back
+// the copy it had read, the owed refill was forgotten, and the store it
+// cleared looked like one that never held the old shape.
+func TestASaveKeepsWhatAnotherProcessRecordedOfTheStores(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "state.json")
+	first := LoadState(path)
+	first.Stores["influxdb"] = &StoreRecord{Destination: "url=http://i bucket=g", FirstWrittenBy: "2.6.1"}
+	first.Stores["postgres"] = &StoreRecord{Destination: "host=db", FirstWrittenBy: "2.6.1"}
+	if err := first.Save(); err != nil {
+		t.Fatal(err)
+	}
+	when := time.Date(2026, 9, 29, 9, 0, 0, 0, time.UTC)
+
+	oneShot := LoadState(path)
+	migrate := LoadState(path)
+	rec := migrate.Stores["influxdb"]
+	rec.MarkApplied("2.6.1/gh_discussion_comment/is_answer", when)
+	rec.OweRefill("2.6.1/gh_discussion_comment/is_answer", "gh_discussion_comment", []string{"discussions", "outbound"}, when)
+	rec.KeepAside(Aside{Name: "gh_discussion_comment-20260929T090000", Measurement: "gh_discussion_comment", At: when})
+	if err := migrate.Save(); err != nil {
+		t.Fatal(err)
+	}
+
+	// The one-shot changes what it has, a store record of its own among
+	// it, and saves over the file the other wrote.
+	oneShot.Mark("repo", when)
+	oneShot.Stores["postgres"].MarkNotNeeded("1.0.0/gh_dependabot_alert_item/state", when)
+	if err := oneShot.Save(); err != nil {
+		t.Fatal(err)
+	}
+	after := LoadState(path)
+	got := after.Stores["influxdb"]
+	if got.Refill == nil || len(got.Applied) != 1 || len(got.SetAside) != 1 {
+		t.Errorf("after the one-shot's save the store records %+v; the migration's records are gone", got)
+	}
+	if _, kept := after.Stores["postgres"].NotNeeded["1.0.0/gh_dependabot_alert_item/state"]; !kept {
+		t.Errorf("the one-shot's own record was lost: %+v", after.Stores["postgres"])
+	}
+	if _, ran := after.LastRun["repo"]; !ran {
+		t.Error("the one-shot's sweep marks were lost")
+	}
+
+	// Both changed one record: each keeps what it recorded, and a refill
+	// owed by either stays owed, since one read twice costs its time and one
+	// forgotten costs the history.
+	a, b := LoadState(path), LoadState(path)
+	a.Stores["influxdb"].Refill = nil
+	a.Stores["influxdb"].MarkNotNeeded("1.0.0/gh_code_scanning_alert_item/state", when)
+	b.Stores["influxdb"].OweRefill("1.0.0/gh_code_scanning_alert_item/state", "gh_code_scanning_alert_item", []string{"security"}, time.Time{})
+	b.Stores["influxdb"].DropAside("gh_discussion_comment-20260929T090000")
+	if err := b.Save(); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.Save(); err != nil {
+		t.Fatal(err)
+	}
+	got = LoadState(path).Stores["influxdb"]
+	if got.Refill == nil || !slices.Equal(got.Refill.Families, []string{"discussions", "outbound", "security"}) ||
+		!got.Refill.Since.IsZero() {
+		t.Errorf("two refills owed at once merged as %+v", got.Refill)
+	}
+	if len(got.SetAside) != 0 || len(got.NotNeeded) != 1 {
+		t.Errorf("a copy one purged, or a finding the other made, was not kept as such: %+v", got)
+	}
+}
+
+// TestAStateFileThatCannotBeReadIsNotAFirstRun: a run that writes to the
+// stores refuses a state file it cannot read or parse rather than starting
+// afresh, since a first run's save renames its own file over the one it could
+// not read and forgets for good the refills a migration still owes there. A
+// file that is not there is a first run, as it always was.
+func TestAStateFileThatCannotBeReadIsNotAFirstRun(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if s, err := OpenState(filepath.Join(dir, "none.json")); err != nil || !s.Fresh() {
+		t.Errorf("a state file that is not there opens as %v, %v", s, err)
+	}
+	broken := filepath.Join(dir, "broken.json")
+	if err := os.WriteFile(broken, []byte(`{"last_run":{"repo":`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := OpenState(broken); err == nil || !strings.Contains(err.Error(), "does not parse") {
+		t.Errorf("a truncated state file opens with %v", err)
+	}
+	unreadable := filepath.Join(dir, "unreadable.json")
+	if err := os.WriteFile(unreadable, []byte(`{}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// A directory where the file should be is what a read refuses on every
+	// platform and for every user, root included.
+	if err := os.Remove(unreadable); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(unreadable, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := OpenState(unreadable); err == nil || !strings.Contains(err.Error(), "cannot be read") {
+		t.Errorf("a state file that cannot be read opens with %v", err)
+	}
+}

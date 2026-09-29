@@ -176,7 +176,9 @@ that table's own key, and its new rows hold the empty string for `is_answer`.
 The SQL file cannot know that key, so replayed into such a table its
 `gh_discussion_comment` statements are refused while the rest of the file loads,
 until the table is dropped. The Prometheus exporter keeps nothing across a
-restart and counts each comment once.
+restart and counts each comment once. `-migrate` says which of the configured
+stores hold the two shapes, under `2.6.1/gh_discussion_comment/is_answer`: see
+[Migrations](/ghchronicle/install/upgrading/#migrations).
 
 ### From a row to a query
 
@@ -702,6 +704,8 @@ total, `days_since_use` and `key` those of the one used most recently, and
 entry of one cache on one ref had the same tags and the same day, so the store
 kept whichever was written last: on 2026-09-26 the fifteen CodeQL caches on
 main of jmrplens/jmrplens, 57.9 MB between them, were stored as one of 3.8 MB.
+No API lists a past day's caches, so those days stay as they are, and
+`-migrate` only notes them, under `2.6.0/gh_actions_cache_entry/sum`.
 The listing is read a hundred entries a page, up to ten pages, where it used to
 stop at the first: on 2026-09-27 two repositories of the account held 118 and
 232 entries. It is read newest created first, an order a cache hit does not
@@ -735,7 +739,11 @@ sometimes gives the measurement two Graphite path depths, and the panels index
 their nodes from one fixed table. `alert_state` on both items and `resolution`
 on the code scanning one are fields, since an alert is dated when it was
 raised and both move when it closes; `resolution` reads `open` until then, so
-the column exists before any alert has closed.
+the column exists before any alert has closed. A build before 1.0.0 tagged both
+items with `state`, and the code scanning one with `reason`, so a store it
+wrote holds those rows beside today's: `-migrate` finds them, under
+`1.0.0/gh_dependabot_alert_item/state` and
+`1.0.0/gh_code_scanning_alert_item/state`, in the stores that can be asked.
 
 The fields are the opposite: `cve`, `cwe`, `first_patched`, `epss`,
 `epss_percentile` and `seconds_to_detect` are written only when the advisory

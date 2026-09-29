@@ -81,11 +81,15 @@ almost nothing: an outbound TCP socket and one writable directory.
 the right ownership on start, so the state file has somewhere to live without a
 manual `mkdir` and a `chown` that someone will forget after a reinstall.
 
-Three files live there, not one. Beside `state.json` the sweep keeps its write
+Four files live there, not one. Beside `state.json` the sweep keeps its write
 ledger, `state-written.bin` by default, which is what stops an unchanged point
 being written again, and its cache, `state-cache.bin`, which is what lets a
-restart ask GitHub only for what changed; `ReadWritePaths` covers the
-directory, so all three are already allowed. Put the state file or the ledger
+restart ask GitHub only for what changed; and the service holds `state-lock`
+for as long as it runs, which is how `-migrate -yes` knows not to change the
+stores under it. A backfill, or the reading back of a
+[migration](/ghchronicle/install/upgrading/#migrations), that stops half way
+leaves its checkpoint there too. `ReadWritePaths` covers the directory, so all
+of them are already allowed. Put the state file or the ledger
 somewhere else and that path needs adding here, and the cache follows the state
 file wherever it goes. Losing the ledger costs one sweep of rewriting:
 [only what changed is written](/ghchronicle/sinks/#only-what-changed-is-written);
@@ -114,6 +118,7 @@ losing the cache, one sweep at full price:
       - state.json created by the service
       - state-written.bin the write ledger, beside it
       - state-cache.bin the cache, beside it too
+      - state-lock held by the service while it runs
 
     </FileTree>
 
@@ -162,13 +167,16 @@ level=INFO msg="rate budget" bucket=core remaining=4477 limit=5000
 day](/ghchronicle/configuration/logging/#what-the-log-says-on-a-good-day) has
 every routine line.
 
-Two warnings are worth an alert:
+Three warnings are worth an alert:
 
 - **`rate limit reserve reached`** means a family was skipped to protect the
   budget. Once is fine; every sweep means the cadences are too fast for the
   number of repositories.
 - **`family failed everywhere, not marking it as run`** means every repository
   failed for one family, so it will be retried rather than treated as done.
+- **`migration pending`**, at every start after an upgrade, means a store still
+  holds rows in a shape this release no longer writes, and the start left
+  them: see [after an upgrade](#after-an-upgrade).
 
 ```sh
 journalctl -u ghchronicle -f
@@ -180,6 +188,44 @@ journalctl -u ghchronicle -p warning --since today
   sandbox is not covering. It is the fastest way to see that an edit quietly
   removed a restriction.
 </Aside>
+
+## After an upgrade
+
+Replace the binary and restart the service. Under the default
+[`migrate: auto`](/ghchronicle/configuration/#migrate), the start checks every
+store against the changes the new release carries and, before its first sweep,
+applies on its own each one that loses nothing, saying so at `WARN`. A change
+it leaves is a `WARN` at every start, naming the store, the reason and the two
+commands: [what a start does about
+it](/ghchronicle/install/upgrading/#what-a-start-does-about-it).
+
+Run those as the service's own user and with its environment file, with the
+service stopped, since `-migrate -yes` refuses to run beside it:
+
+```sh
+sudo systemctl stop ghchronicle
+sudo systemd-run --uid=ghchronicle --gid=ghchronicle --pipe --wait --collect \
+  --property=EnvironmentFile=/etc/ghchronicle/ghchronicle.env \
+  /usr/local/bin/ghchronicle -config /etc/ghchronicle/config.yaml -migrate
+sudo systemd-run --uid=ghchronicle --gid=ghchronicle --pipe --wait --collect \
+  --property=EnvironmentFile=/etc/ghchronicle/ghchronicle.env \
+  /usr/local/bin/ghchronicle -config /etc/ghchronicle/config.yaml -migrate -yes
+sudo systemctl start ghchronicle
+```
+
+The first prints the plan and changes nothing; the second applies it and reads
+back what it cleared. `systemd-run` reads the environment file as root, as the
+unit does, so it stays mode 600, and runs the binary as `ghchronicle`: measured
+on systemd 257, a command started that way saw the token of a file only root
+could read and ran as the user named. Run by root instead, `-migrate -yes`
+saves the files it rewrites beside the state file as root's, mode 600,
+`state.json` among them, and the service, which runs as `ghchronicle`, then
+stops at its start and names the file rather than start from a new one, which
+would forget a refill still owed: `chown ghchronicle:ghchronicle` it back.
+
+With `-once` run from cron rather than a service, comment the line out for the
+length of the two commands: a `-once` holds no lock while it sweeps, so nothing
+stops it running beside `-migrate -yes`.
 
 ## cron instead of a service
 

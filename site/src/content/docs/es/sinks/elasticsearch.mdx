@@ -95,7 +95,10 @@ texto un subcampo `.keyword`, que es sobre lo que agrega el dashboard.
 
 Si quieres mappings explícitos, crea las plantillas de índice antes de la
 primera escritura. Nada del destino depende de ellas; solo la elección de
-`.keyword` en los paneles.
+`.keyword` en los paneles. [`-migrate`](#qué-hace-aquí-una-migración) lee el
+mapping antes de preguntar de quién son las filas de un índice, así que una
+plantilla que mapea las cadenas como `keyword`, sin subcampo `.keyword`, se lee
+del propio campo.
 
 ## El dashboard
 
@@ -118,6 +121,55 @@ repositorio archivado que el filtro por omisión aparta por sus documentos de
 los últimos siete días, donde los almacenes SQL preguntan si el colector lo
 sigue escribiendo, así que un rango que terminó hace más de una semana deja
 fuera esos repositorios.
+
+## Qué hace aquí una migración
+
+Cuando una versión cambia aquello por lo que se identifican los documentos de
+una medida, [`-migrate`](/ghchronicle/es/install/upgrading/#migraciones)
+encuentra los documentos de la forma antigua contando los que llevan la
+etiqueta antigua, y aplicar el cambio aparta el índice en tres pasos.
+**Medido contra Elasticsearch 9.5.3**:
+
+1. El índice deja de aceptar escrituras, con `PUT <índice>/_block/write`.
+2. Se clona a `<índice>-<instante>`, el instante en UTC y en minúsculas, como
+   exige el nombre de un índice, por ejemplo
+   `ghchronicle-gh_discussion_comment-20261001t091004`, y el clon tiene que
+   tener tantos documentos como el índice antes de que ocurra nada más.
+3. Se borra el índice, y la siguiente escritura del destino lo crea de nuevo,
+   con un mapping propio.
+
+Antes de aplicar el cambio, el plan pregunta de quién son las filas del índice
+y a qué repositorios pertenecen, con una agregación terms sobre el campo que el
+mapping deje agregar: el subcampo `.keyword` que da el mapping dinámico a una
+cadena, o el propio campo donde una plantilla lo mapea como `keyword`. Los
+buckets tienen que sumar todos los documentos que tienen el campo, o la
+respuesta no se acepta: medido en 9.5.3, una agregación sobre `user.keyword` en
+un índice cuya plantilla mapeaba `user` como `keyword` respondió sin buckets y
+sin error, lo que se leía como un índice sin filas de nadie más, y un valor que
+pasa del `ignore_above` del subcampo tampoco está en ningún bucket. Un
+documento sin el campo es una fila que no nombra a nadie, y el plan lo dice
+así.
+
+Un paso que falla antes del borrado vuelve a quitar el bloqueo de escritura,
+así que un clúster que rechazó el clon sigue aceptando las escrituras del
+destino, y el cambio sigue pendiente con la razón del clúster. Un borrado que
+falla se vuelve a mirar antes de deshacer nada: medido a través de un proxy que
+respondió 502 a un borrado que el clúster llevó a cabo, el índice ya no
+estaba, así que el clon, la única copia de sus documentos, se conserva y el
+cambio se registra como aplicado; solo a un índice que sigue ahí se le quita el
+bloqueo y se le borra el clon. La clave de API
+necesita los privilegios `manage` y `delete_index` sobre los índices del
+prefijo; una clave que solo puede escribir se rechaza así.
+
+El clon conserva el bloqueo de escritura, y ghchronicle lo borra cuando lleva
+24 horas guardado: tras una pasada del servicio, en el siguiente arranque de
+cualquier ejecución o en el siguiente `-migrate -yes`. Hasta entonces, deshacer
+el cambio es borrar el índice nuevo y clonar la copia de vuelta con su nombre.
+Toda consulta del dashboard que se distribuye nombra su índice entero,
+`_index:ghchronicle-gh_discussion_comment`, así que ningún panel lee el clon:
+la consulta de un panel sobre `ghchronicle-*` contó el único documento nuevo y
+no los tres del clon. Una data view de Kibana sobre el mismo patrón sin ese
+filtro sí lo lee, durante el día que se guarda.
 
 ## Por dónde seguir
 

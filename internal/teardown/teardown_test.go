@@ -242,6 +242,37 @@ func TestTheElasticsearchStoreClaimsItsPrefixAndNothingElse(t *testing.T) {
 	}
 }
 
+// TestAPrefixWithCapitalsIsListedTheWayTheSinkWritesIt: the sink writes an
+// index name in lower case, and _cat/indices matches case and all, so a
+// prefix of Rev96Up listed nothing on 9.5.3 (measured) until it was asked in
+// lower case; the copies a migration set aside under it were then never
+// found to be purged, and -uninstall data found nothing to remove.
+func TestAPrefixWithCapitalsIsListedTheWayTheSinkWritesIt(t *testing.T) {
+	t.Parallel()
+	var listed, deleted []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			deleted = append(deleted, strings.TrimPrefix(r.URL.Path, "/"))
+			return
+		}
+		listed = append(listed, r.URL.Path)
+		if r.URL.Path != "/_cat/indices/rev96up*" {
+			_, _ = io.WriteString(w, `[]`)
+			return
+		}
+		_, _ = io.WriteString(w, `[{"index":"rev96up-gh_repo"},{"index":"rev96up-gh_discussion_comment-20260927t011320"}]`)
+	}))
+	t.Cleanup(srv.Close)
+	store := &elastic{sink: &config.ElasticsearchSink{URL: srv.URL, Prefix: "Rev96Up"}}
+	asides, err := store.Asides(t.Context(), []string{"gh_discussion_comment"})
+	if err != nil || len(asides) != 1 || asides[0].Name != "rev96up-gh_discussion_comment-20260927t011320" {
+		t.Errorf("the copies under a prefix with capitals are %+v, %v (asked %v)", asides, err, listed)
+	}
+	if err = store.Drop(t.Context(), "rev96up-gh_repo"); err != nil || strings.Join(deleted, ",") != "rev96up-gh_repo" {
+		t.Errorf("an index the sink wrote under the prefix was not removed: %v, %v", err, deleted)
+	}
+}
+
 // TestAnIndexAlreadyGoneIsNotAFailure, for the reason a dropped table is not:
 // what was asked for is that it not be there.
 func TestAnIndexAlreadyGoneIsNotAFailure(t *testing.T) {
@@ -404,5 +435,25 @@ func TestBothWaysIntoPostgresAreOfferedSeparately(t *testing.T) {
 	}
 	if !strings.Contains(said, "never connects") {
 		t.Errorf("the sql sink said %q, want it to say rows already loaded are not its to remove", said)
+	}
+}
+
+// TestATableInfluxDBHasDeletedIsNotOffered: InfluxDB 3 lists a table it has
+// deleted, under <name>-<instant>, until it purges it, and refuses a delete
+// of it with a 409 that Drop would take as done. It is left out of what the
+// store holds and said to be lingering instead.
+func TestATableInfluxDBHasDeletedIsNotOffered(t *testing.T) {
+	t.Parallel()
+	s := &influxServer{tables: []string{"gh_repo", "gh_repo-20260928T222330", "gh_repo-2026", "payments-20260928T222330"}}
+	store := &influx{sink: s.start(t)}
+	held, err := store.Holds(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(held, ",") != "gh_repo,gh_repo-2026" {
+		t.Errorf("holds = %v, want the live tables alone", held)
+	}
+	if got := store.Lingering(); strings.Join(got, ",") != "gh_repo-20260928T222330" {
+		t.Errorf("lingering = %v", got)
 	}
 }

@@ -134,6 +134,16 @@ volume under an image before 2.6.1, none of which that uid owns, or a state
 file mounted on its own, which cannot be renamed over; see [what has to be
 writable](https://jmrp.io/docs/ghchronicle/install/docker/#what-has-to-be-writable).
 
+**`the state file ... cannot be read` or `does not parse`, and the run stops.**
+The state file is there and this run could not read it, or it is not whole. A
+run that writes to the stores does not take it for a new one, which would
+forget the refills a migration still owes and put a new file in its place on
+its first save. A file root left behind, after `-migrate -yes` or a backfill
+run with `sudo`, is the usual cause: `chown` it back to the user the collector
+runs as. Moved aside instead, the next run starts from a new one, and what it
+recorded, a refill still owed among it, is gone; see [the state
+file](https://jmrp.io/docs/ghchronicle/configuration/#state_file).
+
 **`rate limit reserve reached, family skipped`.** Once is fine. Every sweep
 means the cadences are too fast for the number of repositories. If the bucket
 that runs short is `core`, lengthen `artifacts` and then `actions`; if it is
@@ -141,7 +151,25 @@ that runs short is `core`, lengthen `artifacts` and then `actions`; if it is
 activity, not with
 size](https://jmrp.io/docs/ghchronicle/api/cost/#what-scales-with-activity-not-with-size).
 
+**`refill owed: a store a migration cleared does not hold that history yet`.**
+A migration cleared the measurement named in that store and reading its history
+back from GitHub did not finish: the run was stopped, a store refused a write,
+or GitHub did not answer. The store now looks like one that never held the old
+shape, so only the state file knows. Under `migrate: warn` a start says this
+and sweeps; `-migrate -yes`, named in the line, reads it back from where it
+stopped, and so does any start under `migrate: auto`. See [reading the history
+back](https://jmrp.io/docs/ghchronicle/install/upgrading/#reading-the-history-back).
+
 ## The data looks wrong
+
+**`reconciled` at `WARN`, with `not_served`.** After reading a cleared
+measurement back, ghchronicle compared the copy of the old rows with the table
+and found items GitHub no longer serves: a repository deleted or no longer
+covered, a comment deleted, an alert whose feature was switched off. `first`
+names a few, and `only_in` is the copy that still holds them, until it is
+purged: a day after the migration for PostgreSQL's and Elasticsearch's, and
+when the server's schedule says for InfluxDB 3's, 72 hours by default. Carrying
+them over is by hand, from that copy, while it is there.
 
 **A number is a multiple of the sweep count.** Something that is a snapshot is
 being summed over time. Referrers, paths, labels and milestones are snapshots
@@ -239,12 +267,14 @@ log:
 
 A family that is not due yet simply does not appear.
 
-> **Deleting the state file costs quota, and one thing more**
+> **Deleting the state file costs quota, and two things more**
 >
-> It remembers eight things, and seven of them cost only quota when they go: what
+> It remembers nine things, and seven of them cost only quota when they go: what
 > is collected again is keyed by measurement, tags and timestamp and overwrites.
-> The eighth, `last_head`, is the commit each dependency diff started from, and
-> without it the next sweep has the photograph and no diff. See
+> `last_head` is the commit each dependency diff started from, and without it
+> the next sweep has the photograph and no diff. `stores` is what the file
+> records of each store, a refill a migration still owes among it, and without
+> it nothing reads that history back until a `-backfill -families` does. See
 > [the state file](https://jmrp.io/docs/ghchronicle/configuration/#state_file). The cache file
 > beside it costs quota and nothing more: see [the cache beside
 > it](https://jmrp.io/docs/ghchronicle/configuration/#the-cache-beside-it).
@@ -381,6 +411,123 @@ cannot be emptied from here and say so: Graphite has no delete, the Prometheus
 sink was scraped rather than written to, and the SQL sink's file goes but rows
 already loaded from it into a real database were loaded by you.
 
+**Tables or indices named `gh_...-20261001T091004`.** A migration set the
+measurement's old rows aside under that name, the measurement, a dash and the
+instant in UTC: PostgreSQL's renamed table, Elasticsearch's clone, lower case
+there, and the name InfluxDB 3 gives a table it deleted. None of the shipped
+panels reads one. ghchronicle purges PostgreSQL's and Elasticsearch's once they
+have been kept 24 hours, and InfluxDB 3 purges its own on its own schedule, 72
+hours after the delete by default; `-migrate` lists them
+under their store as `kept aside`. `-uninstall data` removes PostgreSQL's and
+Elasticsearch's with everything else, and leaves out InfluxDB 3's with a note,
+since the server refuses a delete of a table it has already deleted.
+
+## After an upgrade
+
+**`migration pending`, at every start.** A store holds rows of a measurement in
+a shape this release no longer writes, and this start did not bring it along.
+`not_applied` says why: `migrate: warn`, or a reason the change needs somebody's
+word, such as an InfluxDB 2, whose only way is a final delete, a SQL file, a
+Graphite or a Telegraf, where ghchronicle keeps nothing aside, rows of accounts
+this configuration does not collect, rows reading it again would not bring
+back, or rows whose accounts or repositories could not be read, which an
+InfluxDB 3 Core past its query file limit refuses to say; or a one-shot run on
+a new state file, every run of the Action without one restored, which applies
+nothing on its own. `plan` and `apply` are the two commands, and `first`, on
+the service, says to stop it before the second. It is said at every start until
+the store is brought along: see
+[Migrations](https://jmrp.io/docs/ghchronicle/install/upgrading/#migrations).
+
+**`applying a migration before the first sweep`.** Not an error. Under
+`migrate: auto` the start found a change it can apply without losing anything,
+and is applying it: `found` is what the store holds, `action` where the old
+rows go, and `refill` what is read back from GitHub. It comes once per store
+and change, followed by `refill starting`, `refill complete` and `reconciled`,
+and then the first sweep.
+
+**`migration noted: nothing is changed` or `migration frozen`.** Not errors
+either. A note is a change nothing can put right, such as the
+`gh_actions_cache_entry` rows dated before 2.6.0, and a frozen measurement is
+one nothing this configuration runs writes any more. Each is said once at
+`INFO` and then at `DEBUG`.
+
+**`migration check failed: the store did not answer`.** The store was asked at
+start-up whether it holds an old shape, and refused or did not answer within 30
+seconds. Nothing was recorded and nothing changed; the sweep goes on, and the
+next start asks again.
+
+**`migration failed`.** The store refused what applying asked of it, and the
+change stays pending; the other stores went ahead. `err` says why, and the
+usual reason is a credential that may write and may not delete: InfluxDB 3's
+token has to be allowed to delete a table, and the error carries the same
+delete as a `curl` to run by hand; PostgreSQL's user has to own the table, as it
+does when its own sink made it; an Elasticsearch key needs `manage` and
+`delete_index` on the indices of its prefix. PostgreSQL also gives up after
+three waits of 5 seconds each behind a query that holds the table, which a long
+Grafana query can be. Run the same command again once the cause is fixed: what
+was applied is recorded and is not done twice.
+
+**`refill did not finish, and is still owed`.** Reading back what was cleared
+stopped: the run was stopped, a store refused a write or GitHub did not answer.
+`resume` says how to go on. The walk keeps its checkpoint beside the state
+file, `<name>-refill.json`, and `refill owed`, under [things that are
+errors](https://jmrp.io/docs/ghchronicle/reference/troubleshooting/#things-that-are-errors), is what a later start says of it.
+
+**`the store may have been cleared, so the refill stays owed`.** Clearing the
+store failed in a way that does not say whether it was carried out: a proxy's
+502, a timeout, a connection that broke after the store did what it was asked.
+The refill was recorded as owed before the store was touched and stays owed,
+so the history is read back whether or not the clear happened; the change is
+asked about again at the next start. At worst that reads the history once for
+nothing.
+
+**`the state file records a refill owed to ... where it no longer points`.** A
+migration cleared a store, the refill did not finish, and the sink now points
+at another store. The record is kept, and the refill is read the next time the
+sink points there; until then nothing reads it. `-migrate` shows it under the
+store as `owed there`.
+
+**`not reconciled: the copy and the table could not be compared`.** The
+history was read back, and the copy of the old rows could not be read, or was
+already due to be purged. What came back is in the table; only the list of the
+items GitHub no longer serves is missing, and while the copy is there it can be
+read by hand.
+
+**`set-aside copy not purged` or `set-aside copies not listed`.** A day after a
+migration set it aside, ghchronicle could not drop PostgreSQL's copy or delete
+Elasticsearch's clone, or could not ask the store which copies it holds. It
+tries again after every sweep and at every start; `aside` names the copy, which
+can also be removed by hand. InfluxDB 3 purges its own on its own schedule.
+
+**`the cache file still claims what the cleared store held`.** A migration
+could not rewrite the cache file to forget the refusals, and the workflow runs
+already written, of the families it reads back, so those families may go on
+skipping what the cleared store no longer holds. With the service stopped,
+deleting `<name>-cache.bin` costs one sweep at full price: [the cache beside
+it](https://jmrp.io/docs/ghchronicle/configuration/#the-cache-beside-it).
+
+**`-migrate -yes` answers `process N (ghchronicle ..., service, since ...)
+holds ...-lock`.** The service, or another `-migrate -yes`, holds the state
+file, and nothing was changed. Stop it, or let it finish, and run the command
+again. In Docker, N is the process as the service's own container numbers it.
+
+**`waiting for the process holding the state file to finish`.** The service was
+started while `-migrate -yes` ran on the same state file. It waits for it to
+end and then starts on what it left.
+
+**`another ghchronicle service keeps the same state file`.** A second service
+was started on a state file a running one holds, and refused, since two
+services saving one state file undo each other's marks. Stop one, or give each
+a `state_file` of its own.
+
+**`the state file cannot be locked, so -migrate -yes cannot tell this service
+is running`.** The service could not create or open `<name>-lock` beside the
+state file: the directory is not writable, or a run as another user, root most
+often, made the file. The service runs without the lock, and `-migrate -yes`
+then refuses to run at all, since nothing would keep the service from starting
+under it half way. Run it as the service's user: [after an
+upgrade](https://jmrp.io/docs/ghchronicle/install/systemd/#after-an-upgrade).
+
 ## The PostgreSQL that connects
 
 **`could not reach its database`.** The sink connects on the first write rather
@@ -394,19 +541,23 @@ as NULL. The column appears the first time a point carries something for it.
 **A field changed type and the insert fails.** A column is created with the
 type of the first value seen and is never altered afterwards, so a field that
 was a number and is now a string has nowhere to go. Rename the field, or drop
-the table and restart the collector, whose next sweep declares it again. The
-restart is not optional: the sink declares a table once per process, so while
-it runs it goes on writing into the table it declared, and every insert fails
-until it starts again.
+the table, and the collector's next write declares it again. No restart is
+needed: the sink declares a table once per process, and the first insert after
+the drop is refused because the table is not there, so the sink forgets the
+tables of that batch, declares them again and sends the batch once more.
 
 **The SQL file's `gh_discussion_comment` statements are refused.** With `there
 is no unique or exclusion constraint matching the ON CONFLICT specification`,
 replayed into a table a release before 2.6.1 made. That table keeps
 `is_answer` in its key, which 2.6.1 no longer writes, and the file cannot read
 a table's key the way the connecting sink does, so its upserts name a key the
-table does not have. The rest of the file loads. Drop the table, as [the
-measurements page](https://jmrp.io/docs/ghchronicle/collectors/measurements/#how-to-read-the-tables)
-describes, and fill it again with a backfill.
+table does not have. The rest of the file loads. `-migrate -yes` writes the
+drop of that table into the file, ahead of the rows it reads again, so the file
+replayed in order loads whole: see [what applying does in each
+store](https://jmrp.io/docs/ghchronicle/install/upgrading/#what-applying-does-in-each-store). By
+hand, drop the table, as [the measurements
+page](https://jmrp.io/docs/ghchronicle/collectors/measurements/#how-to-read-the-tables) describes,
+and fill it again with a backfill.
 
 **The file sink and this one disagree.** Apart from the key above, they cannot:
 both render the same schema from the same code, and `cmd/check_postgres` plans every panel query

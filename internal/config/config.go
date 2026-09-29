@@ -40,6 +40,14 @@ type Config struct {
 	// Backfill settings. They only apply to a run started with -backfill.
 	Backfill Backfill `yaml:"backfill"`
 
+	// Migrate is what a run that writes to the stores does, before its first
+	// sweep, about a store an earlier release left in a shape this one no
+	// longer writes: MigrateAuto brings it along when nothing can be lost by
+	// doing so and warns about the rest, MigrateWarn only warns. Empty is
+	// MigrateAuto. There is deliberately no value that applies everything:
+	// what is unsafe waits for somebody to run -migrate -yes.
+	Migrate string `yaml:"migrate" ghc:"example=auto"`
+
 	// Grafana is where the dashboard and the datasource it reads from are
 	// published. A pointer because the whole feature is opt-in: without the
 	// key the binary never talks to a Grafana, which is how it behaved before
@@ -827,12 +835,45 @@ func (c *Config) Validate() error {
 	if err := c.resolveHeartbeat(); err != nil {
 		return err
 	}
+	if err := c.resolveMigrate(); err != nil {
+		return err
+	}
 	c.resolveGrafana()
 	// Last, because it reads the finished schedule: a family the groups key
 	// removed has no cadence left to complain about.
 	c.noteCadences()
 	return nil
 }
+
+// The values migrate takes. The first is what an empty value means.
+const (
+	MigrateAuto = "auto"
+	MigrateWarn = "warn"
+)
+
+// migrateModes is what migrate accepts, the default first.
+var migrateModes = []string{MigrateAuto, MigrateWarn}
+
+// MigrateModes are the accepted values of migrate, the default first.
+func MigrateModes() []string { return slices.Clone(migrateModes) }
+
+// resolveMigrate fills the default and refuses anything else. Refused rather
+// than read as the default, unlike log.level: a misspelled "off" read as auto
+// would change a store the reader meant to keep as it was.
+func (c *Config) resolveMigrate() error {
+	c.Migrate = strings.TrimSpace(c.Migrate)
+	if c.Migrate == "" {
+		c.Migrate = MigrateAuto
+	}
+	if !slices.Contains(migrateModes, c.Migrate) {
+		return fmt.Errorf("migrate: %q is not %s", c.Migrate, strings.Join(migrateModes, " or "))
+	}
+	return nil
+}
+
+// MigratesOnItsOwn says whether a run may bring a store along without being
+// asked, when doing so loses nothing.
+func (c *Config) MigratesOnItsOwn() bool { return c.Migrate == MigrateAuto }
 
 // resolveGrafana expands the credential and the two addresses, and falls back
 // to GRAFANA_TOKEN the way the GitHub token falls back to GITHUB_TOKEN.
@@ -932,6 +973,22 @@ func (c *Config) BackfillProgressFile() string {
 	return strings.TrimSuffix(c.StateFile, ".json") + "-progress.json"
 }
 
+// RefillProgressFile is where the refill of a migration keeps its checkpoint:
+// beside the state file, and apart from a backfill's. The two are different
+// walks, one of every family into every store and one of the families that
+// write what a migration cleared into the stores it cleared, so each would
+// refuse the other's checkpoint; kept in one file, a backfill in progress
+// would stop a migration from reading its history back, or the other way
+// round.
+//
+// Empty when there is no state file, and such a run keeps no checkpoint.
+func (c *Config) RefillProgressFile() string {
+	if c.StateFile == "" {
+		return ""
+	}
+	return strings.TrimSuffix(c.StateFile, ".json") + "-refill.json"
+}
+
 // CacheFile is where a run keeps what it learned about GitHub for the run
 // after it: the conditional cache, the workflow runs whose jobs were
 // written, the refusals and the pull request page sizes. Beside the state
@@ -950,6 +1007,20 @@ func (c *Config) CacheFile() string {
 		return ""
 	}
 	return strings.TrimSuffix(c.StateFile, ".json") + "-cache.bin"
+}
+
+// LockFile is what a process holds while nothing else may change the stores
+// and the state file under it: the service for its whole life, and
+// -migrate -yes while it applies. Beside the state file, because the state
+// file is the thing two such processes would both write, and two
+// configurations that keep separate state files are separate collectors.
+//
+// Empty when there is no state file.
+func (c *Config) LockFile() string {
+	if c.StateFile == "" {
+		return ""
+	}
+	return strings.TrimSuffix(c.StateFile, ".json") + "-lock"
 }
 
 // resolveSinks expands the environment in every configured sink, fills its

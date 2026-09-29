@@ -34,12 +34,25 @@ func TestInfluxSinkWritesLineProtocol(t *testing.T) {
 
 	sweepOnce(t, cfg)
 
-	reqs := rec.Requests()
+	reqs := rec.Writes()
 	if len(reqs) == 0 {
 		t.Fatal("nothing reached the InfluxDB receiver")
 	}
 	for _, r := range reqs {
 		assertInfluxWrite(t, &r)
+	}
+	// Before the first sweep the run asks the store what shape the migrated
+	// measurements are in, and asks it only that: which server, and what the
+	// catalog says, with the sink's own credential.
+	for _, r := range rec.Reads() {
+		q, _ := url.ParseQuery(r.RawQuery)
+		read := r.Path == "/ping" || r.Path == "/api/v3/query_sql" && strings.HasPrefix(q.Get("q"), "SELECT ")
+		if !read || !strings.HasSuffix(r.Header.Get("Authorization"), "influx-token") {
+			t.Errorf("before the sweep the store was sent %s %s?%s", r.Method, r.Path, r.RawQuery)
+		}
+	}
+	if n := len(rec.Requests()) - len(reqs) - len(rec.Reads()); n != 0 {
+		t.Errorf("%d requests were neither a write nor a read", n)
 	}
 
 	points := parseLineProtocol(t, rec.Body())
@@ -199,7 +212,7 @@ func TestInfluxBisectsAroundAnUnparseableLine(t *testing.T) {
 		t.Errorf("the rest of the stats batch was lost with the bad lines; seen: %v", sortedNames(byName))
 	}
 	batches := 0
-	for _, r := range rec.Requests() {
+	for _, r := range rec.Writes() {
 		if strings.Contains(string(r.Body), "gh_commits_week,") {
 			batches++
 		}

@@ -146,6 +146,14 @@ Under the hardened systemd unit, the directory has to be in `ReadWritePaths`.
 In a container it has to be writable by uid 65532. Both are the same mistake in
 two clothes: the process is deliberately allowed to write almost nowhere.
 
+## Nothing to migrate
+
+The file, and standard output, are a record of what was written when, in the
+shape of the release that wrote it, and
+[`-migrate`](/ghchronicle/install/upgrading/#migrations) leaves them as they
+are. Replayed into a store, a file brings back every shape it holds, and the
+store then needs the migration again.
+
 ## Where to go next
 
 - [Choosing a store](/ghchronicle/sinks/) compares the file sink with the others,

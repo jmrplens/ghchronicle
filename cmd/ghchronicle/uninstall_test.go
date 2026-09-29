@@ -10,8 +10,10 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jmrplens/ghchronicle/v2/internal/config"
+	"github.com/jmrplens/ghchronicle/v2/internal/run"
 )
 
 // teardownStub is a Grafana and an InfluxDB in one server, which is all the
@@ -36,6 +38,14 @@ func (s *teardownStub) serve(t *testing.T) string {
 			target := r.URL.Path
 			if table := r.URL.Query().Get("table"); table != "" {
 				target = "table:" + table
+				// What InfluxDB 3.11.2 answers a delete of a table it has
+				// already deleted, which it lists under this name until it
+				// purges it.
+				if strings.Contains(table, "-2026") {
+					w.WriteHeader(http.StatusConflict)
+					_, _ = io.WriteString(w, "attempted to modify resource that was already deleted")
+					return
+				}
 			}
 			s.deleted = append(s.deleted, target)
 			return
@@ -129,6 +139,78 @@ func TestWithYesItActuallyRemoves(t *testing.T) {
 	}
 	if _, err := os.Stat(strings.TrimSuffix(cfg.StateFile, ".json") + "-written.bin"); !os.IsNotExist(err) {
 		t.Error("the dedupe ledger beside the state file was left behind")
+	}
+}
+
+// TestAnUninstallRefusesWhileAnotherProcessHoldsTheStateFile: removing the
+// tables or the state files under a running service removes what it goes on
+// writing, and the lock file is among the state files; unlinked while the
+// service held it, the next -migrate -yes took a lock of its own and ran
+// beside the service. With the lock held, nothing is removed and the holder
+// is named; once it is let go, everything goes, the lock file and the
+// refill checkpoint with the rest. The lock file goes last, after the
+// uninstall has let go of its own hold: Windows removes no file a process
+// holds open, and that was the one state file an uninstall there left.
+func TestAnUninstallRefusesWhileAnotherProcessHoldsTheStateFile(t *testing.T) {
+	t.Parallel()
+	s := &teardownStub{tables: []string{"gh_repo"}}
+	cfg := teardownConfig(t, s.serve(t))
+	if err := os.WriteFile(cfg.RefillProgressFile(), []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	service, err := run.TakeLock(cfg.LockFile(), run.HeldByService, "test", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var said strings.Builder
+	err = uninstall(t.Context(), cfg, "data,state", true, &said)
+	if err == nil || !strings.Contains(err.Error(), "ghchronicle test, service") || !strings.Contains(err.Error(), "nothing was removed") {
+		t.Errorf("an uninstall beside the service = %v", err)
+	}
+	if _, statErr := os.Stat(cfg.LockFile()); statErr != nil || len(s.deleted) != 0 {
+		t.Errorf("beside the service it removed %v, and the lock file: %v", s.deleted, statErr)
+	}
+	if err = service.Release(); err != nil {
+		t.Fatal(err)
+	}
+	said.Reset()
+	if err = uninstall(t.Context(), cfg, "data,state", true, &said); err != nil {
+		t.Fatal(err)
+	}
+	for _, gone := range []string{cfg.StateFile, cfg.LockFile(), cfg.RefillProgressFile()} {
+		if _, statErr := os.Stat(gone); !os.IsNotExist(statErr) {
+			t.Errorf("%s is still there after the uninstall:\n%s", gone, said.String())
+		}
+	}
+	lines := strings.Split(strings.TrimRight(said.String(), "\n"), "\n")
+	if last := lines[len(lines)-1]; last != "  removed the state file "+cfg.LockFile() {
+		t.Errorf("the last thing removed is %q, not the lock file:\n%s", last, said.String())
+	}
+}
+
+// TestATableInfluxDBAlreadyDeletedIsNotReportedRemoved. InfluxDB 3 keeps a
+// table it deleted, renamed <name>-<instant>, for 72 hours, lists it with the
+// others and answers a delete of it with a 409, which Drop takes as the table
+// being gone. Listed, every uninstall said "removed" of a table that was still
+// there afterwards; a migration sets a table aside exactly that way. It is
+// said once as the server's to purge, and not offered.
+func TestATableInfluxDBAlreadyDeletedIsNotReportedRemoved(t *testing.T) {
+	t.Parallel()
+	s := &teardownStub{tables: []string{"gh_discussion_comment", "gh_discussion_comment-20260928T222330", "gh_repo"}}
+	cfg := teardownConfig(t, s.serve(t))
+	var said strings.Builder
+	if err := uninstall(t.Context(), cfg, targetData, true, &said); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(s.deleted, " "); got != "table:gh_discussion_comment table:gh_repo" {
+		t.Errorf("deleted %q, want the two live tables alone", got)
+	}
+	if strings.Contains(said.String(), "removed gh_discussion_comment-20260928T222330") {
+		t.Errorf("it reported removed a table the server keeps:\n%s", said.String())
+	}
+	if !strings.Contains(said.String(), "purged by the server itself") ||
+		!strings.Contains(said.String(), "gh_discussion_comment-20260928T222330") {
+		t.Errorf("it does not say whose the deleted table is to purge:\n%s", said.String())
 	}
 }
 
