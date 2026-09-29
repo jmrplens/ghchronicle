@@ -148,7 +148,9 @@ func TestWithYesItActuallyRemoves(t *testing.T) {
 // service held it, the next -migrate -yes took a lock of its own and ran
 // beside the service. With the lock held, nothing is removed and the holder
 // is named; once it is let go, everything goes, the lock file and the
-// refill checkpoint with the rest.
+// refill checkpoint with the rest. The lock file goes last, after the
+// uninstall has let go of its own hold: Windows removes no file a process
+// holds open, and that was the one state file an uninstall there left.
 func TestAnUninstallRefusesWhileAnotherProcessHoldsTheStateFile(t *testing.T) {
 	t.Parallel()
 	s := &teardownStub{tables: []string{"gh_repo"}}
@@ -179,6 +181,10 @@ func TestAnUninstallRefusesWhileAnotherProcessHoldsTheStateFile(t *testing.T) {
 		if _, statErr := os.Stat(gone); !os.IsNotExist(statErr) {
 			t.Errorf("%s is still there after the uninstall:\n%s", gone, said.String())
 		}
+	}
+	lines := strings.Split(strings.TrimRight(said.String(), "\n"), "\n")
+	if last := lines[len(lines)-1]; last != "  removed the state file "+cfg.LockFile() {
+		t.Errorf("the last thing removed is %q, not the lock file:\n%s", last, said.String())
 	}
 }
 

@@ -39,11 +39,13 @@ func uninstall(ctx context.Context, cfg *config.Config, list string, confirmed b
 	if err != nil {
 		return err
 	}
+	lock := &run.Lock{}
 	if confirmed && (wanted[targetData] || wanted[targetState]) {
-		lock, lockErr := holdForUninstall(cfg)
+		held, lockErr := holdForUninstall(cfg)
 		if lockErr != nil {
 			return lockErr
 		}
+		lock = held
 		defer func() { _ = lock.Release() }()
 	}
 	var found []removal
@@ -62,7 +64,7 @@ func uninstall(ctx context.Context, cfg *config.Config, list string, confirmed b
 		found = append(found, storeSide...)
 	}
 	if wanted[targetState] {
-		found = append(found, stateRemovals(cfg)...)
+		found = append(found, stateRemovals(cfg, lock)...)
 	}
 	return carryOut(ctx, found, confirmed, out)
 }
@@ -259,16 +261,40 @@ func dataRemovals(ctx context.Context, cfg *config.Config, out io.Writer) ([]rem
 
 // stateRemovals is what a sweep keeps between runs. All of it is rebuilt by
 // running again; what it costs to lose is one full pass over the API.
-func stateRemovals(cfg *config.Config) []removal {
+//
+// The lock file goes last, once this uninstall has let go of it. Windows
+// will not remove a file Go holds open, in the process asking as in any
+// other, so removed while held it was the one state file an uninstall there
+// never took away. Removed before the others anywhere else, it would let a
+// -migrate -yes started in between lock a new one and change the stores
+// while the rest of the state was still being removed.
+func stateRemovals(cfg *config.Config, lock *run.Lock) []removal {
 	var found []removal
+	var lockFile *removal
 	for _, path := range statePaths(cfg) {
 		if _, err := os.Stat(path); err != nil {
 			continue
 		}
-		found = append(found, removal{
+		item := removal{
 			what: "the state file " + path,
 			drop: func(_ context.Context) error { return os.Remove(path) },
-		})
+		}
+		// Compared clean: the glob that found it cleans what it returns, and
+		// on Windows turns a configured forward slash into a backslash.
+		if cfg.LockFile() != "" && filepath.Clean(path) == filepath.Clean(cfg.LockFile()) {
+			item.drop = func(_ context.Context) error {
+				// A close that fails leaves nothing held either way, and the
+				// remove says whether the file went.
+				_ = lock.Release()
+				return os.Remove(path)
+			}
+			lockFile = &item
+			continue
+		}
+		found = append(found, item)
+	}
+	if lockFile != nil {
+		found = append(found, *lockFile)
 	}
 	return found
 }
