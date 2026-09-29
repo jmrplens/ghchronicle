@@ -26,7 +26,8 @@ cmd/ghchronicle     the binary: flags, sinks, runner, the one-shot card, -setup,
 cmd/probe           development aid, runs collectors and prints line protocol, writes nothing
 internal/ghapi      REST and GraphQL client, ETag cache, per-bucket rate state, typed
                     errors, and the one retry of a REST 500, 502, 503 or 504,
-                    and of a job log's storage
+                    of a GraphQL failure that is not GitHub's timeout, and of
+                    a job log's storage
 internal/collect    one file per family of metrics, Walk (the pagination bound),
                     Refusals (the memory of 403 and 404), Movements (the gate)
 internal/sink       Point, line protocol, twelve sink types, the Unchanged wrapper
@@ -212,11 +213,18 @@ and with the same `If-None-Match`, and a `collector failed` naming one has
 already failed twice. A job log's object storage answering one of the four is
 asked again on its own, without the brake, since it spends no budget. A 4xx, a
 501 or 505, and a request that got no answer at all are never asked again. A
-collector must not add a retry of its own. A GraphQL 502 is the query being too
-large for those ten seconds (`TooLargeError`), which the same query would only
-time out on again, so the collector halves its page on the same cursor, and an
-aliased batch (`aliasBatch`) halves the batch. Do not port either remedy to the
-other.
+collector must not add a retry of its own. In GraphQL only a 502 or 504 that
+took GitHub's documented ten seconds (`ghapi.GraphQLTimeoutWindow`; all 51 in
+the production proxy's log came after 10.45 to 11.23 s) is the query being too
+large (`TooLargeError`), which the same query would only time out on again, so
+`Pulls` and the co-authored walk halve their page on the same cursor, an
+aliased batch (`aliasBatch`) halves the batch, and the other walks keep what
+they read and stop. Any other 500, 502, 503 or 504 to a query is asked once
+more like a GET, on the same page: the log's three 503s came after 0.70 to
+1.08 s, and each, read as too large, ended a commit walk as though the history
+had run out and reported success. A query that fails twice, or an answer that
+is not JSON and not that timeout, is a `StatusError`, a failure. Do not port
+either remedy to the other.
 
 **Three families read only what moved, and the gate is exact, not a guess.**
 `commits`, `issueevents` and the incremental pass of `issues` leave unread a

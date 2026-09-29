@@ -73,6 +73,10 @@ type Client struct {
 	// retryPause is how long a request waits before its one retry; see send
 	// for which answers get one.
 	retryPause time.Duration
+
+	// timeoutWindow is how long a query must have run before a 502 or a 504
+	// is read as GitHub giving up on it; see graphql.
+	timeoutWindow time.Duration
 }
 
 // RateState is the budget as GitHub last reported it.
@@ -114,12 +118,13 @@ func New(token string, timeout time.Duration) *Client {
 	// test server shutting down broke another test's request about one run in
 	// twenty.
 	return &Client{
-		http:       &http.Client{Timeout: timeout, Transport: httpx.OwnTransport()},
-		token:      token,
-		base:       defaultBase,
-		cache:      newCache(DefaultCacheBytes),
-		rates:      map[string]RateState{},
-		retryPause: DefaultRetryPause,
+		http:          &http.Client{Timeout: timeout, Transport: httpx.OwnTransport()},
+		token:         token,
+		base:          defaultBase,
+		cache:         newCache(DefaultCacheBytes),
+		rates:         map[string]RateState{},
+		retryPause:    DefaultRetryPause,
+		timeoutWindow: GraphQLTimeoutWindow,
 	}
 }
 
@@ -146,6 +151,29 @@ func (c *Client) SetRetryPause(d time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.retryPause = max(d, 0)
+}
+
+// GraphQLTimeoutWindow is how long GitHub lets a GraphQL query run before it
+// gives up on it. GitHub documents it: a query that takes more than ten
+// seconds is terminated and answered with a 502 or a 504. Measured on the
+// production proxy's log from 2026-09-11 to 2026-09-29, 66,821 queries:
+// GitHub answered 42 with a 502 after 10.45 to 11.20 seconds and 9 with a 504
+// after 11.03 to 11.23, and no other failure came that late: its three 503s
+// took 0.70 to 1.08. This client times an answer from before the query is
+// sent to when its headers arrive, which is never shorter than GitHub's own
+// count, so a 502 or a 504 that arrives before the window cannot be that
+// timeout.
+const GraphQLTimeoutWindow = 10 * time.Second
+
+// SetTimeoutWindow changes how long a query must have run before a 502 or a
+// 504 is read as GitHub's timeout, a query too large, rather than as a
+// failure to ask once more. Zero reads every 502 and 504 as the timeout,
+// which is what a test whose fake answers one at once to stand for it wants;
+// nothing in the binary changes it.
+func (c *Client) SetTimeoutWindow(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.timeoutWindow = max(d, 0)
 }
 
 // SetBaseURL points the client at a different API root: a GitHub Enterprise
@@ -533,6 +561,10 @@ func (e *UnavailableError) Error() string {
 // TooLargeError means the GraphQL gateway gave up on a query before finishing it.
 // Measured: an HTML 502 at about ten seconds, independent of the point cost.
 // The remedy is a smaller page, not a retry of the same one.
+//
+// Only a 502 or a 504 that took GitHub's timeout window to arrive is one (see
+// GraphQLTimeoutWindow). A quicker failure is not the query running out of
+// time, and graphql asks it once more instead.
 type TooLargeError struct{ Status int }
 
 func (e *TooLargeError) Error() string {
@@ -569,7 +601,10 @@ func (e *RateLimitedError) Error() string {
 //
 // A 500, 502, 503 or 504 that arrives here from a REST GET, or from the
 // object storage a job log is read from, is the second of two: send has
-// already asked once more.
+// already asked once more. So is one from a GraphQL query, other than the
+// 502 or 504 of GitHub's timeout, which is a TooLargeError; and so is a
+// query's answer that is not JSON and is not that timeout, whatever its
+// status, since it is no GraphQL answer.
 type StatusError struct {
 	// Path is the request, relative to the REST base.
 	Path string
@@ -765,10 +800,7 @@ func replayable(raw []byte, out any) []byte {
 // same page answered in 0.6 seconds: one sample, not a rate, and it is asked
 // again all the same, because it is the same slow listing giving up one layer
 // further in, and a retry that fails costs a core request and eight seconds,
-// as a 502's costs one and ten. No REST request answered 503 in that log; the
-// three GraphQL queries that did were answered in about a second, and the same
-// query was answered on its next attempt each time, 1.0, 1.8 and 17.9 seconds
-// later.
+// as a 502's costs one and ten. No REST request answered 503 in that log.
 //
 // Once, because each attempt can hold the family for ten seconds, and a
 // request that fails twice is left to the next sweep as it was before. The
@@ -793,32 +825,42 @@ func replayable(raw []byte, out any) []byte {
 // is the same answer asked again, and a spent budget is waited out by the
 // brake, not here.
 //
-// GraphQL does not come through here. Its gateway error is a query too large
-// for ten seconds (TooLargeError), which the same query asked again would only
-// time out on again, so the collectors ask again on the same cursor with a
-// smaller page instead. Both keep what the walk already read and ask again
-// from where it stopped; each asks the way its own failure can be fixed.
+// A GraphQL query is asked again by the same retry, with one answer left out:
+// GitHub's timeout, a query too large for ten seconds (TooLargeError), which
+// the same query asked again would only time out on again, so the collectors
+// ask again on the same cursor with a smaller page instead; see graphql. Both
+// keep what the walk already read and ask again from where it stopped; each
+// asks the way its own failure can be fixed.
 func (c *Client) send(ctx context.Context, path string, req *http.Request, do func(*http.Request) (*http.Response, error)) (*http.Response, error) {
-	return c.sendTwice(ctx, path, req, do, true)
+	resp, _, err := c.sendTwice(ctx, path, req, do, true, restAgain)
+	return resp, err
 }
+
+// restAgain is REST's rule for what send asks once more: the four statuses,
+// however long they took.
+func restAgain(code int, _ time.Duration) bool { return askedAgain(code) }
 
 // fromStorage is send for a request to the object storage a job log
 // redirects to. The same answers are asked again, after the same pause, but
 // not through the brake: storage is not GitHub's API and spends no budget.
 func (c *Client) fromStorage(ctx context.Context, path string, req *http.Request, do func(*http.Request) (*http.Response, error)) (*http.Response, error) {
-	return c.sendTwice(ctx, path, req, do, false)
+	resp, _, err := c.sendTwice(ctx, path, req, do, false, restAgain)
+	return resp, err
 }
 
 // sendTwice is send, with charged saying whether the request spends the
-// budget, and so whether the brake is asked before the retry.
-func (c *Client) sendTwice(ctx context.Context, path string, req *http.Request, do func(*http.Request) (*http.Response, error), charged bool) (*http.Response, error) {
-	resp, err := do(req)
+// budget, and so whether the brake is asked before the retry, and again
+// saying which answers are asked for once more, by their status and by how
+// long they took to arrive. It returns how long the answer it hands back
+// took, which is what graphql reads GitHub's timeout from.
+func (c *Client) sendTwice(ctx context.Context, path string, req *http.Request, do func(*http.Request) (*http.Response, error), charged bool, again func(code int, took time.Duration) bool) (*http.Response, time.Duration, error) {
+	resp, took, err := timed(do, req)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	c.readRate(resp)
-	if !askedAgain(resp.StatusCode) {
-		return resp, nil
+	if !again(resp.StatusCode, took) {
+		return resp, took, nil
 	}
 	first := &StatusError{Path: path, Code: resp.StatusCode, Status: resp.Status}
 	// Drained so the connection goes back to the pool for the retry rather
@@ -833,20 +875,36 @@ func (c *Client) sendTwice(ctx context.Context, path string, req *http.Request, 
 	case <-ctx.Done():
 		// Both, because each answers a different caller: the status is what
 		// GitHub said, and the cancellation is why nobody asked again.
-		return nil, fmt.Errorf("%w, and was not asked again: %w", first, ctx.Err())
+		return nil, 0, fmt.Errorf("%w, and was not asked again: %w", first, ctx.Err())
 	case <-time.After(pause):
 	}
 	if charged {
 		if stopped := c.brake(ctx, path); stopped != nil {
-			return nil, stopped
+			return nil, 0, stopped
 		}
 	}
-	resp, err = do(req.Clone(ctx))
+	retry := req.Clone(ctx)
+	if req.GetBody != nil {
+		// A query is a POST, and the first attempt read its body to the end.
+		// A GET's body is http.NoBody, which has nothing to read again.
+		if retry.Body, err = req.GetBody(); err != nil {
+			return nil, 0, err
+		}
+	}
+	resp, took, err = timed(do, retry)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	c.readRate(resp)
-	return resp, nil
+	return resp, took, nil
+}
+
+// timed makes one request and says how long its answer took to arrive: until
+// the status and the headers, which is when a gateway that gave up says so.
+func timed(do func(*http.Request) (*http.Response, error), req *http.Request) (*http.Response, time.Duration, error) {
+	start := time.Now()
+	resp, err := do(req)
+	return resp, time.Since(start), err
 }
 
 // askedAgain reports whether an answer is one of the four send asks once
@@ -1094,12 +1152,22 @@ func (c *Client) graphql(ctx context.Context, query string, vars map[string]any,
 	req.Header.Set(userAgentHeader, userAgent)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.http.Do(req)
+	// A failure that is not GitHub's timeout is asked once more, as send asks
+	// a REST GET, on the same page, because it is not a query too large, and
+	// a walk that reads it as one loses what it has not read yet. On the
+	// production proxy's log from 2026-09-11 to 2026-09-29 GitHub answered
+	// three queries with a 503, after 0.70 to 1.08 seconds where its timeout
+	// takes more than ten, each a page of a commit history 28 to 2,488 pages
+	// into a walk, and each moved the budget's used count by one. Read as too
+	// large, each ended its repository's walk there, since the commit walk
+	// takes that as the end of what can be read, and the walk reported
+	// success; the next query, the next repository's first page, was
+	// answered. A walk that halves its page would have halved it for nothing.
+	resp, took, err := c.sendTwice(ctx, graphqlPath, req, c.http.Do, charged, c.queryAgain)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	c.readRate(resp)
 
 	var envelope struct {
 		Data   json.RawMessage `json:"data"`
@@ -1109,10 +1177,20 @@ func (c *Client) graphql(ctx context.Context, query string, vars map[string]any,
 		} `json:"errors"`
 	}
 	if resp.StatusCode >= 500 || !strings.Contains(resp.Header.Get("Content-Type"), "json") {
-		// The gateway answers a query it cannot finish in about ten seconds
-		// with an HTML 502, whatever the point cost. That is a request too
-		// large, not a server down, and the caller should shrink it.
-		return &TooLargeError{Status: resp.StatusCode}
+		// The gateway answers a query it cannot finish in ten seconds with
+		// an HTML 502 or a 504, whatever the point cost. That is a request
+		// too large, not a server down, and the caller should shrink it.
+		if c.timedOut(resp.StatusCode, took) {
+			return &TooLargeError{Status: resp.StatusCode}
+		}
+		// Anything else here has been asked twice, or is an answer asking
+		// again would not change, and is not a GraphQL answer either. It is
+		// a failure the collector reports, not the end of what it can read.
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return &StatusError{
+			Path: graphqlPath, Code: resp.StatusCode, Status: resp.Status,
+			Body: string(bytes.TrimSpace(b)),
+		}
 	}
 	if err = json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
 		return fmt.Errorf("graphql: %w", err)
@@ -1141,6 +1219,21 @@ func (c *Client) graphql(ctx context.Context, query string, vars map[string]any,
 		return fmt.Errorf("graphql: %s: no data in the response", resp.Status)
 	}
 	return json.Unmarshal(envelope.Data, out)
+}
+
+// timedOut reports whether a query's answer is GitHub's timeout: a 502 or a
+// 504 that took the timeout window to arrive (see GraphQLTimeoutWindow).
+func (c *Client) timedOut(code int, took time.Duration) bool {
+	c.mu.Lock()
+	window := c.timeoutWindow
+	c.mu.Unlock()
+	return (code == http.StatusBadGateway || code == http.StatusGatewayTimeout) && took >= window
+}
+
+// queryAgain is GraphQL's rule for what sendTwice asks once more: REST's four
+// statuses, less GitHub's timeout, which the same query would meet again.
+func (c *Client) queryAgain(code int, took time.Duration) bool {
+	return askedAgain(code) && !c.timedOut(code, took)
 }
 
 // rateLimited reports a spent budget, or nil when the refusal was about

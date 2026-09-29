@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"testing"
@@ -290,28 +291,173 @@ func TestGetTextAsksAGatewayErrorOnceMore(t *testing.T) {
 	}
 }
 
-// TestGraphQLIsNotAskedAgainByTheClient: a query is a POST, and the
-// gateway's 502 on one is a query too large, which the collectors ask again
-// with a smaller page. Asking the same one again here would be ten more
-// seconds for the same answer.
-func TestGraphQLIsNotAskedAgainByTheClient(t *testing.T) {
+// failingQueries answers the first n queries with status after taking took,
+// as HTML the way the gateway does, and every later one with a login. It
+// keeps the body of every query it was asked, in order.
+func failingQueries(t *testing.T, n, status int, took time.Duration) (*Client, func() []string) {
+	t.Helper()
+	var mu sync.Mutex
+	var bodies []string
+	c, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		bodies = append(bodies, string(b))
+		asked := len(bodies)
+		mu.Unlock()
+		if asked <= n {
+			time.Sleep(took)
+			w.Header().Set("Content-Type", "text/html")
+			w.WriteHeader(status)
+			_, _ = w.Write([]byte("<html>" + strconv.Itoa(status) + "</html>"))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"viewer":{"login":"octocat"}}}`))
+	})
+	return c, func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]string(nil), bodies...)
+	}
+}
+
+// aPage is a query with a cursor and a page size, the shape of every walk a
+// quick failure used to cut short or shrink.
+var aPage = map[string]any{"owner": "o", "name": "n", "first": 50, "after": "5044a832 124399"}
+
+// TestAQuickGraphQLFailureIsAskedOnceMoreOnTheSamePage is the three 503s of
+// the production proxy's log, 2026-09-13 and 2026-09-18: each came back in
+// under a second and a half, was read as a query too large, and ended the
+// commit walk it was part of as though the history had run out, where
+// GitHub's timeout takes ten seconds. A failure that did not take that long
+// is asked again after the pause, with the same query and the same page, as
+// a REST GET is. A 502 or a 504 that quick is not the timeout either.
+func TestAQuickGraphQLFailureIsAskedOnceMoreOnTheSamePage(t *testing.T) {
 	t.Parallel()
 	for _, status := range askedAgainStatuses {
 		t.Run(strconv.Itoa(status), func(t *testing.T) {
 			t.Parallel()
-			var calls atomic.Int32
-			c, _ := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
-				calls.Add(1)
-				w.Header().Set("Content-Type", "text/html")
-				w.WriteHeader(status)
-			})
-			if _, ok := errors.AsType[*TooLargeError](c.GraphQL(context.Background(), "{}", nil, nil)); !ok {
-				t.Errorf("a %d on a query is no longer a TooLargeError", status)
+			c, asked := failingQueries(t, 1, status, 0)
+			var out struct {
+				Viewer struct {
+					Login string `json:"login"`
+				} `json:"viewer"`
 			}
-			if n := calls.Load(); n != 1 {
+			if err := c.GraphQL(context.Background(), "query { viewer { login } }", aPage, &out); err != nil {
+				t.Fatalf("a quick %d followed by an answer failed the query: %v", status, err)
+			}
+			if out.Viewer.Login != "octocat" {
+				t.Errorf("decoded %+v, want the retry's answer", out)
+			}
+			bodies := asked()
+			if len(bodies) != 2 {
+				t.Fatalf("the server saw %d queries, want the failed one and one more", len(bodies))
+			}
+			if bodies[1] != bodies[0] {
+				t.Errorf("the retry asked %s, want the same query and page as %s", bodies[1], bodies[0])
+			}
+		})
+	}
+}
+
+// TestASlow502Or504IsGitHubsTimeout: GitHub documents its timeout as a 502
+// or a 504 once a query has run for ten seconds, and the 51 in the production
+// proxy's log came after 10.45 to 11.23. That is a query too large, which the
+// same query would meet again, so it is not asked again: the collectors ask
+// for a smaller page. The window is shortened here so the fake takes it for
+// real rather than the test waiting ten seconds.
+func TestASlow502Or504IsGitHubsTimeout(t *testing.T) {
+	t.Parallel()
+	for _, status := range []int{http.StatusBadGateway, http.StatusGatewayTimeout} {
+		t.Run(strconv.Itoa(status), func(t *testing.T) {
+			t.Parallel()
+			c, asked := failingQueries(t, 1, status, 40*time.Millisecond)
+			c.SetTimeoutWindow(20 * time.Millisecond)
+			err := c.GraphQL(context.Background(), "{}", aPage, nil)
+			if tl, ok := errors.AsType[*TooLargeError](err); !ok || tl.Status != status {
+				t.Errorf("err = %v, want a query too large carrying the %d", err, status)
+			}
+			if n := len(asked()); n != 1 {
 				t.Errorf("the server saw %d queries, want one", n)
 			}
 		})
+	}
+	if New("", 0).timeoutWindow != GraphQLTimeoutWindow {
+		t.Error("a new client does not wait GitHub's ten seconds before reading the timeout")
+	}
+}
+
+// TestAGraphQLFailureThatIsNotTheTimeoutIsAFailure: once, not until it works,
+// and a second failure is handed up as the status it is. As a query too large
+// it would be read by the commit walk, and by every other walk that stops at
+// one, as the end of what can be read, and reported as success. A 500 or a
+// 503 is not what GitHub documents its timeout as, however long it took.
+func TestAGraphQLFailureThatIsNotTheTimeoutIsAFailure(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name   string
+		status int
+		window time.Duration
+	}{
+		{"a quick 500", http.StatusInternalServerError, GraphQLTimeoutWindow},
+		{"a quick 502", http.StatusBadGateway, GraphQLTimeoutWindow},
+		{"a quick 503", http.StatusServiceUnavailable, GraphQLTimeoutWindow},
+		{"a quick 504", http.StatusGatewayTimeout, GraphQLTimeoutWindow},
+		{"a 500 past the window", http.StatusInternalServerError, 0},
+		{"a 503 past the window", http.StatusServiceUnavailable, 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			c, asked := failingQueries(t, 2, tc.status, 0)
+			c.SetTimeoutWindow(tc.window)
+			err := c.GraphQL(context.Background(), "{}", aPage, nil)
+			if _, tooLarge := errors.AsType[*TooLargeError](err); tooLarge {
+				t.Errorf("err = %v, read as a query too large", err)
+			}
+			se, ok := errors.AsType[*StatusError](err)
+			if !ok || se.Code != tc.status || se.Path != "/graphql" || !strings.Contains(se.Body, strconv.Itoa(tc.status)) {
+				t.Errorf("err = %v, want the second %d as a StatusError on /graphql with its body", err, tc.status)
+			}
+			if n := len(asked()); n != 2 {
+				t.Errorf("the server saw %d queries, want exactly two", n)
+			}
+		})
+	}
+}
+
+// TestTheGraphQLRetryIsBraked: each of the three 503s moved the budget's used
+// count by one, so asking again spends a point, and a budget the failure left
+// at the reserve is not spent on it. The budget query is the exception, as it
+// is on its first attempt: it is free, and it has to be able to say how
+// little is left.
+func TestTheGraphQLRetryIsBraked(t *testing.T) {
+	t.Parallel()
+	var calls atomic.Int32
+	reset := time.Now().Add(time.Hour).Truncate(time.Second)
+	c, _ := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		// The query's one attempt and the budget query's first.
+		if calls.Add(1) <= 2 {
+			rateHeaders(w, "graphql", 5000, 10, reset)
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		budgetAnswer(w, 1, 4990, reset)
+	})
+	c.SetReserve(500, false)
+	err := c.GraphQL(context.Background(), "{ viewer { login } }", nil, nil)
+	if limited, ok := errors.AsType[*RateLimitedError](err); !ok || limited.Resource != "graphql" {
+		t.Errorf("err = %v, want the brake's refusal of the retry", err)
+	}
+	if n := calls.Load(); n != 1 {
+		t.Errorf("the server saw %d queries, want only the one that spent the budget", n)
+	}
+	st, err := c.GraphQLRate(context.Background())
+	if err != nil || st.Remaining != 10 {
+		t.Errorf("the budget query = %+v, %v; want it asked again past the reserve", st, err)
+	}
+	if n := calls.Load(); n != 3 {
+		t.Errorf("the server saw %d queries, want the budget query's two as well", n)
 	}
 }
 

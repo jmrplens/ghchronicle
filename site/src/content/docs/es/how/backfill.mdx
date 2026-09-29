@@ -365,7 +365,12 @@ requests con sus revisiones en una consulta responde un **502 en HTML** al cabo
 de unos diez segundos. El recorrido de pull requests parte su página por la
 mitad y reintenta sobre el mismo cursor, en silencio: el colector de pull
 requests no lleva registrador, así que un relleno de un repositorio activo lo
-muestra solo como una familia más lenta, nunca como una línea.
+muestra solo como una familia más lenta, nunca como una línea. Solo esa
+respuesta parte la página: un `503`, o un `502` que vuelve antes de diez
+segundos, no es una consulta con la que a la pasarela se le acabó el tiempo, y
+[el cliente la vuelve a preguntar una vez
+más](/ghchronicle/es/api/#una-respuesta-que-github-no-pudo-terminar-se-pregunta-una-vez-más)
+con el mismo tamaño.
 
 <Aside type="caution" title="Tres cosas no se pueden rellenar a ningún precio">
 Ninguna espera cambia esto, y son la razón de que el proyecto exista.

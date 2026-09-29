@@ -59,6 +59,11 @@ func newFixtureServer(t *testing.T) *fixtureServer {
 	// A route that answers 502 here does it on purpose, every time, so the
 	// client's one retry of it is asked at once rather than after a pause.
 	f.Client.SetRetryPause(0)
+	// And a query answered 502 or 504 here stands for GitHub's timeout,
+	// which takes ten seconds to arrive and this server answers at once, so
+	// the client reads it as the timeout whatever the time. A 500 and a 503
+	// are never the timeout, and the client still asks them once more.
+	f.Client.SetTimeoutWindow(0)
 	return f
 }
 

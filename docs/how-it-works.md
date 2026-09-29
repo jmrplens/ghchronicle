@@ -722,7 +722,11 @@ hundred pull requests with their reviews in one query answers an **HTML 502**
 after about ten seconds. The pull request walk halves its page size and retries
 on the same cursor, silently: the pull request collector carries no logger, so
 a backfill of a busy repository shows this only as a slower family, never as a
-line.
+line. Only that answer is halved for: a `503`, or a `502` that comes back
+sooner than ten seconds, is not a query the gateway ran out of time on, and
+[the client asks it once
+more](https://jmrp.io/docs/ghchronicle/api/#an-answer-github-could-not-finish-is-asked-once-more)
+at the same size.
 
 > **Three things cannot be backfilled at any price**
 >
