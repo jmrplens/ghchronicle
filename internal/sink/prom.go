@@ -3,6 +3,7 @@ package sink
 import (
 	"context"
 	"fmt"
+	"math"
 	"net/http"
 	"sort"
 	"strings"
@@ -221,4 +222,46 @@ func numeric(v any) (float64, bool) {
 		return 0, true
 	}
 	return 0, false
+}
+
+// Int64Field reads what numeric reads, as a whole number, for a value kept as
+// a count rather than published as a gauge. An int64 stays an int64 instead
+// of passing through a float64, which holds integers exactly only up to 2^53.
+// A float is truncated, since a count written as 3.0 is 3. A float no int64
+// holds (NaN, an infinity, a magnitude of 2^63 or more) is refused, not
+// converted: Go leaves that conversion to the platform, and amd64 answers the
+// most negative int64, which a card would draw as a star count and a running
+// total would add.
+func Int64Field(v any) (int64, bool) {
+	switch n := v.(type) {
+	case int:
+		return int64(n), true
+	case int64:
+		return n, true
+	case float64:
+		// -2^63 and 2^63 are both exact in a float64; the first is the
+		// smallest int64 and the second is one past the largest.
+		if math.IsNaN(n) || n < -(1<<63) || n >= 1<<63 {
+			return 0, false
+		}
+		return int64(n), true
+	case bool:
+		if n {
+			return 1, true
+		}
+		return 0, true
+	}
+	return 0, false
+}
+
+// IntField is Int64Field for a count kept in an int. An int is as wide as an
+// int64 on every platform ghchronicle is released for, but Go lets it be 32
+// bits, so the bound is checked rather than assumed, and a value the int
+// cannot hold is refused as well.
+func IntField(v any) (int, bool) {
+	n, ok := Int64Field(v)
+	if !ok || n < math.MinInt || n > math.MaxInt {
+		return 0, false
+	}
+	return int(n), true
 }

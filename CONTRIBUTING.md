@@ -159,6 +159,11 @@ stores fold into other folds in each other store or says it does not
 `ORDER BY` names what tells two of its rows apart after the column it sorts
 by, the item's own identity where the rows are items, since InfluxDB and
 PostgreSQL break a tie each its own way (`TestEverySQLListOrdersItsRowsCompletely`).
+The PostgreSQL translation compares every text key by its bytes, as InfluxDB
+does, and types each key from its name: a panel that sorts by a field it
+cannot type, or takes the least or the greatest of one, stops
+`go run ./cmd/gen_dashboards` until the field is named in `textFields` or
+`numberFields` (`internal/dashboards/collate.go`).
 
 **A cadence change** means a measured reason in `config.defaultEvery`, the
 cadence table in both languages, `make config-options` then

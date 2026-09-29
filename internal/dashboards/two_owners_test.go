@@ -360,7 +360,7 @@ var (
 // short name with no full name beside it. repoNameSQL, which reads the short
 // name only to tell whether two full names share it, is set aside first.
 func sqlShortNameKeys(sql string) []string {
-	s := blankQuoted(strings.ReplaceAll(sql, repoNameSQL, "name"))
+	s := blankQuoted(strings.ReplaceAll(withoutCollation(sql), repoNameSQL, "name"))
 	var out []string
 	for _, level := range sqlLevels(s) {
 		for _, part := range sqlUnion.Split(level, -1) {

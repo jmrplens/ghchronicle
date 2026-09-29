@@ -22,6 +22,24 @@ const (
 	overviewNoTraffic      = "no traffic"
 )
 
+// alwaysARow is a statement of the newest row of a snapshot that answers one
+// row over any range: the newest row joined to a row that is always there, so
+// a range no sweep reached reads a null in every column, which each tile draws
+// as the words its panel gives a value that is not there.
+//
+// The newest row alone answers such a range with no row, and InfluxDB answers
+// no row with no frame and PostgreSQL with a frame with no fields, so a stat
+// had nothing to draw a tile from and the group read "No data" where the
+// groups beside it said what the range lacked (the 2.6.3 review: "Community",
+// "Account", "Since the account began", "Sponsorship" and the repository count,
+// over a range four hundred days back, in all five stores). Measured with
+// InfluxDB 3.11.2 and PostgreSQL 18.6 through Grafana 13.2.1: the join answers
+// one row of typed nulls there, and the newest row's own values over a range
+// that holds one.
+func alwaysARow(newest string) string {
+	return "SELECT newest.* FROM (SELECT 1 AS one) AS always LEFT JOIN (" + newest + ") AS newest ON true"
+}
+
 // ── Overview ────────────────────────────────────────────────────────────────
 
 // A stat panel of several numbers. On a desktop Grafana lays the values out
@@ -64,6 +82,20 @@ func promAggregated(ref, name, expr string) Target {
 	return promNamed(ref, name, "("+expr+") or vector(NaN)")
 }
 
+// promNewest is a gauge of one of the account's snapshots, which the SQL
+// stores read as the newest row of the range, as promAggregated reads a
+// value: NaN, drawn as the words its panel gives a value that is not there,
+// where the query finds no series, as over a range Prometheus holds nothing
+// in. The selector alone answered such a range with nothing, and the group
+// read "No data" (the 2.6.3 review). The aggregation is there for `or` to
+// stand beside, and it is the largest rather than the sum because every
+// series of such a gauge is a reading of the one account the collector
+// sweeps, so two of them at once would be one number twice rather than two
+// numbers to add.
+func promNewest(ref, name, gauge string) Target {
+	return promAggregated(ref, name, "max("+gauge+")")
+}
+
 // promShare is a percentage of two sums, as the SQL stores take it: a part
 // of nothing is 0 of the whole, and a whole of nothing is no share.
 //
@@ -98,21 +130,21 @@ func grNamed(ref, name, expr string) Target {
 }
 
 // grNewest is one Graphite series of a snapshot the SQL stores read as the
-// newest row of the range, and no series at all where the range holds no
-// reading of it, as the SQL stores then have no row.
+// newest row of the range: its last value, and no value where the range holds
+// no reading of it, as the SQL stores read a null there (see alwaysARow).
 //
 // Graphite answers a path it holds with a series whatever the range, and over
 // a range no sweep reached that series is nulls from end to end, which
-// keepLastValue has nothing to carry into. A stat group whose every value was
-// such a series drew a panel with nothing in it, not even the names, since
-// Grafana sizes a tile's text by its value (the 2.6.2 review, "Community",
-// "Account" and "Since the account began" over a range four hundred days
-// back, against graphiteapp/graphite-statsd:1.1.10-5); the other stores
-// answer no row there and the panel reads "No data". Dropped, the series is
-// not there either, and Graphite reads the same. It takes no grNothing: a
-// value the SQL stores have no row for is not a tile to draw without a value.
+// keepLastValue has nothing to carry into; a path it has never held it
+// answers with no series, which grNamed's fallback stands in for. Either way
+// the tile reads the words its panel gives a value that is not there. Without
+// those words a group whose every value was such a series drew a panel with
+// nothing in it, not even the names, since Grafana sizes a tile's text by its
+// value (the 2.6.2 review, "Community", "Account" and "Since the account
+// began" over a range four hundred days back, against
+// graphiteapp/graphite-statsd:1.1.10-5).
 func grNewest(ref, name, series string) Target {
-	return grq(fmt.Sprintf("alias(removeEmptySeries(keepLastValue(%s)), %q)", series, name), ref)
+	return grNamed(ref, name, fmt.Sprintf("keepLastValue(%s)", series))
 }
 
 // grNothing is a series with no value at all: constantLine draws its three
@@ -133,21 +165,23 @@ func frameName(ref, name string) any {
 // fieldGroup is a group of fields of one account-wide snapshot as one stat
 // panel: one SQL statement with a column per field, one Prometheus query per
 // field on the exporter's gauge of it, one Graphite alias per field, and one
-// Elasticsearch top_metrics over them all, whose columns are renamed the way
-// esTbl names them. The newest row is the value: the measurement is rewritten
-// every sweep and a range is never summed.
+// Elasticsearch top_metrics over them all, whose series are renamed the way
+// esNewest names them. The newest row is the value: the measurement is
+// rewritten every sweep and a range is never summed. Every value reads
+// notRead over a range no sweep reached.
 func fieldGroup(b *builder, m, title string, at box, fields []named, p *P) Panel {
 	cols := make([]string, len(fields))
 	for i, f := range fields {
 		cols[i] = fmt.Sprintf("%s AS %q", f.From, f.To)
-		p.Prom = append(p.Prom, promNamed(ref(i), f.To, "github_"+strings.TrimPrefix(m, "gh_")+"_"+f.From))
+		p.Prom = append(p.Prom, promNewest(ref(i), f.To, "github_"+strings.TrimPrefix(m, "gh_")+"_"+f.From))
 		p.GR = append(p.GR, grNewest(ref(i), f.To, gp(m, f.From)))
+		p.Overrides = append(p.Overrides, noValueOf(f.To, notRead))
 	}
-	p.ES, p.ESTF = esTbl(m, []any{b.one()}, []any{b.mNewest(fieldsOf(fields)...)}, fields, nil)
-	return statGroup(title, at, []Target{sqlT(fmt.Sprintf(
+	p.ES, p.ESTF = b.esNewest(m, fields)
+	return statGroup(title, at, []Target{sqlT(alwaysARow(fmt.Sprintf(
 		"SELECT %s FROM %s WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 1",
 		strings.Join(cols, ", "), m,
-	))}, p)
+	)))}, p)
 }
 
 func fieldsOf(fields []named) []string {
@@ -246,36 +280,38 @@ func overview(b *builder) []Panel {
 			named(rp("gh_repo", field, "archived", "false"), "gh_repo"),
 			named(grCollected(rp(rt, field, "archived", "true")), rt))
 	}
+	// The repository count is read in a bucket that has to hold a document,
+	// not the way esNewest reads the other snapshots: this panel adds its
+	// values up, for the stars and the forks, and Grafana adds up a value
+	// that is not there as 0, so over a range no sweep reached the count
+	// would read 0 repositories rather than leave its group with them.
 	countES, countEStf := esTbl("gh_account", []any{b.one()}, []any{b.mNewest("public_repos")},
 		[]named{{"public_repos", "Repositories"}}, nil)
 	reposES[0].Ref = "B"
 	// The Account group reads two measurements, so two queries; each organize
-	// renames the columns of the frame that has them and leaves the other's
+	// renames the series of the query that has them and leaves the other's
 	// alone.
-	contribES, contribEStf := esTbl("gh_contributions_total", []any{b.one()},
-		[]any{b.mNewest("calendar_total")}, []named{{"calendar_total", "Contributions"}}, nil)
-	acctES, acctEStf := esTbl("gh_account", []any{b.one()},
-		[]any{b.mNewest("account_age_days", "watching", "starred", "gists", "packages")},
-		[]named{
-			{"account_age_days", overviewAccountAge},
-			{"watching", "Watching"},
-			{"starred", overviewStarsGiven},
-			{"gists", "Gists"},
-			{"packages", "Packages"},
-		}, nil)
+	contribES, contribEStf := b.esNewest("gh_contributions_total", []named{{"calendar_total", "Contributions"}})
+	acctES, acctEStf := b.esNewest("gh_account", []named{
+		{"account_age_days", overviewAccountAge},
+		{"watching", "Watching"},
+		{"starred", overviewStarsGiven},
+		{"gists", "Gists"},
+		{"packages", "Packages"},
+	})
 	acctES[0].Ref = "B"
 
 	return []Panel{
 		brandPanel(),
 		statGroup("Repositories", box{W: 8, H: 4, X: 0, Y: brandHeight}, []Target{
-			sqlT(`SELECT public_repos AS "Repositories" FROM gh_account` +
-				overviewNewestRow),
+			sqlT(alwaysARow(`SELECT public_repos AS "Repositories" FROM gh_account` +
+				overviewNewestRow)),
 			{Kind: "sql", Format: "table", Ref: "B", SQL: `SELECT SUM(stars) AS "Stars",` +
 				` SUM(forks) AS "Forks" FROM (` +
 				liveOrArchived([]string{"stars", "forks"}) + ")"},
 		}, &P{
 			Prom: []Target{
-				promNamed("A", "Repositories", "github_account_public_repos"),
+				promNewest("A", "Repositories", "github_account_public_repos"),
 				promAggregated("B", "Stars", oneEach("stars")),
 				promAggregated("C", "Forks", oneEach("forks")),
 			},
@@ -308,8 +344,12 @@ func overview(b *builder) []Panel {
 			ES:     append(countES, reposES...), ESTF: append(countEStf, reposEStf...),
 			ESOpts: Opts{"calc": "sum"},
 			ESDesc: esArchivedWindow + " " + esLeftOut("a star or a fork count",
-				esNewestAddedUp("repository")),
-			Overrides: []any{noValueOf("Stars", notRead), noValueOf("Forks", notRead)},
+				esNewestAddedUp("repository")) + " Over a range no sweep reached, the " +
+				"repository count leaves the group with them: the panel adds its values up, for " +
+				"the stars and the forks, and would read a count that is not there as 0.",
+			Overrides: []any{
+				noValueOf("Repositories", notRead), noValueOf("Stars", notRead), noValueOf("Forks", notRead),
+			},
 		}),
 		statGroup("Traffic in range", box{W: 8, H: 4, X: 8, Y: brandHeight}, []Target{sqlT(
 			"SELECT " + trafficSQL("views", "count") + ` AS "Views", ` +
@@ -356,20 +396,20 @@ func overview(b *builder) []Panel {
 				"smaller. Then who sponsors the account and whom it sponsors.",
 		}),
 		statGroup("Account", box{W: 24, H: 5, X: 0, Y: brandHeight + 4}, []Target{
-			sqlT(`SELECT calendar_total AS "Contributions" FROM gh_contributions_total` +
-				overviewNewestRow),
-			{Kind: "sql", Format: "table", Ref: "B", SQL: `SELECT account_age_days AS "Account age",` +
+			sqlT(alwaysARow(`SELECT calendar_total AS "Contributions" FROM gh_contributions_total` +
+				overviewNewestRow)),
+			{Kind: "sql", Format: "table", Ref: "B", SQL: alwaysARow(`SELECT account_age_days AS "Account age",` +
 				` watching AS "Watching", starred AS "Stars given", gists AS "Gists",` +
 				` packages AS "Packages" FROM gh_account` +
-				overviewNewestRow},
+				overviewNewestRow)},
 		}, &P{
 			Prom: []Target{
-				promNamed("A", "Contributions", "github_contributions_total_calendar_total"),
-				promNamed("B", overviewAccountAge, "github_account_account_age_days"),
-				promNamed("C", "Watching", "github_account_watching"),
-				promNamed("D", overviewStarsGiven, "github_account_starred"),
-				promNamed("E", "Gists", "github_account_gists"),
-				promNamed("F", "Packages", "github_account_packages"),
+				promNewest("A", "Contributions", "github_contributions_total_calendar_total"),
+				promNewest("B", overviewAccountAge, "github_account_account_age_days"),
+				promNewest("C", "Watching", "github_account_watching"),
+				promNewest("D", overviewStarsGiven, "github_account_starred"),
+				promNewest("E", "Gists", "github_account_gists"),
+				promNewest("F", "Packages", "github_account_packages"),
 			},
 			Desc: "Contributions in the last year, the number behind the green squares on " +
 				"the profile; the days since the account was created; what it watches, " +
@@ -386,7 +426,12 @@ func overview(b *builder) []Panel {
 				grNewest("F", "Packages", gp("gh_account", "packages")),
 			},
 			ES: append(contribES, acctES...), ESTF: append(contribEStf, acctEStf...),
-			Overrides: []any{unitOf(overviewAccountAge, "d", 0)},
+			Overrides: []any{
+				unitOf(overviewAccountAge, "d", 0), noValueOf("Contributions", notRead),
+				noValueOf(overviewAccountAge, notRead), noValueOf("Watching", notRead),
+				noValueOf(overviewStarsGiven, notRead), noValueOf("Gists", notRead),
+				noValueOf("Packages", notRead),
+			},
 		}),
 	}
 }

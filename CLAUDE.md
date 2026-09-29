@@ -25,7 +25,8 @@ collected while it is there, it is gone.
 cmd/ghchronicle     the binary: flags, sinks, runner, the one-shot card, -setup, -uninstall
 cmd/probe           development aid, runs collectors and prints line protocol, writes nothing
 internal/ghapi      REST and GraphQL client, ETag cache, per-bucket rate state, typed
-                    errors, and the one retry of a REST 502 or 504
+                    errors, and the one retry of a REST 500, 502, 503 or 504,
+                    and of a job log's storage
 internal/collect    one file per family of metrics, Walk (the pagination bound),
                     Refusals (the memory of 403 and 404), Movements (the gate)
 internal/sink       Point, line protocol, twelve sink types, the Unchanged wrapper
@@ -204,12 +205,18 @@ Enterprise Server, leaves it unset too.
 
 **A gateway error means one thing in REST and another in GraphQL.** A REST 502
 or 504 is the gateway giving up after about ten seconds, intermittently and
-whatever the page size, so `ghapi` asks a GET once more two seconds later and
-a `collector failed` naming one has already failed twice. A collector must not
-add a retry of its own. A GraphQL 502 is the query being too large for those
-ten seconds (`TooLargeError`), which the same query would only time out on
-again, so the collector halves its page on the same cursor, and an aliased
-batch (`aliasBatch`) halves the batch. Do not port either remedy to the other.
+whatever the page size, a 500 the application giving up on the same slow
+listing a step further in, and a 503 a server that could not take the request
+just then, so `ghapi` asks a GET once more two seconds later, through the brake
+and with the same `If-None-Match`, and a `collector failed` naming one has
+already failed twice. A job log's object storage answering one of the four is
+asked again on its own, without the brake, since it spends no budget. A 4xx, a
+501 or 505, and a request that got no answer at all are never asked again. A
+collector must not add a retry of its own. A GraphQL 502 is the query being too
+large for those ten seconds (`TooLargeError`), which the same query would only
+time out on again, so the collector halves its page on the same cursor, and an
+aliased batch (`aliasBatch`) halves the batch. Do not port either remedy to the
+other.
 
 **Three families read only what moved, and the gate is exact, not a guess.**
 `commits`, `issueevents` and the incremental pass of `issues` leave unread a
@@ -386,9 +393,13 @@ Verified, so nobody spends an afternoon on it again:
   of its 39 other repositories (2026-09-27), with no ETag, so it is charged
   every time. It is remembered as a refusal for a day.
 - The REST gateway's 502 or 504 is not the page size: `per_page=1` took as
-  long as `per_page=100`. It is rare, 36 of 397,455 GETs in the production
-  proxy log from 2026-09-11 to 2026-09-27, 25 of them after 10.4 to 10.8
-  seconds, and a retry two seconds later answered 200 in 1.6 s.
+  long as `per_page=100`. It is rare: of 457,098 GETs in the production proxy
+  log from 2026-09-11 to 2026-09-29, GitHub answered 50 with a 502 after 10.4
+  to 11.0 seconds, 2 with a 504 and 9 with a 500, 7 of those the artifact
+  listing of jmrplens/jmrp.io after 8.3 to 8.5 seconds. The proxy's own 502s,
+  answered when this client canceled a request, are not GitHub's and are not
+  counted. Of the 21 502s and 504s asked again two seconds later since 2.6.0,
+  20 were answered.
 - GraphQL aliased batches are bounded by the gateway's ten seconds, not by
   points. A hundred aliases cost 2 points and answered
   `RESOURCE_LIMITS_EXCEEDED` for every alias past the sixty-fifth; fifty

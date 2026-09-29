@@ -10,6 +10,7 @@ import (
 	"container/list"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -69,8 +70,8 @@ type Client struct {
 	// endpoint reports it: `GET /rate_limit` does not even see this budget.
 	spend GraphQLSpend
 
-	// retryPause is how long a REST GET waits before asking again after a
-	// gateway gave up on it; see send.
+	// retryPause is how long a request waits before its one retry; see send
+	// for which answers get one.
 	retryPause time.Duration
 }
 
@@ -122,22 +123,25 @@ func New(token string, timeout time.Duration) *Client {
 	}
 }
 
-// DefaultRetryPause is how long a REST GET waits before its one retry after a
-// 502 or a 504; see send for why there is one.
+// DefaultRetryPause is how long a request waits before its one retry; see send
+// for which answers get one and why.
 //
-// Short, because the attempt that failed has usually taken ten seconds
-// already. Not zero, because five of the 36 in send's measurement failed in
-// 113 to 811 ms, and without a pause the retry of one of those would reach
-// the gateway that had just failed within the same second. It is not tuned:
-// two seconds is the pause the retry was measured with by hand on
-// 2026-09-27, when page 3 of jmrplens/phonometry's artifact listing answered
-// 502 after 10.5 s and the same request two seconds later answered 200 in
-// 1.6 s.
+// Short, because the attempt that failed has usually taken eight to ten
+// seconds already. It is not tuned: two seconds is the pause the retry was
+// first measured with by hand on 2026-09-27, when page 3 of
+// jmrplens/phonometry's artifact listing answered 502 after 10.5 s and the
+// same request two seconds later answered 200 in 1.6 s, and it is the pause
+// the 21 retries in send's measurement were made with. Nothing measured holds
+// it above zero either: the five gateway errors once counted as failing in 113
+// to 811 ms, which a retry with no pause would have sent straight back into,
+// were not GitHub's. The recording proxy the measurement was taken through
+// answers 502 when its client goes away, and all five were this client
+// canceling its own request on a stop.
 const DefaultRetryPause = 2 * time.Second
 
-// SetRetryPause changes how long a REST GET waits before asking again after a
-// 502 or a 504. Zero asks again at once, which is what a test against a fake
-// that fails on purpose wants; nothing in the binary changes it.
+// SetRetryPause changes how long a request waits before asking again. Zero
+// asks again at once, which is what a test against a fake that fails on
+// purpose wants; nothing in the binary changes it.
 func (c *Client) SetRetryPause(d time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -563,8 +567,9 @@ func (e *RateLimitedError) Error() string {
 // like every other line. The message is what it always was, so anything that
 // reads the text, isPaginationLimit for one, reads the same text.
 //
-// A 502 or a 504 that arrives here from a REST GET is the second of two: send
-// has already asked once more.
+// A 500, 502, 503 or 504 that arrives here from a REST GET, or from the
+// object storage a job log is read from, is the second of two: send has
+// already asked once more.
 type StatusError struct {
 	// Path is the request, relative to the REST base.
 	Path string
@@ -736,40 +741,83 @@ func replayable(raw []byte, out any) []byte {
 	return encoded
 }
 
-// send makes a REST GET, and makes it once more when the gateway in front of
-// GitHub gave up on it.
+// send makes a REST GET, and makes it once more when GitHub failed to finish
+// the answer.
 //
-// A 502 or a 504 is the gateway reporting that the answer did not come back
-// in time, not the application refusing, and it is intermittent. Measured on
-// the production proxy's log from 2026-09-11 to 2026-09-27: 36 of 397,455
-// REST GETs answered one, 25 of them after 10.4 to 10.8 seconds, and 16 of
-// the 20 from 2026-09-25 on were the artifact listing of the two repositories
-// with the longest artifact history, each costing its pass the repository's
-// gh_artifact_total. The size of the page is not the cause: per_page=1 took
-// as long as per_page=100. A 500 is the application's own failure and is left
-// to the next sweep, which answered both of the two in that log.
+// Four statuses are that failure. A 502 or a 504 is the gateway in front of
+// GitHub giving up on an answer that did not come back in time, a 500 is the
+// application giving up on it itself, and a 503 is a server that could not
+// take the request just then. Measured on the production proxy's log from
+// 2026-09-11 to 2026-09-29, 457,098 REST GETs: GitHub answered 50 with a 502
+// after 10.4 to 11.0 seconds, 2 with a 504 after 11.0 and 11.5, and 9 with a
+// 500, 7 of them the artifact listing of jmrplens/jmrp.io after 8.3 to 8.5
+// seconds, which is the same slow listing whose 502s arrive at 10.4 and the
+// application's own time limit rather than the gateway's, and the other 2 the
+// SBOM export answering "Request timed out." The size of the page is not the
+// cause: per_page=1 took as long as per_page=100. Each one cost its pass what
+// the family would have read, the listing's gh_artifact_total for one.
+//
+// Since 2.6.0 a 502 or a 504 has been asked again two seconds later, and 20 of
+// the 21 retries in that log were answered, 200 or 304. The 500s were not
+// asked again until the next pass, an hour later, which answered every one
+// that has had a next pass. Asked again by hand two seconds after a 500 on
+// 2026-09-29, the listing answered 500 once more, and 38 seconds later the
+// same page answered in 0.6 seconds: one sample, not a rate, and it is asked
+// again all the same, because it is the same slow listing giving up one layer
+// further in, and a retry that fails costs a core request and eight seconds,
+// as a 502's costs one and ten. No REST request answered 503 in that log; the
+// three GraphQL queries that did were answered in about a second, and the same
+// query was answered on its next attempt each time, 1.0, 1.8 and 17.9 seconds
+// later.
 //
 // Once, because each attempt can hold the family for ten seconds, and a
 // request that fails twice is left to the next sweep as it was before. The
-// retry costs budget: every one of those 25 was charged a core request,
-// conditional or not (used moved by one each time, where a 304 moves it by
-// none), so it goes through the brake like any other request and a budget at
-// its reserve is not spent on it. It carries the If-None-Match of the first
-// attempt, because the pair the caller read is still the pair, and a 304 to
-// the retry is replayed from it.
+// retry costs budget: a 500 and a 502 are charged a core request, conditional
+// or not (used moved by one on each, where a 304 moves it by none), so it goes
+// through the brake like any other request and a budget at its reserve is not
+// spent on it. It carries the If-None-Match of the first attempt, because the
+// pair the caller read is still the pair, and a 304 to the retry is replayed
+// from it.
+//
+// A request that got no answer at all is not asked again. Between the
+// recording proxy and GitHub the only such failure, other than this client
+// canceling its own request, was a DNS lookup, three times, and the job log's
+// object storage met three more in the journal. Each of the six took ten
+// seconds to fail, which is the resolver asking every server it knows twice
+// before it gives up, so the lookup had already been asked again; and the
+// three against storage came in one pass, 15 and 24 seconds apart, so a retry
+// of the first two seconds after it would have been looking the name up while
+// the second was failing. No connection refused, reset or TLS handshake
+// timeout appeared at all, and a GET whose kept-alive connection was closed
+// before it was answered is sent again by net/http itself. A refusal, any 4xx,
+// is the same answer asked again, and a spent budget is waited out by the
+// brake, not here.
 //
 // GraphQL does not come through here. Its gateway error is a query too large
-// for ten seconds (TooLargeError), which the same query asked again would
-// only time out on again, so the collectors ask again on the same cursor with
-// a smaller page instead. Both keep what the walk already read and ask again
+// for ten seconds (TooLargeError), which the same query asked again would only
+// time out on again, so the collectors ask again on the same cursor with a
+// smaller page instead. Both keep what the walk already read and ask again
 // from where it stopped; each asks the way its own failure can be fixed.
 func (c *Client) send(ctx context.Context, path string, req *http.Request, do func(*http.Request) (*http.Response, error)) (*http.Response, error) {
+	return c.sendTwice(ctx, path, req, do, true)
+}
+
+// fromStorage is send for a request to the object storage a job log
+// redirects to. The same answers are asked again, after the same pause, but
+// not through the brake: storage is not GitHub's API and spends no budget.
+func (c *Client) fromStorage(ctx context.Context, path string, req *http.Request, do func(*http.Request) (*http.Response, error)) (*http.Response, error) {
+	return c.sendTwice(ctx, path, req, do, false)
+}
+
+// sendTwice is send, with charged saying whether the request spends the
+// budget, and so whether the brake is asked before the retry.
+func (c *Client) sendTwice(ctx context.Context, path string, req *http.Request, do func(*http.Request) (*http.Response, error), charged bool) (*http.Response, error) {
 	resp, err := do(req)
 	if err != nil {
 		return nil, err
 	}
 	c.readRate(resp)
-	if resp.StatusCode != http.StatusBadGateway && resp.StatusCode != http.StatusGatewayTimeout {
+	if !askedAgain(resp.StatusCode) {
 		return resp, nil
 	}
 	first := &StatusError{Path: path, Code: resp.StatusCode, Status: resp.Status}
@@ -788,8 +836,10 @@ func (c *Client) send(ctx context.Context, path string, req *http.Request, do fu
 		return nil, fmt.Errorf("%w, and was not asked again: %w", first, ctx.Err())
 	case <-time.After(pause):
 	}
-	if stopped := c.brake(ctx, path); stopped != nil {
-		return nil, stopped
+	if charged {
+		if stopped := c.brake(ctx, path); stopped != nil {
+			return nil, stopped
+		}
 	}
 	resp, err = do(req.Clone(ctx))
 	if err != nil {
@@ -797,6 +847,18 @@ func (c *Client) send(ctx context.Context, path string, req *http.Request, do fu
 	}
 	c.readRate(resp)
 	return resp, nil
+}
+
+// askedAgain reports whether an answer is one of the four send asks once
+// more for. A list and not every status from 500 up: a 501 or a 505 says the
+// request itself will never be served, which asking again cannot change.
+func askedAgain(code int) bool {
+	switch code {
+	case http.StatusInternalServerError, http.StatusBadGateway,
+		http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return true
+	}
+	return false
 }
 
 // GetText fetches a path that answers with plain text rather than JSON.
@@ -859,23 +921,16 @@ func (c *Client) GetTextAs(ctx context.Context, path, accept string) (string, er
 		// redirect, and each one would be borrowing connections from
 		// whatever else in the process is using that default.
 		Transport: c.http.Transport,
-		CheckRedirect: func(r *http.Request, via []*http.Request) error {
-			r.Header.Del("Authorization")
-			// The redirect itself is the API's answer and carries the rate
-			// headers; the final response comes from storage and carries
-			// none. Go only returns the final one, so the budget is read
-			// here, on the way through.
-			if r.Response != nil {
-				c.readRate(r.Response)
-			}
-			if len(via) >= 5 {
-				return fmt.Errorf("%s: too many redirects", path)
-			}
-			return nil
-		},
+		// Every redirect comes back to follow rather than being followed
+		// inside Do, because the two ends of one are asked again in two
+		// different ways; see follow.
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
 	resp, err := c.send(ctx, path, req, client.Do)
 	if err != nil {
+		return "", err
+	}
+	if resp, err = c.follow(ctx, path, req, resp, client.Do); err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
@@ -909,6 +964,78 @@ func (c *Client) GetTextAs(ctx context.Context, path, accept string) (string, er
 		c.mu.Unlock()
 	}
 	return string(b), nil
+}
+
+// maxHops is how many redirects follow walks before it gives up. A job log
+// takes one. Four is the limit this client kept when net/http followed the
+// redirects for it, and a chain that long is already a loop: a hop back to
+// the API is a charged request.
+const maxHops = 4
+
+// follow walks the redirects an answer names to the answer at the end of them,
+// which for a job log is one hop, to a signed URL in object storage.
+//
+// It is here and not inside the client's Do because the two ends of that hop
+// fail differently and are asked again differently. The redirect is the API's
+// answer: charged a core request (the used count in the recording proxy's log
+// moved by one on 8,484 of the 8,612 it logged), braked, and asked again by
+// send if it failed. The storage it names is not the API: it spends no budget,
+// so it is asked again without the brake, and on its own URL, which stays
+// signed for ten minutes. Followed inside Do, a storage 502 went back to send
+// as the answer to the API request, and send paid for a new redirect through
+// the brake to get a second signed URL for the same log.
+//
+// Every hop goes without the token: the signed URL carries its own credentials
+// and the storage endpoint rejects a request that arrives with both.
+func (c *Client) follow(ctx context.Context, path string, asked *http.Request, resp *http.Response, do func(*http.Request) (*http.Response, error)) (*http.Response, error) {
+	for hops := 0; ; hops++ {
+		target, err := redirectTarget(resp)
+		if err != nil {
+			_ = resp.Body.Close()
+			return nil, fmt.Errorf("%s: %w", path, err)
+		}
+		if target == "" {
+			return resp, nil
+		}
+		// Drained so the connection goes back to the pool for the hop.
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
+		_ = resp.Body.Close()
+		if hops >= maxHops {
+			return nil, fmt.Errorf("%s: too many redirects", path)
+		}
+		hop, err := http.NewRequestWithContext(ctx, http.MethodGet, target, http.NoBody)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", path, err)
+		}
+		hop.Header = asked.Header.Clone()
+		hop.Header.Del("Authorization")
+		if resp, err = c.fromStorage(ctx, path, hop, do); err != nil {
+			return nil, err
+		}
+	}
+}
+
+// redirectTarget is where a redirect sends the request, resolved against the
+// URL that answered it, or the empty string for an answer that is not one to
+// follow. The statuses are the five net/http follows; a 300 is a choice for a
+// person to make and a 304 is an answer. A redirect with no Location is
+// returned as it is, as net/http returns it, and one whose Location does not
+// parse is an error.
+func redirectTarget(resp *http.Response) (string, error) {
+	switch resp.StatusCode {
+	case http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther,
+		http.StatusTemporaryRedirect, http.StatusPermanentRedirect:
+	default:
+		return "", nil
+	}
+	loc, err := resp.Location()
+	if errors.Is(err, http.ErrNoLocation) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return loc.String(), nil
 }
 
 // GraphQL runs one query and unmarshals data into out.

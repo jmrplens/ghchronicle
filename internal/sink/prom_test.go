@@ -3,9 +3,11 @@ package sink
 import (
 	"bufio"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -181,6 +183,55 @@ func TestNumericReadsEveryShapeAFieldHolds(t *testing.T) {
 	}
 	if _, ok := numeric("12"); ok {
 		t.Error("numeric read a string as a number")
+	}
+}
+
+// TestIntFieldReadsACountAndRefusesWhatNoIntHolds covers the shapes numeric
+// reads, read whole: an int64 exactly, where the float64 numeric passes it
+// through would round 2^62+1, and a float truncated, while a float no int64
+// holds is refused instead of left to the platform. 2^63 is refused and -2^63
+// read, which is where the float64 range of an int64 ends on each side.
+func TestIntFieldReadsACountAndRefusesWhatNoIntHolds(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		in   any
+		want int64
+		ok   bool
+	}{
+		{7, 7, true},
+		{int64(1)<<62 + 1, 1<<62 + 1, true},
+		{3.0, 3, true},
+		{2.9, 2, true},
+		{-2.9, -2, true},
+		{-0x1p63, math.MinInt64, true},
+		{0x1p63, 0, false},
+		{1e19, 0, false},
+		{-1e19, 0, false},
+		{math.Inf(1), 0, false},
+		{math.Inf(-1), 0, false},
+		{math.NaN(), 0, false},
+		{true, 1, true},
+		{false, 0, true},
+		{"7", 0, false},
+		{nil, 0, false},
+	}
+	for _, tc := range cases {
+		if got, ok := Int64Field(tc.in); got != tc.want || ok != tc.ok {
+			t.Errorf("Int64Field(%#v) = %v, %v, want %v, %v", tc.in, got, ok, tc.want, tc.ok)
+		}
+		// On a 64-bit build an int holds every int64, and IntField agrees
+		// with Int64Field.
+		if strconv.IntSize == 64 {
+			if got, ok := IntField(tc.in); int64(got) != tc.want || ok != tc.ok {
+				t.Errorf("IntField(%#v) = %v, %v, want %v, %v", tc.in, got, ok, tc.want, tc.ok)
+			}
+		}
+	}
+	// Where an int is 32 bits, what passes it is refused, not wrapped.
+	beyond := int64(math.MaxInt32) + 1
+	got, ok := IntField(beyond)
+	if want := strconv.IntSize == 64; ok != want {
+		t.Errorf("IntField(%d) = %v, %v on a %d-bit int, want ok %v", beyond, got, ok, strconv.IntSize, want)
 	}
 }
 

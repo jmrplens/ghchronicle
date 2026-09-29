@@ -49,7 +49,7 @@ keep it running once you are done watching it.
   ship as `tar.gz` (`zip` on Windows).
 
   ```sh
-  tar -xzf ghchronicle_2.6.3_linux_amd64.tar.gz
+  tar -xzf ghchronicle_2.6.4_linux_amd64.tar.gz
   sudo install -m 755 ghchronicle /usr/local/bin/
   ```
 
@@ -165,7 +165,7 @@ the version you see is the file it just wrote, and it says so when another
 Pin a version, or choose where it goes:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.6.3 BIN_DIR=~/bin bash
+curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.6.4 BIN_DIR=~/bin bash
 ```
 
 > **Reading it first is the whole point of a short script**
@@ -190,7 +190,7 @@ Release archives are named
 | `aarch64`          | `linux_arm64`       |
 
 ```sh
-VERSION=2.6.3
+VERSION=2.6.4
 arch=$(uname -m); case "$arch" in x86_64) arch=amd64 ;; aarch64) arch=arm64 ;; esac
 base=https://github.com/jmrplens/ghchronicle/releases/download/v$VERSION
 curl -fsSLO "$base/ghchronicle_${VERSION}_linux_${arch}.tar.gz"
@@ -228,7 +228,7 @@ the file, then verify the archive against the file.
     ```
 
     ```text
-    ghchronicle_2.6.3_linux_amd64.tar.gz: OK
+    ghchronicle_2.6.4_linux_amd64.tar.gz: OK
     ```
 
 3. Check the checksum file itself, if you have
@@ -298,7 +298,7 @@ meant to.
 the build date of that release.
 
 ```text
-ghchronicle 2.6.3 (commit <commit>, built <date>)
+ghchronicle 2.6.4 (commit <commit>, built <date>)
 ```
 
 ### Run it once
@@ -348,7 +348,7 @@ find.
   the go command fetched and the Go release that compiled it:
 
   ```text
-  ghchronicle 2.6.3 (module v2.6.3, built with <go version>)
+  ghchronicle 2.6.4 (module v2.6.4, built with <go version>)
   ```
 
   The first version comes from the `VERSION` file the module embeds.
@@ -419,7 +419,7 @@ the version you see is the file it just wrote, and it says so when another
 Pin a version, or choose where it goes:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.6.3 BIN_DIR=~/bin bash
+curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.6.4 BIN_DIR=~/bin bash
 ```
 
 > **Reading it first is the whole point of a short script**
@@ -444,7 +444,7 @@ architecture.
 | `x86_64`           | Intel              | `darwin_amd64`      |
 
 ```sh
-VERSION=2.6.3
+VERSION=2.6.4
 arch=$(uname -m); case "$arch" in x86_64) arch=amd64 ;; esac
 base=https://github.com/jmrplens/ghchronicle/releases/download/v$VERSION
 curl -fsSLO "$base/ghchronicle_${VERSION}_darwin_${arch}.tar.gz"
@@ -482,7 +482,7 @@ signature over that file.
     ```
 
     ```text
-    ghchronicle_2.6.3_darwin_arm64.tar.gz: OK
+    ghchronicle_2.6.4_darwin_arm64.tar.gz: OK
     ```
 
 3. Check the checksum file itself, if you have
@@ -695,7 +695,7 @@ so the Xcode command line tools are not needed for it.
   module version the go command fetched and the Go release that compiled it:
 
   ```text
-  ghchronicle 2.6.3 (module v2.6.3, built with <go version>)
+  ghchronicle 2.6.4 (module v2.6.4, built with <go version>)
   ```
 
 - **make**
@@ -774,7 +774,7 @@ takes parameters, which needs the slightly longer form because `iex` has
 nowhere to put them:
 
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1))) -Version 2.6.3 -BinDir C:\tools -NoPathUpdate
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1))) -Version 2.6.4 -BinDir C:\tools -NoPathUpdate
 ```
 
 > **Reading it first is the whole point of a short script**
@@ -836,7 +836,7 @@ rather than the shell:
 ```
 
 ```powershell
-$version = "2.6.3"
+$version = "2.6.4"
 $arch = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64" } else { "amd64" }
 $base = "https://github.com/jmrplens/ghchronicle/releases/download/v$version"
 $zip = "ghchronicle_${version}_windows_${arch}.zip"
@@ -959,7 +959,7 @@ It answers with one line: the release number, then the commit and the build
 date of that release.
 
 ```text
-ghchronicle 2.6.3 (commit <commit>, built <date>)
+ghchronicle 2.6.4 (commit <commit>, built <date>)
 ```
 
 > **If Windows warns about the file**
@@ -1158,7 +1158,7 @@ means no MSVC, no MinGW and no Windows SDK.
   compiled it:
 
   ```text
-  ghchronicle 2.6.3 (module v2.6.3, built with <go version>)
+  ghchronicle 2.6.4 (module v2.6.4, built with <go version>)
   ```
 
 - **From a checkout**
@@ -1909,11 +1909,11 @@ tag, recorded in a public transparency log. With
 cosign verify \
   --certificate-identity-regexp 'https://github.com/jmrplens/ghchronicle/.github/workflows/release.yml@refs/tags/.*' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  ghcr.io/jmrplens/ghchronicle:v2.6.3 > /dev/null
+  ghcr.io/jmrplens/ghchronicle:v2.6.4 > /dev/null
 ```
 
 ```text
-Verification for ghcr.io/jmrplens/ghchronicle:v2.6.3 --
+Verification for ghcr.io/jmrplens/ghchronicle:v2.6.4 --
 The following checks were performed on each of these signatures:
   - The cosign claims were validated
   - Existence of the claims in the transparency log was verified offline
@@ -2139,7 +2139,7 @@ it downloads a release binary and calls it.
 | `card-width`      | `""`                 | Card width in pixels. Empty draws the layout at its own width; each one draws between two ends of its own, stated in its [section](https://jmrp.io/docs/ghchronicle/card/layouts/). Only `activity-heatmap` spends the room on data, a whole year of the calendar at its far end |
 | `card-speed`      | `""`                 | How fast an animated layout plays, as a decimal from 0 to 1. Empty means 0.5, the pace every card has always been drawn at; below it the card is slower, above it faster, and every animated layout scales together. 0 is the slowest animation and not a still card, `card-motion: off` is |
 | `include-private` | `false`              | `true` counts private repositories when no config file is given. See the warning below |
-| `version`         | `latest`             | The release to install: `latest` for the newest, or a release with or without its `v`, so `2.6.3` and `v2.6.3` are the same one. The major tag `v2` is what `uses:` takes, not a release, and is refused |
+| `version`         | `latest`             | The release to install: `latest` for the newest, or a release with or without its `v`, so `2.6.4` and `v2.6.4` are the same one. The major tag `v2` is what `uses:` takes, not a release, and is refused |
 
 ### The four modes
 
@@ -2486,14 +2486,14 @@ stores are asked questions, GitHub is asked for the repository list alone, and
 the state file is read and never written. A store that can be asked decides for
 itself; one that cannot is decided by what the state file remembers of it.
 
-| Store                                | What decides                                                                                                       |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| Store                                | What decides                                                                                                                                              |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | InfluxDB 3                           | Whether the old tag is a tag column of the live table, asked of the catalog. A table InfluxDB has set aside is listed under another name and is not asked |
-| InfluxDB 2                           | Whether any row carries the old tag. The tag keys stay listed after a delete, so they are not asked                 |
-| PostgreSQL                           | Whether any row holds a value in the old tag's column, in the schema the sink writes to                             |
-| Elasticsearch                        | A count of the documents that carry the old tag. The mapping keeps a field after its documents are gone             |
-| SQL file, Graphite, Telegraf         | The release the state file records as the first to write the store                                                  |
-| Loki, Prometheus, OTLP, file, stdout | Nothing: none of them keeps a row whose identity a release could change                                             |
+| InfluxDB 2                           | Whether any row carries the old tag. The tag keys stay listed after a delete, so they are not asked                                                       |
+| PostgreSQL                           | Whether any row holds a value in the old tag's column, in the schema the sink writes to                                                                   |
+| Elasticsearch                        | A count of the documents that carry the old tag. The mapping keeps a field after its documents are gone                                                   |
+| SQL file, Graphite, Telegraf         | The release the state file records as the first to write the store                                                                                        |
+| Loki, Prometheus, OTLP, file, stdout | Nothing: none of them keeps a row whose identity a release could change                                                                                   |
 
 Each line starts with what the check found:
 
@@ -2629,15 +2629,15 @@ inputs](https://jmrp.io/docs/ghchronicle/install/actions/#inputs).
 
 #### What applying does in each store
 
-| Store                                                                         | What applying does                                                                                                        |
-| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| [InfluxDB 3](https://jmrp.io/docs/ghchronicle/sinks/influxdb/#what-a-migration-does-here)         | Deletes the one table, which InfluxDB keeps as `<measurement>-<instant>`, queryable, and purges itself 72 hours later     |
-| InfluxDB 2                                                                    | Deletes every row of the measurement in the bucket. Nothing is kept, so a start never does it on its own                  |
-| [PostgreSQL](https://jmrp.io/docs/ghchronicle/sinks/postgres/#what-a-migration-does-here)         | Renames the table `<measurement>-<instant>` in the sink's schema; ghchronicle drops it 24 hours later                     |
-| [Elasticsearch](https://jmrp.io/docs/ghchronicle/sinks/elasticsearch/#what-a-migration-does-here) | Blocks writes to the index, clones it to `<index>-<instant>` and deletes it; ghchronicle deletes the clone 24 hours later |
-| SQL file                                                                      | Writes `DROP TABLE IF EXISTS` for the measurement into the file, ahead of the rows written after it                       |
-| Graphite                                                                      | Prints the commands that remove the old paths on the Graphite host                                                        |
-| Telegraf                                                                      | Says what to do in the store behind it                                                                                    |
+| Store                                                                         | What applying does                                                                                                                         |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| [InfluxDB 3](https://jmrp.io/docs/ghchronicle/sinks/influxdb/#what-a-migration-does-here)         | Deletes the one table, which InfluxDB keeps as `<measurement>-<instant>`, queryable, and purges itself 72 hours later, or never before 3.2 |
+| InfluxDB 2                                                                    | Deletes every row of the measurement in the bucket. Nothing is kept, so a start never does it on its own                                   |
+| [PostgreSQL](https://jmrp.io/docs/ghchronicle/sinks/postgres/#what-a-migration-does-here)         | Renames the table `<measurement>-<instant>` in the sink's schema; ghchronicle drops it 24 hours later                                      |
+| [Elasticsearch](https://jmrp.io/docs/ghchronicle/sinks/elasticsearch/#what-a-migration-does-here) | Blocks writes to the index, clones it to `<index>-<instant>` and deletes it; ghchronicle deletes the clone 24 hours later                  |
+| SQL file                                                                      | Writes `DROP TABLE IF EXISTS` for the measurement into the file, ahead of the rows written after it                                        |
+| Graphite                                                                      | Prints the commands that remove the old paths on the Graphite host                                                                         |
+| Telegraf                                                                      | Says what to do in the store behind it                                                                                                     |
 
 Each store touches that one measurement and nothing else: the table, index or
 paths named exactly, in the database, bucket, schema or prefix the sink writes
@@ -2655,9 +2655,13 @@ run of the Action that does not restore one among them, asks PostgreSQL and
 Elasticsearch for copies named the way a migration names them, since its state
 file cannot name them. InfluxDB 3 purges its own on a schedule of its own, which
 is read back from the system table of its `_internal` database: 72 hours after
-the delete by default (measured on 3.11.2 and 3.11.5), and it keeps the name in
-its catalog for its delete grace period after that, 24 hours by default. Until
-a copy goes, undoing the change is on each store's page.
+the delete by default (measured on 3.2.1 to 3.11.5), and it keeps the name in
+its catalog for its delete grace period after that, 24 hours by default. A
+server before 3.2 never purges one: the plan says so before applying, and
+`-migrate` asks the server for every copy it keeps that way, with the request
+that removes it once the server runs a release from 3.2 to 3.9 (see [before 3.2
+the copy stays](https://jmrp.io/docs/ghchronicle/sinks/influxdb/#before-32-the-copy-stays)). Until a
+copy goes, undoing the change is on each store's page.
 
 A store that was cleared is written again whole. The [write
 ledger](https://jmrp.io/docs/ghchronicle/sinks/#only-what-changed-is-written) forgets the

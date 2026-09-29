@@ -24,6 +24,13 @@ type teardownStub struct {
 	// when one does is read.
 	refuseDelete bool
 	deleted      []string
+	// release is the InfluxDB release /ping names, the way 3.0.0 to 3.4.0
+	// name it; empty answers as Grafana does.
+	release string
+	// schedule is what the system table of _internal lists as deleted, each
+	// with its hard deletion time or none, which is how a table a release
+	// before 3.2 deleted looks there after an upgrade (measured on 3.4.0).
+	schedule map[string]string
 }
 
 func (s *teardownStub) serve(t *testing.T) string {
@@ -51,6 +58,12 @@ func (s *teardownStub) serve(t *testing.T) string {
 			return
 		}
 		switch {
+		case r.URL.Path == "/ping" && s.release != "":
+			w.Header().Set("X-Influxdb-Build", "Core")
+			w.Header().Set("X-Influxdb-Version", s.release)
+			_, _ = io.WriteString(w, `{"version":"`+s.release+`"}`)
+		case strings.Contains(r.URL.Path, "/api/v3/query_sql") && r.URL.Query().Get("db") == "_internal":
+			s.systemTables(w)
 		case strings.Contains(r.URL.Path, "/api/v3/query_sql"):
 			rows := make([]map[string]string, 0, len(s.tables))
 			for _, name := range s.tables {
@@ -64,6 +77,34 @@ func (s *teardownStub) serve(t *testing.T) string {
 	}))
 	t.Cleanup(srv.Close)
 	return srv.URL
+}
+
+// systemTables answers the question of what the server deleted the way the
+// release does: 3.0 and 3.1 have no such table, and 3.2.0's has no hard
+// deletion time, which it answers with a 500 (both measured).
+func (s *teardownStub) systemTables(w http.ResponseWriter) {
+	switch {
+	case strings.HasPrefix(s.release, "3.0.") || strings.HasPrefix(s.release, "3.1."):
+		http.Error(w, "table 'public.system.tables' not found", http.StatusBadRequest)
+		return
+	case s.release == "3.2.0":
+		http.Error(w, "query error: error while planning query: Schema error: No field named hard_deletion_time.",
+			http.StatusInternalServerError)
+		return
+	}
+	// A table with no hard deletion time is answered without the key, as
+	// 3.4.0 answers it.
+	rows := []map[string]string{}
+	for name, until := range s.schedule {
+		row := map[string]string{"table_name": name}
+		if until != "" {
+			row["hard_deletion_time"] = until
+		}
+		rows = append(rows, row)
+	}
+	if err := json.NewEncoder(w).Encode(rows); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 // teardownConfig points both halves at the one stub.
@@ -196,7 +237,10 @@ func TestAnUninstallRefusesWhileAnotherProcessHoldsTheStateFile(t *testing.T) {
 // said once as the server's to purge, and not offered.
 func TestATableInfluxDBAlreadyDeletedIsNotReportedRemoved(t *testing.T) {
 	t.Parallel()
-	s := &teardownStub{tables: []string{"gh_discussion_comment", "gh_discussion_comment-20260928T222330", "gh_repo"}}
+	s := &teardownStub{
+		tables:   []string{"gh_discussion_comment", "gh_discussion_comment-20260928T222330", "gh_repo"},
+		schedule: map[string]string{"gh_discussion_comment-20260928T222330": "2026-10-01T22:23:30Z"},
+	}
 	cfg := teardownConfig(t, s.serve(t))
 	var said strings.Builder
 	if err := uninstall(t.Context(), cfg, targetData, true, &said); err != nil {
@@ -211,6 +255,126 @@ func TestATableInfluxDBAlreadyDeletedIsNotReportedRemoved(t *testing.T) {
 	if !strings.Contains(said.String(), "purged by the server itself") ||
 		!strings.Contains(said.String(), "gh_discussion_comment-20260928T222330") {
 		t.Errorf("it does not say whose the deleted table is to purge:\n%s", said.String())
+	}
+}
+
+// TestAnUninstallSaysAnInfluxDBBefore32KeepsWhatItDeletes. 3.0 and 3.1 have
+// no hard deletion: every table the uninstall deletes stays, renamed, beside
+// the ones deleted already, which is worth knowing before yes, and so is the
+// request that removes one on a later release.
+func TestAnUninstallSaysAnInfluxDBBefore32KeepsWhatItDeletes(t *testing.T) {
+	t.Parallel()
+	s := &teardownStub{
+		tables:  []string{"gh_discussion_comment", "gh_discussion_comment-20260928T222330", "gh_repo"},
+		release: "3.1.0",
+	}
+	url := s.serve(t)
+	var said strings.Builder
+	if err := uninstall(t.Context(), teardownConfig(t, url), targetData, false, &said); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"note: influxdb: each table deleted here is renamed <table>-<instant> and kept for good, and the tables " +
+			"deleted already are kept for good: gh_discussion_comment-20260928T222330. InfluxDB 3 Core 3.1.0 has no " +
+			"hard deletion",
+		"curl -X DELETE '" + url + "/api/v3/configure/table?db=github&table=<table>-<instant>&hard_delete_at=now'",
+	} {
+		if !strings.Contains(said.String(), want) {
+			t.Errorf("the uninstall does not say %q:\n%s", want, said.String())
+		}
+	}
+	if strings.Contains(said.String(), "purged by the server itself") {
+		t.Errorf("it says a server with no hard deletion purges what it deleted:\n%s", said.String())
+	}
+}
+
+// TestAnUninstallSaysWhatAnUpgradedInfluxDBKeepsForGood. A table a release
+// before 3.2 deleted keeps no hard deletion time through an upgrade, so the
+// release that runs now never purges it either, and its system table lists it
+// deleted with none (measured on 3.2.0, 3.4.0, 3.9.13 and 3.11.5). That one is
+// said to stay, with the request that removes it where the release takes one,
+// and only the others are the server's to purge; only a release from 3.10 on
+// refuses to be asked for one sooner, which 3.2.1 to 3.9.13 were measured to
+// take. 3.2.0's system table has no hard deletion time, so there which of
+// them stays cannot be read, and the note says that rather than a schedule.
+func TestAnUninstallSaysWhatAnUpgradedInfluxDBKeepsForGood(t *testing.T) {
+	t.Parallel()
+	const (
+		legacy = "gh_discussion_comment-20260601T080000"
+		own    = "gh_discussion_comment-20260928T222330"
+	)
+	for _, c := range []struct {
+		release string
+		says    func(url string) []string
+		not     []string
+	}{
+		{
+			release: "3.4.0",
+			says: func(url string) []string {
+				return []string{
+					"note: influxdb: " + legacy + " was deleted already and is kept for good: a release before 3.2 " +
+						"set it aside, so nothing is scheduled to purge it. InfluxDB 3 Core 3.4.0 removes it when " +
+						"told to: curl -X DELETE '" + url + "/api/v3/configure/table?db=github&table=" + legacy +
+						"&hard_delete_at=now' -H 'Authorization: Bearer <token>'\n",
+					"note: influxdb: deleted already, and purged by the server itself on its own schedule, 72 hours " +
+						"after the delete by default: " + own + "\n",
+				}
+			},
+			not: []string{"refuses", "table=" + own, "could not be read"},
+		},
+		{
+			release: "3.11.2",
+			says: func(string) []string {
+				return []string{
+					"note: influxdb: " + legacy + " was deleted already and is kept for good: a release before 3.2 " +
+						"set it aside, so nothing is scheduled to purge it. InfluxDB 3 Core 3.11.2 refuses to be told " +
+						"to, with or without hard_delete_at",
+					"note: influxdb: deleted already, and purged by the server itself on its own schedule, 72 hours " +
+						"after the delete by default, which refuses to be asked again sooner: " + own + "\n",
+				}
+			},
+			not: []string{"curl", "could not be read"},
+		},
+		{
+			release: "3.2.0",
+			says: func(string) []string {
+				return []string{
+					"note: influxdb: deleted already, and purged by the server itself on its own schedule, 72 hours " +
+						"after the delete by default, but a table a release before 3.2 deleted stays for good, and " +
+						"which of these that is could not be read (500 Internal Server Error: query error: error while " +
+						"planning query: Schema error: No field named hard_deletion_time.",
+					"): " + legacy + ", " + own + "\n",
+				}
+			},
+			not: []string{"refuses", "is kept for good"},
+		},
+	} {
+		t.Run(c.release, func(t *testing.T) {
+			t.Parallel()
+			s := &teardownStub{
+				tables:   []string{"gh_discussion_comment", legacy, own, "gh_repo"},
+				release:  c.release,
+				schedule: map[string]string{legacy: "", own: "2026-10-01T22:23:30Z"},
+			}
+			url := s.serve(t)
+			var said strings.Builder
+			if err := uninstall(t.Context(), teardownConfig(t, url), targetData, false, &said); err != nil {
+				t.Fatal(err)
+			}
+			for _, want := range c.says(url) {
+				if !strings.Contains(said.String(), want) {
+					t.Errorf("the uninstall does not say %q:\n%s", want, said.String())
+				}
+			}
+			for _, wrong := range c.not {
+				if strings.Contains(said.String(), wrong) {
+					t.Errorf("the uninstall says %q:\n%s", wrong, said.String())
+				}
+			}
+			if len(s.deleted) != 0 {
+				t.Errorf("it removed %v without being told yes", s.deleted)
+			}
+		})
 	}
 }
 

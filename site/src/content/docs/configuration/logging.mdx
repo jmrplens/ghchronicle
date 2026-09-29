@@ -112,7 +112,7 @@ log:
   level: debug
 ```
 
-Debug adds seven lines, and no more:
+Debug adds these lines, and no more:
 
 - `loaded the written-points ledger`, with how many points it came back with,
   when the service starts;
@@ -127,13 +127,22 @@ Debug adds seven lines, and no more:
   rejected;
 - `card-only sweep, the state file is left as it was`;
 - `cache file saved`, with how many answers and runs it holds and how long it
-  took.
+  took;
+- `migration not needed` and `migration applied before`, at every start, for
+  each change a store never needed or has had applied already;
+- `migration noted: nothing is changed` and `migration frozen`, at every start
+  after the first, which says each at `INFO`;
+- `set-aside copy forgotten`, when a copy a migration set aside falls due and
+  the state file stops naming it: `the store purges it itself` for one
+  InfluxDB 3 purges on its own schedule, and `the store keeps it for good, and
+  -migrate asks the store for it` for one it keeps for good.
 
 There is no per-request log: the client in `internal/ghapi` carries no logger,
 so which endpoint was called and which answer came back 304 are not visible at
-any level. That includes its one retry: a REST request answered 502 or 504 is
-asked again two seconds later, silently, so a `collector failed` naming a 502
-or a 504 has already failed twice.
+any level. That includes its one retry: a REST request answered 500, 502, 503
+or 504 is asked again two seconds later, silently, and so is a job log's
+download from storage, so a `collector failed` naming one of those four has
+already failed twice.
 
 <Aside type="tip" title="JSON for a shipper, text for a person">
   `format: json` emits one object per line, which is what Promtail, Vector or

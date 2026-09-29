@@ -13,6 +13,220 @@ day the tag was pushed, with two exceptions: 2.5.2 has a section and no tag,
 and its changes shipped in 2.6.0; 2.6.2 has a tag and no release, since its
 release stopped at the containerised suite, and its changes shipped in 2.6.3.
 
+## 2.6.4 - 2026-09-29
+
+A review of 2.6.3 in production on the day it was released: the service's
+journal, the recording proxy's log of every request it sent GitHub, the stored
+rows read against GitHub, every panel of the dashboards, and the repository's
+issues, pull requests, workflows and code scanning. It found six code scanning
+alerts open on main since mid-September, a repository whose pass failed each
+time GitHub answered its artifact listing with a 500, a job log whose storage
+was asked again through the API, a PostgreSQL dashboard that lists text in the
+database's order rather than in InfluxDB's, five groups of tiles that draw
+nothing over a range no sweep reached, and a migration's copy that an InfluxDB
+before 3.2 keeps for good while ghchronicle said the server would purge it.
+Each is fixed here; the last is the server's doing, and ghchronicle now says
+so wherever it matters, with what removes the copy.
+
+- **Six code scanning alerts are closed at their cause.** CodeQL's
+  `go/incorrect-integer-conversion` stood at four lines of the card's
+  accumulator and one of the Reducer: each read a field as a float64 and
+  converted it to an int with nothing in between, and Go leaves converting a
+  float that no int holds to the platform. On amd64 a repository written with
+  1e19 stars drew -9223372036854775808 on the card, and a row whose `events`
+  said 1e19 or an infinity set the running total of its series there. A field
+  kept as a count is now read whole, an int64 staying one instead of passing
+  through a float64, and a NaN, an infinity or a value no int holds is
+  refused: the card leaves it out, and the Reducer weighs such a row as one
+  item, as it weighs a row that says nothing. CodeQL 2.27.1, run locally,
+  reports none of the five with the bound and reports the new reader when the
+  bound is taken out. The sixth, `js/useless-regexp-character-escape`, was the
+  documentation's parity check building a regular expression out of a code
+  fence read from the page. It now matches the closing run with a fixed
+  pattern and compares it with the opening afterwards, which is the rule the
+  pattern stated, and a self-test that passes against the old check and the
+  new pins it.
+- **A 500 or a 503 from GitHub is asked once more.** GitHub answered the
+  artifact listing of `jmrplens/jmrp.io` with a 500 seven times between 28 and
+  29 September, on pages 1, 2 and 3, each after 8.3 to 8.5 seconds, and three
+  more times on the 29th before these notes; each cost that repository's
+  pass. It is the same slow listing whose 502s arrive after ten and a half
+  seconds, giving up at the application's own limit instead of at the
+  gateway's, and the client asked only a 502 or a 504 again. On the recording
+  proxy's log from 11 to 29 September, 457,098 REST requests, GitHub answered
+  50 with a 502, 2 with a 504, 9 with a 500 (those seven and two SBOM exports
+  that timed out) and none with a 503. Of the 21 gateway errors asked again
+  two seconds later since 2.6.0, 20 were answered, and each of the three
+  GraphQL 503s was answered on the query's next attempt. A 500 asked again by
+  hand two seconds later answered 500 once more, one sample; it is asked
+  again all the same, since a retry that fails costs a core request and eight
+  seconds, as a 502's costs one and ten. So a 500 and a 503 now take the one
+  retry a 502 and a 504 take, after the same pause, through the rate brake and
+  with the same `If-None-Match`. A 501, a 505, any 4xx and a GraphQL request
+  are not asked again. The 36 gateway errors 2.6.0 counted held eight that
+  were not GitHub's: five the recording proxy answered for requests this
+  client canceled on a stop, and three of the proxy's own failed lookups. The
+  [API page](https://jmrp.io/docs/ghchronicle/api/#an-answer-github-could-not-finish-is-asked-once-more)
+  now counts only GitHub's.
+- **A request that got no answer is still not asked again, and a test says
+  so.** The only such failure since 11 September was a name that could not be
+  looked up, six times, three of them on 28 September on the way to a job
+  log's storage. Each took ten seconds to fail, which is the resolver asking
+  every server twice before it gives up, so the lookup had been asked again
+  already. No refused connection, reset or TLS handshake timeout appeared, and
+  Go's HTTP client already sends again a GET whose kept-alive connection
+  closed before it was answered. Tests now hold a failed lookup, a refused
+  connection, a reset and a handshake that timed out to one attempt each.
+- **A job log's storage is asked again on its own.** A failed job's log is two
+  requests: the API answers with a redirect, which is charged (the used count
+  in the proxy's log moved by one on 8,484 of the 8,612 redirects it logged),
+  and object storage sends the text from a URL signed for ten minutes. Go's
+  HTTP client followed the redirect inside the API request, so a storage 502
+  or 504 was asked again by asking the API for a new redirect, through the
+  brake and paying for it, and a budget at its reserve did not ask at all. The
+  client now stops at the redirect and follows it itself, one hop at a time
+  and without the token, as before. A hop that answers a 500, 502, 503 or 504
+  is asked once more on its own signed URL after the same pause, without the
+  brake, since storage spends no budget. The limit of four hops is what it
+  was.
+- **The PostgreSQL dashboard compares text by its bytes.** InfluxDB orders
+  strings by their UTF-8 bytes; PostgreSQL orders them by the database's
+  collation, which on glibc under a locale such as `en_US.UTF-8` sets case and
+  punctuation aside on its first pass. Measured against `postgres:18.6` on
+  Debian, whose database is created as `en_US.utf8`, loaded with the
+  containerised suite's sweep: "Pull requests by author" and "Reviewers" put
+  "(ghost)" after "alice" and "bob", and "Commits by signature" put "VALID"
+  after "unsigned", where InfluxDB draws both the other way round. The suite's
+  `postgres:18.6-alpine` agreed with InfluxDB only because musl compares bytes
+  whatever the locale is called. The translation of the dashboard's SQL now
+  gives `COLLATE "C"` to every text key of an `ORDER BY`, of a window's
+  `ORDER BY` and of a `MIN` or a `MAX`, and leaves numbers, flags and times
+  alone, which PostgreSQL refuses a collation on; a key it cannot type stops
+  the generator. Nothing changes in the database. The suite now runs the
+  Debian image, on which three panels drew their rows in another order before
+  and none does now, and a new containerised test asks PostgreSQL itself:
+  every expression the dashboard sorts by without the collation is run again
+  with it, and PostgreSQL refuses a collation on anything but text before it
+  reads a row. Against the dashboard before the change 218 such probes of 103
+  panels were answered, each a text left to the collation; now all 220 are
+  refused. The
+  [PostgreSQL page](https://jmrp.io/docs/ghchronicle/sinks/postgres/) says
+  how the dashboard compares text.
+- **The account's own tiles say "not read" over a range no sweep reached.**
+  Community, Account, Since the account began, Sponsorship and the repository
+  count of Repositories read the newest snapshot of the range, and over a
+  range with no sweep in it they drew "No data" in all five stores, beside
+  groups that said what the range lacked: InfluxDB answers no row with no
+  frame and PostgreSQL with a frame with no fields, and the other three stores
+  had been built to draw the same. Every store now answers one value per tile
+  there. The SQL stores join the newest row to a row that is always there;
+  Prometheus takes the largest series of the gauge, or NaN where there is
+  none; Graphite keeps the series of nulls, with a fallback for a path never
+  written; and Elasticsearch reads the newest document of one date histogram
+  bucket a century wide, since asked for its empty buckets instead the
+  datasource fails the whole panel with "index out of range [0] with length
+  0". Checked on the containerised suite's Grafana 13.2.1 over 26 July to 25
+  August 2025, every tile of the five groups reads "not read" in every store
+  but one: the Elasticsearch repository count leaves its group over such a
+  range, with the stars and the forks, because that panel adds its values up
+  and would read a count that is not there as 0. Over the suite's own range
+  every store draws the fixture's values as before. The containerised check of
+  tiles over nothing now also holds InfluxDB to drawing, over nothing, every
+  tile it draws over the dashboard's range: comparing five stores that drew
+  nothing had let these 21 tiles of five panels through. The
+  [panels page](https://jmrp.io/docs/ghchronicle/dashboards/panels/) says so.
+- **An InfluxDB before 3.2 keeps a migration's copy for good, and ghchronicle
+  says so.** A migration clears an InfluxDB 3 table by deleting it, which the
+  server turns into a rename and purges later on its own. The review took the
+  purge to be missing up to 3.3. Measured on Core in throwaway containers, it
+  begins at 3.2.0: 3.0.0, 3.0.3 and 3.1.0 start no deleter, ignore
+  `hard_delete_at`, have no `system.tables` in `_internal`, and answer a
+  delete of the renamed table with a 200 and a second rename, while 3.2.0 and
+  3.3.0 schedule the hard deletion 72 hours out and carry it out as 3.4.0
+  does. So 2.6.3's "before 3.4.0 may keep it until somebody drops it" was
+  wrong both ways. The binary now reads the release from `/ping`. Before 3.2
+  the plan says `set aside for good`, applying says it with the copy's name,
+  and `-migrate` asks the server for every copy nothing will purge and lists
+  each with the request that removes it once the server runs a release from
+  3.2 to 3.9. That list holds copies the state file has forgotten too: a copy
+  made before 3.2 keeps no hard deletion time through an upgrade (copies of
+  3.0.3 and 3.1.0 opened by 3.2.0, 3.4.0, 3.9.13 and 3.11.5), so it stays
+  after the upgrade as well. 3.2.0, 3.4.0 and 3.9.13 took
+  `DELETE ...&hard_delete_at=now` for such a copy and dropped it from their
+  catalog after the grace period, while 3.10.0 to 3.11.5 answer a 409 either
+  way, which is why the request is sent on the way up. The
+  [InfluxDB page](https://jmrp.io/docs/ghchronicle/sinks/influxdb/#before-32-the-copy-stays)
+  and the [upgrading page](https://jmrp.io/docs/ghchronicle/install/upgrading/#migrations)
+  say what stays and what removes it.
+- **`-uninstall data` says which tables an InfluxDB keeps for good.** Each
+  table it deletes is a rename, and its note said the server purges the
+  renamed tables 72 hours later and refuses to be asked sooner. On 3.0 and
+  3.1 neither is true, and on 3.2 or later a table a release before 3.2
+  deleted is never purged either. The note now says, before `-yes`, which
+  tables stay: every one on a server before 3.2, and from 3.2.1 on each that
+  the server's system table shows with no hard deletion time, the question
+  `-migrate` asks, with the request that removes it where the release takes
+  one. 3.2.0's system table has no such column and answers the question with a
+  500, and there the note says which tables stay cannot be read. The rest keep
+  the note of the purge schedule, which now says the server refuses an earlier
+  removal only from 3.10 on. Measured with a copy 3.1.0 made, opened by 3.4.0
+  and by 3.2.0, and on 3.11.2.
+
+Each change in behaviour carries a test shown to fail against the code before
+it, run there again for these notes, in each change's own tree with everything
+but its tests undone: a count no int holds on the card and in the Reducer,
+where the old code drew and totalled -9223372036854775808; a 500 and a 503
+followed by an answer, and twice in a row, where the old code asked once; a
+job log's storage failing with each of the four statuses, twice, and at a
+spent budget, where the old code asked the API for a new redirect or did not
+ask; the three panels measured in PostgreSQL's order; every stat value over
+nothing, which failed on the six statements and 21 values of the five groups
+in the SQL stores, their 21 Graphite series, 21 Prometheus queries and five
+Elasticsearch buckets; and the uninstall's note on a server before 3.2 and on
+one upgraded from it. Where such a test calls something the old code lacks,
+a helper, it was run there with that call stubbed. The tests of what did not
+change, a 4xx, a 501, a 505 and each network failure asked once, and a storage
+refusal and a failed lookup of storage asked once, pass against the old code
+and the new, as does the parity check's self-test. The tests of what the plan,
+applying and `-migrate` say on a server before 3.2 call fields and functions
+the old code lacks, and were not run against it; its plan said only that a
+server before 3.4.0 may keep the copy until somebody drops it. The
+containerised checks were run against the dashboards before each change when
+it was made: the Debian PostgreSQL drew three panels' rows in another order,
+the collation probes found 218 expressions of 103 panels left to the
+collation, and InfluxDB drew no tile of five panels, 21 tiles, over a range no
+sweep reached. The containerised suite passed on this release, without a
+GitHub token, against InfluxDB 3.11.2, PostgreSQL 18.6 on Debian,
+Elasticsearch 9.5.3, `graphiteapp/graphite-statsd:1.1.10-5`, Prometheus
+3.14.0 and Loki 3.7.7, through Grafana 13.2.1.
+
+Not verified:
+
+- None of it has run in production, which still runs 2.6.3. Whether the
+  artifact listing of `jmrplens/jmrp.io` answers a second attempt two seconds
+  after a 500 is not known: the one 500 asked again by hand answered 500 again.
+- GitHub's REST API has not been seen answering a 503: none of the 457,098
+  requests did. It is asked again for what the status means, and because each
+  of the three GraphQL 503s was answered on the query's next attempt.
+- A refused connection, a reset and a TLS handshake timeout were not seen, and
+  are not asked again; whether a second attempt would get past one is not
+  known.
+- No job log's storage has been seen answering a 500, 502, 503 or 504: the
+  journal holds no such failure since 11 September. The retry of a hop is held
+  by tests against a stand-in for storage alone.
+- The collation was measured against PostgreSQL 18.6 on Debian under
+  `en_US.utf8` and against the Alpine image. An ICU collation and other
+  locales were not tried.
+- Code scanning closes an alert when it next analyses main. The five Go
+  alerts were checked with CodeQL 2.27.1 run locally; the JavaScript one was
+  not run locally.
+- The "not read" tiles were drawn through Grafana 13.2.1 alone. A datasource
+  that answers the Elasticsearch century-wide bucket over nothing otherwise
+  would draw something else there.
+- Every InfluxDB measurement above was made on Core, in throwaway
+  containers. Enterprise has still not been sent a delete, and no copy has
+  been removed with `hard_delete_at=now` on a server that holds real data.
+
 ## 2.6.3 - 2026-09-29
 
 2.6.2 was tagged and never released. Its release workflow stopped at the

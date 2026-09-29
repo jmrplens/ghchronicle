@@ -1296,7 +1296,9 @@ func TestStargazersReportWhatBrokeAndSkipWhatIsGone(t *testing.T) {
 	}{
 		{"an increment whose last page is gone", false, http.StatusNotFound, false, 2},
 		{"a full walk whose second page is gone", true, http.StatusNotFound, false, 2},
-		{"a full walk whose second page fails", true, http.StatusInternalServerError, true, 2},
+		// Three: a 500 is asked once more by the client before the walk
+		// hears about it.
+		{"a full walk whose second page fails", true, http.StatusInternalServerError, true, 3},
 	} {
 		f := newFixtureServer(t)
 		f.handle(path, func(w http.ResponseWriter, r *http.Request) {

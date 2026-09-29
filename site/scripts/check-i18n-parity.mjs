@@ -849,11 +849,19 @@ function unterminatedConstruct(body, tree) {
 			const lines = raw.split("\n");
 			const opening = /^[ \t]*(`{3,}|~{3,})/.exec(lines[0]);
 			if (opening === null) return; // Indented code block: nothing to close.
-			const marker = opening[1][0];
-			const closing = new RegExp(
-				`^[ \\t]*\\${marker}{${opening[1].length},}[ \\t]*$`,
-			);
-			if (lines.length < 2 || !closing.test(lines[lines.length - 1])) {
+			// The closing run is matched by a fixed pattern and compared with
+			// the opening afterwards. Building the pattern out of the fence
+			// character put text read from the page into a regular expression,
+			// with a backslash in front of whatever that text was.
+			const closing =
+				lines.length < 2
+					? null
+					: /^[ \t]*(`+|~+)[ \t]*$/.exec(lines[lines.length - 1]);
+			if (
+				closing === null ||
+				closing[1][0] !== opening[1][0] ||
+				closing[1].length < opening[1].length
+			) {
 				found = "code fence";
 			}
 		} else if (node.type === "html") {
@@ -1211,6 +1219,47 @@ never closed
 				`unterminated: ${page.unterminated}`,
 			);
 			expect(page.levels.join(",") === "2", `levels: [${page.levels}]`);
+		},
+	],
+	[
+		"a fence closes on its own character, at least as long",
+		() => {
+			// Indented and followed by a tab, a longer run of tildes closes a
+			// tilde fence; a run of the other character, or a shorter one, is
+			// content, so the block runs to the end of the page. Those two
+			// pages end on that run, with no newline after it, so it is the
+			// last line the check reads rather than an empty one.
+			const closed = pageOf(`---
+title: T
+---
+
+~~~text
+# not a heading
+  ~~~~ \t
+
+## After
+`);
+			expect(
+				closed.unterminated === null,
+				`closed: unterminated: ${closed.unterminated}`,
+			);
+			expect(closed.levels.join(",") === "2", `levels: [${closed.levels}]`);
+			for (const [name, fence, last] of [
+				["other character", "```", "~~~"],
+				["shorter run", "````", "```"],
+			]) {
+				const open = pageOf(`---
+title: T
+---
+
+${fence}text
+## swallowed
+${last}`);
+				expect(
+					open.unterminated === "code fence",
+					`${name}: unterminated: ${open.unterminated}`,
+				);
+			}
 		},
 	],
 	[

@@ -38,14 +38,14 @@ repositorios, y el fichero de estado se lee y nunca se escribe. Un almacén al
 que se le puede preguntar decide por sí mismo; uno al que no, lo decide lo que
 el fichero de estado recuerda de él.
 
-| Almacén                              | Qué decide                                                                                                         |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| Almacén                              | Qué decide                                                                                                                                                         |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | InfluxDB 3                           | Si la etiqueta antigua es una columna de etiqueta de la tabla viva, según el catálogo. Una tabla que InfluxDB ha apartado aparece con otro nombre y no se pregunta |
-| InfluxDB 2                           | Si alguna fila lleva la etiqueta antigua. Las claves de etiqueta siguen listadas tras un borrado, así que no se preguntan |
-| PostgreSQL                           | Si alguna fila tiene un valor en la columna de la etiqueta antigua, en el esquema donde escribe el destino           |
-| Elasticsearch                        | Un recuento de los documentos que llevan la etiqueta antigua. El mapping conserva un campo después de irse sus documentos |
-| Fichero SQL, Graphite, Telegraf      | La versión que el fichero de estado registra como la primera que escribió en el almacén                              |
-| Loki, Prometheus, OTLP, file, stdout | Nada: ninguno guarda una fila cuya identidad pueda cambiar una versión                                               |
+| InfluxDB 2                           | Si alguna fila lleva la etiqueta antigua. Las claves de etiqueta siguen listadas tras un borrado, así que no se preguntan                                          |
+| PostgreSQL                           | Si alguna fila tiene un valor en la columna de la etiqueta antigua, en el esquema donde escribe el destino                                                         |
+| Elasticsearch                        | Un recuento de los documentos que llevan la etiqueta antigua. El mapping conserva un campo después de irse sus documentos                                          |
+| Fichero SQL, Graphite, Telegraf      | La versión que el fichero de estado registra como la primera que escribió en el almacén                                                                            |
+| Loki, Prometheus, OTLP, file, stdout | Nada: ninguno guarda una fila cuya identidad pueda cambiar una versión                                                                                             |
 
 Cada línea empieza por lo que encontró la comprobación:
 
@@ -186,15 +186,15 @@ entradas](/ghchronicle/es/install/actions/#entradas).
 
 ### Qué hace aplicarlo en cada almacén
 
-| Almacén                                                                           | Qué hace aplicarlo                                                                                                         |
-| --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| [InfluxDB 3](/ghchronicle/es/sinks/influxdb/#qué-hace-aquí-una-migración)         | Borra esa tabla, que InfluxDB guarda como `<medida>-<instante>`, consultable, y purga él mismo 72 horas después            |
-| InfluxDB 2                                                                        | Borra todas las filas de la medida en el bucket. No se guarda nada, así que un arranque nunca lo hace por su cuenta        |
-| [PostgreSQL](/ghchronicle/es/sinks/postgres/#qué-hace-aquí-una-migración)         | Renombra la tabla `<medida>-<instante>` en el esquema del destino; ghchronicle la borra 24 horas después                   |
-| [Elasticsearch](/ghchronicle/es/sinks/elasticsearch/#qué-hace-aquí-una-migración) | Bloquea las escrituras del índice, lo clona a `<índice>-<instante>` y lo borra; ghchronicle borra el clon 24 horas después |
-| Fichero SQL                                                                       | Escribe `DROP TABLE IF EXISTS` de la medida en el fichero, antes de las filas escritas después                             |
-| Graphite                                                                          | Imprime las órdenes que quitan las rutas antiguas en la máquina de Graphite                                                |
-| Telegraf                                                                          | Dice qué hacer en el almacén que tiene detrás                                                                              |
+| Almacén                                                                           | Qué hace aplicarlo                                                                                                                       |
+| --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| [InfluxDB 3](/ghchronicle/es/sinks/influxdb/#qué-hace-aquí-una-migración)         | Borra esa tabla, que InfluxDB guarda como `<medida>-<instante>`, consultable, y purga él mismo 72 horas después, o nunca antes de la 3.2 |
+| InfluxDB 2                                                                        | Borra todas las filas de la medida en el bucket. No se guarda nada, así que un arranque nunca lo hace por su cuenta                      |
+| [PostgreSQL](/ghchronicle/es/sinks/postgres/#qué-hace-aquí-una-migración)         | Renombra la tabla `<medida>-<instante>` en el esquema del destino; ghchronicle la borra 24 horas después                                 |
+| [Elasticsearch](/ghchronicle/es/sinks/elasticsearch/#qué-hace-aquí-una-migración) | Bloquea las escrituras del índice, lo clona a `<índice>-<instante>` y lo borra; ghchronicle borra el clon 24 horas después               |
+| Fichero SQL                                                                       | Escribe `DROP TABLE IF EXISTS` de la medida en el fichero, antes de las filas escritas después                                           |
+| Graphite                                                                          | Imprime las órdenes que quitan las rutas antiguas en la máquina de Graphite                                                              |
+| Telegraf                                                                          | Dice qué hacer en el almacén que tiene detrás                                                                                            |
 
 Cada almacén toca esa medida y nada más: la tabla, el índice o las rutas
 nombrados exactamente, en la base de datos, el bucket, el esquema o el prefijo
@@ -213,10 +213,15 @@ ejecución de la Action que no restaura uno, pregunta a PostgreSQL y a
 Elasticsearch por las copias con el nombre que les da una migración, porque su
 fichero de estado no puede nombrarlas. InfluxDB 3 purga las suyas con un
 calendario propio, que se lee de la tabla de sistema de su base de datos
-`_internal`: 72 horas después del borrado por omisión (medido en 3.11.2 y
+`_internal`: 72 horas después del borrado por omisión (medido de la 3.2.1 a la
 3.11.5), y guarda el nombre en su catálogo durante su periodo de gracia de
-borrado después de eso, 24 horas por omisión. Hasta que una copia se va, cómo
-deshacer el cambio está en la página de cada almacén.
+borrado después de eso, 24 horas por omisión. Un servidor anterior a la 3.2 no
+purga ninguna: el plan lo dice antes de aplicar, y `-migrate` pregunta al
+servidor por cada copia que guarda así, con la petición que la quita en cuanto
+el servidor ejecute una versión de la 3.2 a la 3.9 (ver [antes de la 3.2 la
+copia se queda](/ghchronicle/es/sinks/influxdb/#antes-de-la-32-la-copia-se-queda)).
+Hasta que una copia se va, cómo deshacer el cambio está en la página de cada
+almacén.
 
 Un almacén despejado se vuelve a escribir entero. El [registro de
 escrituras](/ghchronicle/es/sinks/#solo-se-escribe-lo-que-ha-cambiado) olvida la
@@ -542,6 +547,6 @@ commits que le quedaban a una pull request. Ver
 [`gh_achievement_progress`](/ghchronicle/es/collectors/measurements/).
 
 <Aside type="note" title="Qué más cambió">
-  Las notas de cada versión, con lo que se midió y lo que no, están en
-  [el historial de versiones](/ghchronicle/es/reference/changelog/).
+  Las notas de cada versión, con lo que se midió y lo que no, están en [el
+  historial de versiones](/ghchronicle/es/reference/changelog/).
 </Aside>

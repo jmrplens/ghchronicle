@@ -232,9 +232,9 @@ switched off must not stop the sweep for the other forty.
 level=ERROR msg="collector failed" family=artifacts repo=acme/parser err="/repos/acme/parser/actions/artifacts?per_page=100&page=2: 502 Bad Gateway: {\n  \"message\": \"Server Error\"\n}"
 ```
 
-A 502 or a 504 in such a line has already failed twice: the client asks once
-more, two seconds later, before it gives up on a REST request, and logs
-neither attempt.
+A 500, 502, 503 or 504 in such a line has already failed twice: the client
+asks once more, two seconds later, before it gives up on a REST request or on a
+job log's download from storage, and logs neither attempt.
 
 A caller that needs to know about that has to read standard error. There is no
 exit code for it, deliberately: on a large account some family fails somewhere

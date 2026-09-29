@@ -421,12 +421,18 @@ the run duration and the queue wait beside the two byte totals leave it as
 well, because that panel adds each value up and would read a value of nothing
 as 0.
 
-Over a range no sweep reached, a group of snapshots the SQL stores read the
-newest row of, Community, Account, Since the account began and Sponsorship,
-reads "No data" in every store, as the SQL stores have no row to read. Before
-2.6.2 Graphite, whose paths answer a range they hold nothing in with nulls,
-drew three of them as a panel with nothing in it, not even the names, and
-Elasticsearch drew the four names of Sponsorship with nothing beside them.
+Over a range no sweep reached, the groups of the account's own snapshots, which
+the SQL stores read as the newest row of the range, say what the range lacked
+as well: since 2.6.4 every tile of Community, Account, Since the account began
+and Sponsorship reads "not read" in every store, and so does the repository
+count beside the stars and forks in every store but Elasticsearch. Until then
+those groups read "No data" in all five, as the SQL stores had no row to read,
+and before 2.6.2 Graphite, whose paths answer a range they hold nothing in with
+nulls, drew three of them as a panel with nothing in it, not even the names,
+and Elasticsearch drew the four names of Sponsorship with nothing beside them.
+In Elasticsearch the repository count leaves the Repositories group over such a
+range, with the stars and the forks, since that panel adds its values up and
+would read a count that is not there as 0.
 
 ### Overview
 
@@ -1205,7 +1211,9 @@ pretend.
   happened, so they draw the traffic of a particular Tuesday, the star curve
   since 2018 and the merge time of a pull request closed in July. The
   PostgreSQL set is the InfluxDB SQL translated, because the SQL sink writes
-  the same facts as tables.
+  the same facts as tables, and it compares text by its bytes as InfluxDB
+  does, so a list is in the same order in both whatever collation the
+  database was created with.
 - **Prometheus** stamps every sample at scrape time, so the exporter reduces
   the per-item rows to current values plus, for the counted measurements, a
   monotonic `_total` of distinct items seen since the exporter started.

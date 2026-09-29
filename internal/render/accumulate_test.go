@@ -3,6 +3,8 @@ package render
 import (
 	"context"
 	"fmt"
+	"math"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -314,27 +316,54 @@ func TestAccumulatorSumsTrafficPerKind(t *testing.T) {
 	}
 }
 
-// numberOf is the one place a field's Go type is read, and a sink receives
-// ints, int64s, floats and booleans depending on which collector wrote the
-// point.
-func TestNumberOfReadsEveryNumericFieldType(t *testing.T) {
-	cases := []struct {
-		in   any
-		want float64
-		ok   bool
-	}{
-		{7, 7, true},
-		{int64(1) << 40, 1 << 40, true},
-		{2.5, 2.5, true},
-		{true, 1, true},
-		{false, 0, true},
-		{"7", 0, false},
-		{nil, 0, false},
-	}
-	for _, tc := range cases {
-		if got, ok := numberOf(tc.in); got != tc.want || ok != tc.ok {
-			t.Errorf("numberOf(%#v) = %v, %v, want %v, %v", tc.in, got, ok, tc.want, tc.ok)
+// A count no int holds is refused rather than converted. Go leaves such a
+// conversion to the platform, and on amd64 a repository written with 1e19
+// stars came out of it as the most negative int, which the card then drew. A
+// refused value is what a field that is not a number already was, nothing to
+// take, so the repository keeps the count it had. Bytes are kept in an int64
+// from the field to the card, so two repositories of torvalds/linux's
+// 1,452,105,738 bytes of C add up past 2^31 exactly.
+func TestAccumulatorRefusesACountNoIntHolds(t *testing.T) {
+	now := time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC)
+	repo := func(stars, forks any, at time.Time) Point {
+		return Point{
+			Measurement: "gh_repo", Tags: map[string]string{"repo": "a", "language": "C"},
+			Fields: map[string]any{"stars": stars, "forks": forks}, Time: at,
 		}
+	}
+	lang := func(repo, name string, bytes any) Point {
+		return Point{
+			Measurement: "gh_repo_language", Tags: map[string]string{"repo": repo, "language": name},
+			Fields: map[string]any{"bytes": bytes}, Time: now,
+		}
+	}
+	a := NewAccumulator("someone")
+	_, _ = a.Write(context.Background(), []Point{
+		repo(5, 1, now),
+		repo(1e19, math.Inf(1), now.Add(time.Hour)),
+		{Measurement: "gh_account", Fields: map[string]any{"followers": -1e19, "public_repos": 3}, Time: now},
+		{Measurement: "gh_contribution_day", Fields: map[string]any{"contributions": math.NaN()}, Time: now},
+		{Measurement: "gh_traffic", Tags: map[string]string{"kind": "views"}, Fields: map[string]any{"count": 4, "uniques": math.Inf(-1)}, Time: now},
+		lang("a", "C", int64(1452105738)),
+		lang("b", "C", int64(1452105738)),
+		lang("b", "Go", 1e19),
+	})
+	c := a.Card()
+	if c.Stars != 5 || c.Forks != 1 {
+		t.Errorf("stars = %d, forks = %d, want the 5 and 1 the repository had", c.Stars, c.Forks)
+	}
+	if c.Followers != 0 || c.Repos != 3 {
+		t.Errorf("followers = %d, repos = %d, want 0 and 3", c.Followers, c.Repos)
+	}
+	if len(c.Sparkline) != 0 {
+		t.Errorf("sparkline = %v, want no day", c.Sparkline)
+	}
+	if c.Views != 4 || c.UniqueVisitors != 0 {
+		t.Errorf("views = %d, visitors = %d, want 4 and 0", c.Views, c.UniqueVisitors)
+	}
+	want := []Language{{Name: "C", Bytes: 2904211476}}
+	if !slices.Equal(c.Languages, want) {
+		t.Errorf("languages = %+v, want %+v", c.Languages, want)
 	}
 }
 

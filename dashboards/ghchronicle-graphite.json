@@ -87,6 +87,30 @@
           {
             "matcher": {
               "id": "byName",
+              "options": "Repositories"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
               "options": "Stars"
             },
             "properties": [
@@ -160,7 +184,7 @@
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "A",
-          "target": "alias(removeEmptySeries(keepLastValue(github.account.*.public_repos)), \"Repositories\")",
+          "target": "alias(fallbackSeries(keepLastValue(github.account.*.public_repos), removeBelowValue(constantLine(0), 1)), \"Repositories\")",
           "textEditor": true
         },
         {
@@ -341,7 +365,104 @@
           },
           "unit": "short"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Followers"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Following"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sponsors"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sponsoring"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 4,
@@ -369,25 +490,25 @@
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "A",
-          "target": "alias(removeEmptySeries(keepLastValue(github.account.*.followers)), \"Followers\")",
+          "target": "alias(fallbackSeries(keepLastValue(github.account.*.followers), removeBelowValue(constantLine(0), 1)), \"Followers\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "B",
-          "target": "alias(removeEmptySeries(keepLastValue(github.account.*.following)), \"Following\")",
+          "target": "alias(fallbackSeries(keepLastValue(github.account.*.following), removeBelowValue(constantLine(0), 1)), \"Following\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "C",
-          "target": "alias(removeEmptySeries(keepLastValue(github.account.*.sponsors)), \"Sponsors\")",
+          "target": "alias(fallbackSeries(keepLastValue(github.account.*.sponsors), removeBelowValue(constantLine(0), 1)), \"Sponsors\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "D",
-          "target": "alias(removeEmptySeries(keepLastValue(github.account.*.sponsoring)), \"Sponsoring\")",
+          "target": "alias(fallbackSeries(keepLastValue(github.account.*.sponsoring), removeBelowValue(constantLine(0), 1)), \"Sponsoring\")",
           "textEditor": true
         }
       ],
@@ -427,6 +548,150 @@
                 "value": "d"
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Contributions"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Account age"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Watching"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Stars given"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Gists"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Packages"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
           }
         ]
       },
@@ -456,37 +721,37 @@
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "A",
-          "target": "alias(removeEmptySeries(keepLastValue(github.contributions_total.*.calendar_total)), \"Contributions\")",
+          "target": "alias(fallbackSeries(keepLastValue(github.contributions_total.*.calendar_total), removeBelowValue(constantLine(0), 1)), \"Contributions\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "B",
-          "target": "alias(removeEmptySeries(keepLastValue(github.account.*.account_age_days)), \"Account age\")",
+          "target": "alias(fallbackSeries(keepLastValue(github.account.*.account_age_days), removeBelowValue(constantLine(0), 1)), \"Account age\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "C",
-          "target": "alias(removeEmptySeries(keepLastValue(github.account.*.watching)), \"Watching\")",
+          "target": "alias(fallbackSeries(keepLastValue(github.account.*.watching), removeBelowValue(constantLine(0), 1)), \"Watching\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "D",
-          "target": "alias(removeEmptySeries(keepLastValue(github.account.*.starred)), \"Stars given\")",
+          "target": "alias(fallbackSeries(keepLastValue(github.account.*.starred), removeBelowValue(constantLine(0), 1)), \"Stars given\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "E",
-          "target": "alias(removeEmptySeries(keepLastValue(github.account.*.gists)), \"Gists\")",
+          "target": "alias(fallbackSeries(keepLastValue(github.account.*.gists), removeBelowValue(constantLine(0), 1)), \"Gists\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "F",
-          "target": "alias(removeEmptySeries(keepLastValue(github.account.*.packages)), \"Packages\")",
+          "target": "alias(fallbackSeries(keepLastValue(github.account.*.packages), removeBelowValue(constantLine(0), 1)), \"Packages\")",
           "textEditor": true
         }
       ],
@@ -524,7 +789,152 @@
               },
               "unit": "short"
             },
-            "overrides": []
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Pull requests merged"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Pull requests reviewed"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Commits"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Issues opened"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Merged elsewhere"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Threads commented elsewhere"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
           },
           "gridPos": {
             "h": 5,
@@ -552,37 +962,37 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "alias(removeEmptySeries(keepLastValue(github.account_total.*.pulls_merged)), \"Pull requests merged\")",
+              "target": "alias(fallbackSeries(keepLastValue(github.account_total.*.pulls_merged), removeBelowValue(constantLine(0), 1)), \"Pull requests merged\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "B",
-              "target": "alias(removeEmptySeries(keepLastValue(github.account_total.*.pulls_reviewed)), \"Pull requests reviewed\")",
+              "target": "alias(fallbackSeries(keepLastValue(github.account_total.*.pulls_reviewed), removeBelowValue(constantLine(0), 1)), \"Pull requests reviewed\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "C",
-              "target": "alias(removeEmptySeries(keepLastValue(github.account_total.*.commits)), \"Commits\")",
+              "target": "alias(fallbackSeries(keepLastValue(github.account_total.*.commits), removeBelowValue(constantLine(0), 1)), \"Commits\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "D",
-              "target": "alias(removeEmptySeries(keepLastValue(github.account_total.*.issues_opened)), \"Issues opened\")",
+              "target": "alias(fallbackSeries(keepLastValue(github.account_total.*.issues_opened), removeBelowValue(constantLine(0), 1)), \"Issues opened\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "E",
-              "target": "alias(removeEmptySeries(keepLastValue(github.account_total.*.pulls_merged_elsewhere)), \"Merged elsewhere\")",
+              "target": "alias(fallbackSeries(keepLastValue(github.account_total.*.pulls_merged_elsewhere), removeBelowValue(constantLine(0), 1)), \"Merged elsewhere\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "F",
-              "target": "alias(removeEmptySeries(keepLastValue(github.account_total.*.commented_elsewhere)), \"Threads commented elsewhere\")",
+              "target": "alias(fallbackSeries(keepLastValue(github.account_total.*.commented_elsewhere), removeBelowValue(constantLine(0), 1)), \"Threads commented elsewhere\")",
               "textEditor": true
             }
           ],
@@ -17314,7 +17724,104 @@
               },
               "unit": "currencyUSD"
             },
-            "overrides": []
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Lifetime received"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Monthly income"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Next payout"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Spent sponsoring"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
           },
           "gridPos": {
             "h": 4,
@@ -17342,25 +17849,25 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "alias(removeEmptySeries(keepLastValue(scale(github.sponsors_listing.*.lifetime_received_cents, 0.01))), \"Lifetime received\")",
+              "target": "alias(fallbackSeries(keepLastValue(scale(github.sponsors_listing.*.lifetime_received_cents, 0.01)), removeBelowValue(constantLine(0), 1)), \"Lifetime received\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "B",
-              "target": "alias(removeEmptySeries(keepLastValue(scale(github.sponsors_listing.*.monthly_income_cents, 0.01))), \"Monthly income\")",
+              "target": "alias(fallbackSeries(keepLastValue(scale(github.sponsors_listing.*.monthly_income_cents, 0.01)), removeBelowValue(constantLine(0), 1)), \"Monthly income\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "C",
-              "target": "alias(removeEmptySeries(keepLastValue(scale(github.sponsors_listing.*.next_payout_cents, 0.01))), \"Next payout\")",
+              "target": "alias(fallbackSeries(keepLastValue(scale(github.sponsors_listing.*.next_payout_cents, 0.01)), removeBelowValue(constantLine(0), 1)), \"Next payout\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "D",
-              "target": "alias(removeEmptySeries(keepLastValue(scale(github.sponsors_listing.*.sponsor_spend_cents, 0.01))), \"Spent sponsoring\")",
+              "target": "alias(fallbackSeries(keepLastValue(scale(github.sponsors_listing.*.sponsor_spend_cents, 0.01)), removeBelowValue(constantLine(0), 1)), \"Spent sponsoring\")",
               "textEditor": true
             }
           ],

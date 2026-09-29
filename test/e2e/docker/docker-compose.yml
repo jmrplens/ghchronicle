@@ -76,8 +76,17 @@ services:
   # PostgreSQL for the SQL sink. The sink writes statements rather than
   # speaking the wire protocol, so a test pipes its file through psql inside
   # this container; the harness has a helper for it.
+  #
+  # The Debian image and not the Alpine one, for its collation. Both create the
+  # database as en_US.utf8, but musl orders text by its bytes whatever the
+  # locale is called, which is InfluxDB's order, while glibc orders it
+  # linguistically, setting case and punctuation aside on the first pass, as
+  # any PostgreSQL on glibc under such a locale does. Against Alpine the
+  # dashboards agreed with InfluxDB by accident: on this image three panels
+  # drew their rows in another order until the PostgreSQL dashboard compared
+  # text by its bytes (measured 2026-09-29).
   postgres:
-    image: postgres:18.6-alpine
+    image: postgres:18.6
     environment:
       POSTGRES_USER: ghchronicle
       POSTGRES_PASSWORD: ghchronicle

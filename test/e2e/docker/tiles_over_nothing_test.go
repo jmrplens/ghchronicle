@@ -30,7 +30,7 @@ var tilesLeftOverNothing = []dashboardDiffer{
 	{
 		title: "Repositories", kind: "stat", stores: []string{"elasticsearch"},
 		reason: "leaves its group when the range holds no document of it",
-		only:   []string{"Stars", "Forks"},
+		only:   []string{"Stars", "Forks", "Repositories"},
 	},
 	{
 		title: "Runs in range", stores: []string{"elasticsearch"},
@@ -72,6 +72,13 @@ var tilesLeftOverNothing = []dashboardDiffer{
 // and Elasticsearch, and Graphite, whose paths answer a range they hold
 // nothing in with nulls, drew three panels with nothing in them, not even the
 // names of their tiles.
+//
+// Five stores that agree on drawing nothing agree, so the comparison alone
+// let the 2.6.2 answer to that stand: those groups, "Sponsorship" and the
+// repository count read "No data" in all five, beside groups that said what
+// the range lacked (the 2.6.3 review). So InfluxDB, which every other store is
+// held to, is held to drawing over nothing every tile it draws over the
+// dashboard's own range.
 func TestEveryTileIsDrawnOverNothing(t *testing.T) {
 	s := Start(t)
 	run := dashboardsRun(t, s)
@@ -91,19 +98,15 @@ func TestEveryTileIsDrawnOverNothing(t *testing.T) {
 			run.quiet[1].Format(time.DateOnly)), run.overQuiet},
 	}
 	for _, q := range questions {
-		pictures := map[int]map[string]grafana.Picture{}
-		for _, store := range dashboardStores {
-			for index, pic := range tilesDrawn(t, store.name, q.answers[store.name]) {
-				if pictures[index] == nil {
-					pictures[index] = map[string]grafana.Picture{}
-				}
-				pictures[index][store.name] = pic
-			}
-		}
+		pictures := tilesByPanel(t, q.answers)
 		tiles, pairs := 0, c.pairs
 		for _, index := range slices.Sorted(maps.Keys(pictures)) {
 			if pic, ok := pictures[index]["influxdb"]; ok {
 				tiles += len(pic.Tiles)
+				if gone := tilesGone(t, run, index, &pic); len(gone) > 0 {
+					t.Errorf("panel %d %q of influxdb draws %v over the dashboard's range and not over %s, "+
+						"where a tile says what the range lacks", index, dashboardPanelTitle(run, index), gone, q.name)
+				}
 			}
 			if failures := c.compare(index, pictures[index]); len(failures) > 0 {
 				t.Errorf("panel %d %q draws %s differently in stores whose descriptions do not say why:\n  %s",
@@ -112,9 +115,10 @@ func TestEveryTileIsDrawnOverNothing(t *testing.T) {
 		}
 		t.Logf("over %s: %d tiles drawn by InfluxDB, %d pairs of stores compared", q.name, tiles, c.pairs-pairs)
 		// A floor rather than a count, measured on the 2.6.2 branch at 52
-		// tiles over the repository and 19 over the range, where the tiles of
-		// the account's snapshots have no row to draw, so that a change that
-		// stops asking fails instead of passing with nothing asked.
+		// tiles over the repository and 19 over the range, and on the 2.6.4
+		// one at 52 over each, where 2.6.3 drew 31 over the range because the
+		// tiles of the account's snapshots had no row to draw there, so that a
+		// change that stops asking fails instead of passing with nothing asked.
 		if tiles < 15 {
 			t.Errorf("InfluxDB drew only %d tiles over %s, too few for this to have asked anything", tiles, q.name)
 		}
@@ -199,6 +203,47 @@ func quietRange(sweeps [][]sqlStoresPoint) [2]time.Time {
 		}
 		to = from
 	}
+}
+
+// tilesByPanel is what every store draws of each panel it was asked, by the
+// panel's index and then by the store.
+func tilesByPanel(t *testing.T, answers map[string][]grafana.Result) map[int]map[string]grafana.Picture {
+	t.Helper()
+	pictures := map[int]map[string]grafana.Picture{}
+	for _, store := range dashboardStores {
+		for index, pic := range tilesDrawn(t, store.name, answers[store.name]) {
+			if pictures[index] == nil {
+				pictures[index] = map[string]grafana.Picture{}
+			}
+			pictures[index][store.name] = pic
+		}
+	}
+	return pictures
+}
+
+// tilesGone is every tile InfluxDB draws of a panel over the dashboard's own
+// range and not in over, what it drew of the panel over nothing. A panel of
+// one value draws it without a name, so for one only its absence counts.
+func tilesGone(t *testing.T, run *dashboardRun, index int, over *grafana.Picture) []string {
+	t.Helper()
+	o, ok := run.outcomes["influxdb"][index]
+	if !ok || o.err != "" {
+		return nil // a query that failed is the first question's business
+	}
+	full, drawn, err := grafana.Drawing(o.panel.Source, o.answer)
+	if err != nil || !drawn {
+		return nil
+	}
+	if len(full.Tiles) == 1 && len(over.Tiles) > 0 {
+		return nil
+	}
+	var gone []string
+	for _, name := range full.Names() {
+		if !slices.Contains(over.Names(), name) {
+			gone = append(gone, name)
+		}
+	}
+	return gone
 }
 
 // tilesDrawn is what each answer askTilesOverNothing had puts on the screen,

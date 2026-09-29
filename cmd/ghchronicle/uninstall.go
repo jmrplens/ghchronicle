@@ -250,13 +250,69 @@ func dataRemovals(ctx context.Context, cfg *config.Config, out io.Writer) ([]rem
 				drop: func(ctx context.Context) error { return store.Drop(ctx, item) },
 			})
 		}
-		if l, ok := store.(teardown.Lingerer); ok && len(l.Lingering()) > 0 {
-			fmt.Fprintf(out, "note: %s: deleted already, and purged by the server itself on its own schedule, 72 "+
-				"hours after the delete by default, which refuses to be asked again sooner: %s\n", store.Name(),
-				strings.Join(l.Lingering(), ", "))
-		}
+		sayLingering(ctx, store, len(items), out)
 	}
 	return found, nil
+}
+
+// sayLingering notes what a store keeps of the tables it was told to delete,
+// which Holds leaves out of the list, and, on a server that never purges what
+// it deletes, that each table this deletes stays too, under a new name, which
+// is worth knowing before yes.
+//
+// A later release is asked which of those tables it will never purge either:
+// one a release before 3.2 deleted keeps no hard deletion time through an
+// upgrade, and said to be purged on schedule it would be left for good with
+// no word of the request that removes it.
+func sayLingering(ctx context.Context, store teardown.Store, deleting int, out io.Writer) {
+	var lingering []string
+	if l, ok := store.(teardown.Lingerer); ok {
+		lingering = l.Lingering()
+	}
+	k, ok := store.(teardown.Keeper)
+	if !ok || (len(lingering) == 0 && deleting == 0) {
+		return
+	}
+	if stay, forGood := k.KeptForGood(ctx); forGood {
+		sayKeptForGood(store.Name(), stay, deleting, lingering, out)
+		return
+	}
+	if len(lingering) == 0 {
+		return
+	}
+	staying, err := k.Staying(ctx, lingering)
+	if err != nil {
+		fmt.Fprintf(out, "note: %s: deleted already, and %s, but a table a release before 3.2 deleted stays for "+
+			"good, and which of these that is could not be read (%v): %s\n", store.Name(), k.Schedule(ctx),
+			err, strings.Join(lingering, ", "))
+		return
+	}
+	var purged []string
+	for _, name := range lingering {
+		if stay, stays := staying[name]; stays {
+			fmt.Fprintf(out, "note: %s: %s was deleted already and is kept for good: %s\n", store.Name(), name, stay)
+			continue
+		}
+		purged = append(purged, name)
+	}
+	if len(purged) > 0 {
+		fmt.Fprintf(out, "note: %s: deleted already, and %s: %s\n", store.Name(), k.Schedule(ctx),
+			strings.Join(purged, ", "))
+	}
+}
+
+// sayKeptForGood is the note of a store that keeps for good what it deletes.
+func sayKeptForGood(name string, stay teardown.Stay, deleting int, lingering []string, out io.Writer) {
+	var kept []string
+	if deleting > 0 {
+		kept = append(kept, "each table deleted here is renamed <table>-<instant> and kept for good")
+	}
+	if len(lingering) > 0 {
+		kept = append(kept, "the tables deleted already are kept for good: "+strings.Join(lingering, ", "))
+	}
+	if len(kept) > 0 {
+		fmt.Fprintf(out, "note: %s: %s. %s\n", name, strings.Join(kept, ", and "), stay)
+	}
 }
 
 // stateRemovals is what a sweep keeps between runs. All of it is rebuilt by

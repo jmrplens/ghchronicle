@@ -114,12 +114,13 @@ for one family, so it will be retried rather than treated as done. One
 repository failing is normal; all of them is the token, the network or an
 outage.
 
-**`collector failed` naming a `502 Bad Gateway` or a `504 Gateway Timeout`.**
-GitHub's gateway gave up on a REST request. The client asks once more two
-seconds later and says nothing about it, so a line like this is a request that
-failed twice, and the next sweep asks again. GitHub's GraphQL gateway gives up
-the same way on a query too large for its ten seconds, and there the collectors
-ask again with a smaller page instead.
+**`collector failed` naming a `500`, a `502 Bad Gateway`, a `503` or a `504
+Gateway Timeout`.** GitHub did not finish the answer to a REST request, at its
+gateway or in the application, or the storage a job log is read from did not.
+The client asks once more two seconds later and says nothing about it, so a
+line like this is a request that failed twice, and the next sweep asks again.
+GitHub's GraphQL gateway gives up the same way on a query too large for its ten
+seconds, and there the collectors ask again with a smaller page instead.
 
 **`state not saved` or `cache file not saved`.** The user the collector runs as
 could not put the file in place. Each of the two is written under a temporary
@@ -168,7 +169,8 @@ and found items GitHub no longer serves: a repository deleted or no longer
 covered, a comment deleted, an alert whose feature was switched off. `first`
 names a few, and `only_in` is the copy that still holds them, until it is
 purged: a day after the migration for PostgreSQL's and Elasticsearch's, and
-when the server's schedule says for InfluxDB 3's, 72 hours by default. Carrying
+when the server's schedule says for InfluxDB 3's, 72 hours by default, or
+never on a server before 3.2. Carrying
 them over is by hand, from that copy, while it is there.
 
 **A number is a multiple of the sweep count.** Something that is a snapshot is
@@ -252,12 +254,15 @@ ghchronicle -config config.yaml -once        # one sweep in the foreground, then
 journalctl -u ghchronicle -f                 # under systemd
 ```
 
-`debug` adds seven lines to that and nothing else: the size of the
-written-points ledger at start-up, a first start with no cache file, a start
-listing jobs again because a store keeps no ledger, the account-wide families
-skipped for want of a `targets.user`, the entries a sink left out for being too
-old, a card-only sweep leaving the state file alone, and each save of the cache
-file. There is no per-request log at any level. See
+`debug` adds these to that and nothing else: the size of the written-points
+ledger at start-up, a first start with no cache file, a start listing jobs
+again because a store keeps no ledger, the account-wide families skipped for
+want of a `targets.user`, the entries a sink left out for being too old, a
+card-only sweep leaving the state file alone, each save of the cache file, the
+migrations a start finds not needed or applied before, the ones noted or frozen
+that the first start said at `INFO`, and each copy a migration set aside that
+the state file forgets because the store purges it or keeps it for good. There
+is no per-request log at any level. See
 [debugging](https://jmrp.io/docs/ghchronicle/configuration/logging/#debugging).
 
 ```yaml
@@ -417,10 +422,13 @@ instant in UTC: PostgreSQL's renamed table, Elasticsearch's clone, lower case
 there, and the name InfluxDB 3 gives a table it deleted. None of the shipped
 panels reads one. ghchronicle purges PostgreSQL's and Elasticsearch's once they
 have been kept 24 hours, and InfluxDB 3 purges its own on its own schedule, 72
-hours after the delete by default; `-migrate` lists them
-under their store as `kept aside`. `-uninstall data` removes PostgreSQL's and
-Elasticsearch's with everything else, and leaves out InfluxDB 3's with a note,
-since the server refuses a delete of a table it has already deleted.
+hours after the delete by default, except one a release before 3.2 deleted,
+which is never purged, not even after an upgrade (see [before 3.2 the copy
+stays](https://jmrp.io/docs/ghchronicle/sinks/influxdb/#before-32-the-copy-stays)); `-migrate` lists
+them under their store as `kept aside`. `-uninstall data` removes PostgreSQL's
+and Elasticsearch's with everything else, and leaves out InfluxDB 3's with a
+note saying which of them stay, since the server refuses a delete of a table it
+has already deleted, or, before 3.2, renames it once more.
 
 ## After an upgrade
 
@@ -497,7 +505,8 @@ read by hand.
 migration set it aside, ghchronicle could not drop PostgreSQL's copy or delete
 Elasticsearch's clone, or could not ask the store which copies it holds. It
 tries again after every sweep and at every start; `aside` names the copy, which
-can also be removed by hand. InfluxDB 3 purges its own on its own schedule.
+can also be removed by hand. InfluxDB 3 purges its own on its own schedule,
+or, before 3.2, never.
 
 **`the cache file still claims what the cleared store held`.** A migration
 could not rewrite the cache file to forget the refusals, and the workflow runs

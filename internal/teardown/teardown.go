@@ -35,12 +35,28 @@ type Store interface {
 	Drop(ctx context.Context, item string) error
 }
 
-// Lingerer is a store that keeps for a while what it was told to delete and
-// purges it itself, and refuses to be told again.
+// Lingerer is a store that keeps, under another name, what it was told to
+// delete, until it purges it itself if it ever does, and that the same delete
+// sent again does not remove.
 type Lingerer interface {
 	// Lingering is what the last Holds found deleted and not yet purged,
 	// which Holds leaves out.
 	Lingering() []string
+}
+
+// Keeper is a store that may keep for good what it is told to delete:
+// InfluxDB 3, which before 3.2 purges nothing it deletes, and from 3.2 on
+// nothing a release before 3.2 deleted.
+type Keeper interface {
+	// KeptForGood says, when the store keeps for good every table it
+	// deletes, why, and what removes one.
+	KeptForGood(ctx context.Context) (Stay, bool)
+	// Staying is, of the tables named, each one the store deleted already,
+	// those nothing will ever purge, with why each stays and what removes
+	// it. An error is a store that could not say which they are.
+	Staying(ctx context.Context, deleted []string) (map[string]Stay, error)
+	// Schedule is how the store purges the others, as a clause.
+	Schedule(ctx context.Context) string
 }
 
 // Unsupported is a sink whose store cannot be emptied from here, with the

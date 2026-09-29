@@ -53,9 +53,11 @@ func (i *influx) Name() string { return "influxdb" }
 //
 // A table InfluxDB 3 has already deleted is left out. The server renames it
 // to <name>-<instant>, keeps listing it and answering queries of it until it
-// purges it 24 hours later, and answers a delete of it with a 409 whether or
-// not hard_delete_at is sent (measured on 3.11.2). Listed, it was "removed"
-// on every uninstall and still there after. Lingering says which they are.
+// purges it, 72 hours later by default, and never when a release before 3.2
+// deleted it, and answers the delete Drop sends with a 409 from 3.2.1 on, or,
+// before 3.2, by renaming it once more (measured on 3.0.0 to 3.11.5). Listed,
+// it was "removed" on every uninstall and still there after. Lingering says
+// which they are, and Staying which of them will never be purged.
 func (i *influx) Holds(ctx context.Context) ([]string, error) {
 	names, err := i.tables(ctx)
 	if err != nil {
@@ -92,6 +94,56 @@ var asideStamp = regexp.MustCompile(`^-(\d{8}[Tt]\d{6})$`)
 // Lingering is the tables of this project's that the last Holds found
 // deleted and not yet purged.
 func (i *influx) Lingering() []string { return i.lingering }
+
+// KeptForGood says, of a server that keeps every table it deletes for good,
+// why, and what removes one once it is renamed.
+func (i *influx) KeptForGood(ctx context.Context) (Stay, bool) {
+	server, err := i.Describe(ctx)
+	if err != nil || !KeepsForGood(server) {
+		return Stay{}, false
+	}
+	return InfluxStay(server, i.sink, "<table>-<instant>"), true
+}
+
+// Staying is, of the tables named, each one this InfluxDB 3 deleted already,
+// those it will never purge on its own, with why each stays and what removes
+// it: every one on a release before 3.2, and on a later one each its system
+// table lists as deleted with no hard deletion time, which is how a table a
+// release before 3.2 deleted looks after an upgrade. 3.2.0's system table has
+// no such column, so there the question fails.
+func (i *influx) Staying(ctx context.Context, deleted []string) (map[string]Stay, error) {
+	server, err := i.Describe(ctx)
+	if err != nil || i.v2 || len(deleted) == 0 {
+		return nil, err
+	}
+	staying := deleted
+	if !KeepsForGood(server) {
+		unscheduled, askErr := i.unscheduled(ctx)
+		if askErr != nil {
+			return nil, askErr
+		}
+		staying = slices.DeleteFunc(slices.Clone(deleted), func(name string) bool { return !unscheduled[name] })
+	}
+	out := make(map[string]Stay, len(staying))
+	for _, name := range staying {
+		out[name] = InfluxStay(server, i.sink, name)
+	}
+	return out, nil
+}
+
+// Schedule is how InfluxDB 3 purges a table it deleted and scheduled. Only a
+// release known to refuse to be asked again sooner is said to: 3.10.0 to
+// 3.11.5 answer a delete of it with a 409 with or without hard_delete_at,
+// while 3.2.1 to 3.9.13 take one with hard_delete_at=now (measured).
+func (i *influx) Schedule(ctx context.Context) string {
+	purged := fmt.Sprintf("purged by the server itself on its own schedule, %d hours after the delete by default",
+		int(ServerKeeps.Hours()))
+	server, err := i.Describe(ctx)
+	if minor, known := influx3Minor(server); err == nil && known && minor >= 10 {
+		return purged + ", which refuses to be asked again sooner"
+	}
+	return purged
+}
 
 // tables is every table of the database, sorted.
 func (i *influx) tables(ctx context.Context) ([]string, error) {

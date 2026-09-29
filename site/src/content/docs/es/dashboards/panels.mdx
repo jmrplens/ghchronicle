@@ -88,13 +88,19 @@ duración de la ejecución y la espera en cola junto a los dos totales de bytes
 salen también, porque ese panel suma cada valor y leería como 0 un valor de
 nada.
 
-Sobre un rango al que no llegó ningún barrido, un grupo de instantáneas del que
-los almacenes SQL leen la fila más reciente, Community, Account, Since the
-account began y Sponsorship, dice "No data" en todos los almacenes, ya que los
-almacenes SQL no tienen fila que leer. Antes de la 2.6.2 Graphite, cuyas rutas
-responden con nulos a un rango en el que no tienen nada, dibujaba tres de ellos
-como un panel sin nada, ni siquiera los nombres, y Elasticsearch dibujaba los
-cuatro nombres de Sponsorship sin nada al lado.
+Sobre un rango al que no llegó ningún barrido, los grupos de las instantáneas de
+la propia cuenta, de las que los almacenes SQL leen la fila más reciente del
+rango, también dicen qué le faltó al rango: desde la 2.6.4 cada tarjeta de
+Community, Account, Since the account began y Sponsorship dice "not read" en
+todos los almacenes, y también el recuento de repositorios junto a las
+estrellas y los forks en todos menos Elasticsearch. Hasta entonces esos grupos
+decían "No data" en los cinco, ya que los almacenes SQL no tenían fila que
+leer, y antes de la 2.6.2 Graphite, cuyas rutas responden con nulos a un rango
+en el que no tienen nada, dibujaba tres de ellos como un panel sin nada, ni
+siquiera los nombres, y Elasticsearch dibujaba los cuatro nombres de
+Sponsorship sin nada al lado. En Elasticsearch el recuento de repositorios sale
+del grupo Repositories sobre un rango así, con las estrellas y los forks, ya
+que ese panel suma sus valores y leería como 0 un recuento que no está.
 
 ## Overview
 
@@ -919,7 +925,9 @@ en vez de fingir.
   así que dibujan el tráfico de un martes concreto, la curva de estrellas desde
   2018 y el tiempo de fusión de una pull request cerrada en julio. El juego de
   PostgreSQL es el SQL de InfluxDB traducido, porque el destino SQL escribe los
-  mismos hechos como tablas.
+  mismos hechos como tablas, y compara el texto por sus bytes como InfluxDB,
+  así que una lista sale en el mismo orden en los dos, sea cual sea la
+  intercalación con que se creó la base de datos.
 - **Prometheus** sella cada muestra en el momento del scrape, así que el
   exportador reduce las filas por elemento a valores actuales más, para las
   medidas que se cuentan, un `_total` monótono de elementos distintos vistos

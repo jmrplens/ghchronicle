@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -39,13 +40,21 @@ type Aside struct {
 	Measurement string
 	// At is when the rows were set aside, read from the name.
 	At time.Time
-	// ByServer says the store purges the copy itself and refuses to be told
-	// to: InfluxDB 3 answers a delete of a table it has soft deleted with a
-	// 409, measured on 3.11.2 with and without hard_delete_at=now.
+	// ByServer says the copy is the store's to purge, which ghchronicle
+	// never asks for: InfluxDB 3 answers a delete of a table it has soft
+	// deleted with another rename before 3.2, and with a 409 from 3.2.1 on
+	// unless hard_delete_at is sent, which 3.10.0 and later refuse as well
+	// (measured on 3.0.0 to 3.11.5).
 	ByServer bool
 	// Until is when the store itself purges the copy, as it said, zero when
 	// it did not say or purges nothing itself.
 	Until time.Time
+	// ForGood says nothing will ever purge the copy on its own: InfluxDB 3
+	// before 3.2 has no hard deletion, and a copy one of those releases
+	// made keeps none through an upgrade. Stays is why, and what removes
+	// it, as a sentence for the operator, empty when ForGood is not set.
+	ForGood bool
+	Stays   string
 }
 
 // ErrUntouched is a failure that left the store as it was: nothing was set
@@ -124,10 +133,11 @@ func Purgers(cfg *config.Config) []Purger {
 const Grace = 24 * time.Hour
 
 // ServerKeeps is how long InfluxDB 3 keeps a table it soft deleted when it
-// does not say: measured on 3.11.2 and 3.11.5, a delete sent without
+// does not say: measured on 3.2.1 to 3.11.5, a delete sent without
 // hard_delete_at is scheduled for hard deletion 72 hours later, and the
 // catalog keeps the name for the delete grace period after that, 24 hours by
-// default.
+// default. 3.2.0 does not say, and keeps the same 72 hours in its source.
+// Before 3.2 nothing is ever scheduled: see KeepsForGood.
 const ServerKeeps = 72 * time.Hour
 
 // stampLayout is the instant in an aside's name. InfluxDB 3 names its soft
@@ -177,7 +187,8 @@ func asideOf(name string, measurements []string) (Aside, bool) {
 // at once, even one that makes a tag column a field, measured on 3.0.0 to
 // 3.11.5. The name it chose is read back from the catalog, as the one table of
 // that measurement's that was not there before the delete, and when it purges
-// it from its own system table. hard_delete_at is not sent: measured on
+// it from its own system table, or, on a release that never does, why the
+// copy stays and what removes it. hard_delete_at is not sent: measured on
 // 3.11.5, now had not removed the rows eleven minutes later, and it takes the
 // days to undo away.
 //
@@ -234,10 +245,154 @@ func (i *influx) Clear(ctx context.Context, measurement string, _ time.Time) (As
 		}
 	}
 	made.Measurement, made.ByServer = measurement, true
-	if made.Name != "" {
+	switch {
+	case made.Name == "":
+	case KeepsForGood(i.described):
+		made.ForGood, made.Stays = true, InfluxStay(i.described, i.sink, made.Name).String()
+	default:
 		made.Until = i.purgedFrom(ctx, made.Name)
 	}
 	return made, true, nil
+}
+
+// influx3Minor is the minor release of an InfluxDB 3 as Describe names it,
+// and whether the name is one of an InfluxDB 3's.
+func influx3Minor(server string) (int, bool) {
+	fields := strings.Fields(server)
+	if len(fields) == 0 {
+		return 0, false
+	}
+	major, rest, ok := strings.Cut(fields[len(fields)-1], ".")
+	if !ok || major != "3" {
+		return 0, false
+	}
+	minor, _, _ := strings.Cut(rest, ".")
+	n, err := strconv.Atoi(minor)
+	return n, err == nil && n >= 0
+}
+
+// KeepsForGood says whether an InfluxDB 3, as Describe names it, keeps every
+// table it deletes for good. Measured on Core 3.0.0, 3.0.3 and 3.1.0: the
+// delete renames the table as every release does, and nothing ever purges
+// it. There is no hard deletion: no deleter task starts, hard_delete_at is
+// taken and ignored, _internal has no system.tables, and a delete of the
+// renamed table answers 200 and renames it again. 3.2.0 is the first
+// release with a deleter.
+func KeepsForGood(server string) bool {
+	minor, ok := influx3Minor(server)
+	return ok && minor < 2
+}
+
+// Stay is why an InfluxDB 3 keeps a copy for good, and what removes it.
+type Stay struct {
+	// Why is the reason, as a clause.
+	Why string
+	// How says where a removal works, as a sentence without its full stop,
+	// and Command is the request, empty where no request removes it.
+	How, Command string
+}
+
+// String is the whole of it, for a log line or the plan.
+func (s Stay) String() string {
+	switch {
+	case s.How == "":
+		return s.Why + "."
+	case s.Command == "":
+		return s.Why + ". " + s.How + "."
+	}
+	return s.Why + ". " + s.How + ": " + s.Command
+}
+
+// InfluxStay says why a copy nothing will purge on its own stays, and what
+// removes it, on the server Describe named; table is the copy's name, or a
+// placeholder where it is not known yet. A server whose release cannot be
+// read is told what the releases measured do.
+//
+// Measured on Core, a copy made by 3.0.3 or 3.1.0 holds no hard deletion
+// time on 3.2.0, 3.4.0, 3.9.13 or 3.11.5 after an upgrade. A delete of it
+// with hard_delete_at=now schedules it on 3.2.0 (which renames it once more
+// first), 3.4.0 and 3.9.13, and each dropped it from its catalog when its
+// delete grace period had passed; 3.2.1 to 3.9.13 take hard_delete_at=now
+// for a copy of their own too, and 3.10.0 to 3.11.5 answer 409 with or
+// without it.
+func InfluxStay(server string, s *config.InfluxSink, table string) Stay {
+	command := "curl -X DELETE '" + strings.TrimSuffix(s.URL, "/") + "/api/v3/configure/table?db=" +
+		url.QueryEscape(s.Bucket) + "&table=" + table + "&hard_delete_at=now' -H 'Authorization: Bearer <token>'"
+	const unscheduled = "a release before 3.2 set it aside, so nothing is scheduled to purge it"
+	minor, known := influx3Minor(server)
+	switch {
+	case known && minor < 2:
+		return Stay{
+			Why: server + " has no hard deletion, so it never purges a table it deleted, and a delete of one " +
+				"only renames it again",
+			How: "A release from 3.2 to 3.9 removes it when told to, once the server runs one", Command: command,
+		}
+	case known && minor < 10:
+		return Stay{Why: unscheduled, How: server + " removes it when told to", Command: command}
+	case known:
+		return Stay{Why: unscheduled, How: server + " refuses to be told to, with or without hard_delete_at, as " +
+			"every release from 3.10.0 to 3.11.5 was measured to, so no request removes it on this release"}
+	}
+	return Stay{Why: unscheduled, How: "A release from 3.2 to 3.9 removes it when told to", Command: command}
+}
+
+// Unpurged is every copy of the measurements named that this InfluxDB 3 will
+// never purge on its own, with why and what removes it: every copy on a
+// release before 3.2, and on a later one each copy its system table lists as
+// deleted with no hard deletion time, which is one an earlier release set
+// aside. 3.2.0's system table has no such column, so there the question
+// fails, and InfluxDB 2 keeps no copy at all.
+func (i *influx) Unpurged(ctx context.Context, measurements []string) ([]Aside, error) {
+	if _, err := i.Describe(ctx); err != nil || i.v2 {
+		return nil, err
+	}
+	names, err := i.tables(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var copies []Aside
+	var copyNames []string
+	for _, name := range names {
+		if a, ok := asideOf(name, measurements); ok {
+			copies = append(copies, a)
+			copyNames = append(copyNames, name)
+		}
+	}
+	stays, err := i.Staying(ctx, copyNames)
+	if err != nil {
+		return nil, err
+	}
+	copies = slices.DeleteFunc(copies, func(a Aside) bool {
+		_, kept := stays[a.Name]
+		return !kept
+	})
+	for k := range copies {
+		copies[k].ByServer, copies[k].ForGood = true, true
+		copies[k].Stays = stays[copies[k].Name].String()
+	}
+	return copies, nil
+}
+
+// unscheduled is every table of the database the server deleted and has not
+// scheduled a hard deletion of, from the system table of its _internal
+// database: measured on 3.11.5, the query answers each deleted table with its
+// hard_deletion_time, which a table an earlier release deleted lacks.
+func (i *influx) unscheduled(ctx context.Context) (map[string]bool, error) {
+	var rows []struct {
+		Name  string  `json:"table_name"`
+		Until *string `json:"hard_deletion_time"`
+	}
+	if err := i.sqlIn(ctx, "_internal", "SELECT table_name, hard_deletion_time FROM system.tables "+
+		"WHERE database_name = "+sqlString(i.sink.Bucket)+" AND deleted", &rows); err != nil {
+		return nil, err
+	}
+	out := map[string]bool{}
+	for _, r := range rows {
+		if r.Until == nil {
+			out[r.Name] = true
+		}
+	}
+	return out, nil
 }
 
 // purgedFrom is when InfluxDB 3 has scheduled the hard deletion of a table it

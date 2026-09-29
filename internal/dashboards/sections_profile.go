@@ -324,24 +324,21 @@ func sponsorship(b *builder) []Panel {
 	var centColumns []string
 	for i, f := range sponsorFields {
 		moneyCols = append(moneyCols, fmt.Sprintf("%s / 100.0 AS %q", f.From, f.To))
+		// As promNewest reads a gauge, in dollars.
 		money.Prom = append(money.Prom,
-			promNamed(ref(i), f.To, "github_sponsors_listing_"+f.From+" / 100"))
+			promAggregated(ref(i), f.To, "max(github_sponsors_listing_"+f.From+") / 100"))
 		money.GR = append(money.GR,
 			grNewest(ref(i), f.To, fmt.Sprintf("scale(%s, 0.01)", gp(sl, f.From))))
+		money.Overrides = append(money.Overrides, noValueOf(f.To, notRead))
 		cents := f.To + " in cents"
 		inCents = append(inCents, named{f.From, cents})
 		centColumns = append(centColumns, cents)
 		inDollars = append(inDollars, binaryField(f.To, cents, "/", "100"))
 	}
 	// The newest document, as every other snapshot group reads it, and the
-	// dollars a calculation of the panel's. They were four server-side
-	// expressions over a largest reading per day, and an expression answers a
-	// range with no document in it with NaN, which a tile draws as nothing:
-	// over a range no sweep reached the group was four names with no values
-	// where the other stores read "No data" (Grafana 13.2.1, the 2.6.2
-	// review). A bucket with no document in it is no row, and no tile.
-	money.ES, money.ESTF = esTbl(sl, []any{b.one()}, []any{b.mNewest(fieldsOf(sponsorFields)...)},
-		inCents, nil, append(inDollars, hideColumns(centColumns...))...)
+	// dollars a calculation of the panel's, where they were four server-side
+	// expressions over the largest reading of each day.
+	money.ES, money.ESTF = b.esNewest(sl, inCents, append(inDollars, hideColumns(centColumns...))...)
 
 	// Two hundred rows because that is the collector's own ceiling: it reads
 	// first: 100 from each of the two connections and both land in this one
@@ -403,10 +400,10 @@ func sponsorship(b *builder) []Panel {
 		}, nil, hideColumns(panelESTime))
 
 	return []Panel{
-		statGroup("Sponsorship", box{W: 24, H: 4, X: 0, Y: 0}, []Target{sqlT(
+		statGroup("Sponsorship", box{W: 24, H: 4, X: 0, Y: 0}, []Target{sqlT(alwaysARow(
 			"SELECT " + strings.Join(moneyCols, ", ") + profileFrom + sl +
 				" WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 1",
-		)}, money),
+		))}, money),
 		panel("table", "Sponsorships", box{W: 12, H: 10, X: 0, Y: 4}, []Target{sqlT(sponsorships)}, &P{
 			// The count of the last sweep, not increase() over the monotonic
 			// total. Every sweep re-reads the same finite set of sponsorships,

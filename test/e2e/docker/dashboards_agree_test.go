@@ -284,6 +284,13 @@ func TestTheStoresDrawTheSameValues(t *testing.T) {
 // more than one row drew the same rows in another order on two runs: two open
 // items elsewhere, two authors with one pull request each and two ecosystems
 // of one repository among them.
+//
+// Where it sorts by text, the order is also the collation's: InfluxDB compares
+// bytes and PostgreSQL the database's collation, unless the translation says
+// bytes. This suite's PostgreSQL is a linguistic one for that reason (see the
+// compose file), and on it three panels drew another order until it did.
+// TestThePostgreSQLDashboardLeavesNoTextToTheCollation holds the rest, whose
+// rows here happen to sort alike either way.
 func TestTheSQLStoresDrawTheRowsInOneOrder(t *testing.T) {
 	s := Start(t)
 	run := dashboardsRun(t, s)
@@ -307,7 +314,8 @@ func TestTheSQLStoresDrawTheRowsInOneOrder(t *testing.T) {
 		}}
 		if diff := grafana.Order(&a, &b, like); diff != "" {
 			t.Errorf("panel %d %q draws the same rows in another order in InfluxDB and PostgreSQL, "+
-				"so its ORDER BY leaves a tie to each store's sort: %s", index, dashboardPanelTitle(run, index), diff)
+				"so its ORDER BY leaves a tie to each store's sort or a text to PostgreSQL's collation: %s",
+				index, dashboardPanelTitle(run, index), diff)
 		}
 		if len(a.Columns) > 0 && len(a.Columns[0].Values) > 1 {
 			held++

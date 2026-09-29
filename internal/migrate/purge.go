@@ -133,6 +133,9 @@ func (p Purging) candidates(ctx context.Context, rec *run.StoreRecord, s teardow
 // changed.
 func (p Purging) purge(ctx context.Context, store string, rec *run.StoreRecord, s teardown.Purger, a run.Aside) bool {
 	switch {
+	case a.ForGood:
+		p.Log.Debug("set-aside copy forgotten: the store keeps it for good, and -migrate asks the store for it",
+			"sink", store, "aside", a.Name)
 	case a.ByServer:
 		p.Log.Debug("set-aside copy forgotten: the store purges it itself", "sink", store, "aside", a.Name)
 	case s == nil:

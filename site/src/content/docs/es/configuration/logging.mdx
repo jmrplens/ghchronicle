@@ -111,7 +111,7 @@ log:
   level: debug
 ```
 
-Debug añade siete líneas, y ninguna más:
+Debug añade estas líneas, y ninguna más:
 
 - `loaded the written-points ledger`, con cuántos puntos volvió el libro de
   escrituras, cuando arranca el servicio;
@@ -126,13 +126,23 @@ Debug añade siete líneas, y ninguna más:
   recortó en lugar de rechazarse;
 - `card-only sweep, the state file is left as it was`;
 - `cache file saved`, con cuántas respuestas y ejecuciones guarda y cuánto
-  tardó.
+  tardó;
+- `migration not needed` y `migration applied before`, en cada arranque, por
+  cada cambio que un almacén nunca necesitó o que ya tiene aplicado;
+- `migration noted: nothing is changed` y `migration frozen`, en cada arranque
+  después del primero, que dice cada una en `INFO`;
+- `set-aside copy forgotten`, cuando le llega su hora a una copia que apartó una
+  migración y el fichero de estado deja de nombrarla: `the store purges it
+  itself` para una que InfluxDB 3 purga con su propio calendario, y `the store
+  keeps it for good, and -migrate asks the store for it` para una que guarda
+  para siempre.
 
 No hay registro por petición: el cliente de `internal/ghapi` no lleva
 registrador, así que qué endpoint se llamó y qué respuesta volvió 304 no se ven
 en ningún nivel. Eso incluye su único reintento: una petición REST respondida
-con 502 o 504 se repite dos segundos después, en silencio, así que un
-`collector failed` que nombra un 502 o un 504 ya ha fallado dos veces.
+con 500, 502, 503 o 504 se repite dos segundos después, en silencio, y también
+la descarga del log de un job desde el almacenamiento, así que un
+`collector failed` que nombra uno de esos cuatro ya ha fallado dos veces.
 
 <Aside type="tip" title="JSON para un agente de envío, texto para una persona">
   `format: json` emite un objeto por línea, que es lo que quieren Promtail,
