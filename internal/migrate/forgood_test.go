@@ -53,7 +53,7 @@ func TestThePlanSaysWhichInfluxDBKeepsTheCopyForGood(t *testing.T) {
 			want := "curl -X DELETE '" + in.Config.Sinks.Influx.URL + "/api/v3/configure/table?db=" +
 				in.Config.Sinks.Influx.Bucket + "&table=gh_discussion_comment-<time>&hard_delete_at=now' " +
 				"-H 'Authorization: Bearer <token>'"
-			if got := slices.Contains(it.Commands, want); got != c.command {
+			if slices.Contains(it.Commands, want) != c.command {
 				t.Errorf("commands %q, want %q among them: %v", it.Commands, want, c.command)
 			}
 		})

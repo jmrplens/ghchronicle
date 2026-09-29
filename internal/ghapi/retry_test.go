@@ -397,6 +397,12 @@ func networkFailures() []networkFailure {
 				return "http://" + accepted.addr, httpx.OwnTransport(), &accepted.n
 			},
 			carrying: func(err error) bool {
+				// Windows reports the reset as WSAECONNRESET on the read,
+				// which is not syscall.ECONNRESET there: a failed read is
+				// what a reset from the far end is on every system.
+				if op, ok := errors.AsType[*net.OpError](err); ok && op.Op == "read" {
+					return true
+				}
 				return errors.Is(err, syscall.ECONNRESET) || errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)
 			},
 		},
