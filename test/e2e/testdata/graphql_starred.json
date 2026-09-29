@@ -18,7 +18,7 @@
             }
           },
           {
-            "starredAt": "@DAYS_AGO_30@T20:00:00Z",
+            "starredAt": "@DAYS_AGO_29@T20:00:00Z",
             "node": {
               "nameWithOwner": "golang/go",
               "stargazerCount": 125000,

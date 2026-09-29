@@ -132,3 +132,30 @@ func TestEveryMarkerInTheFixturesIsOneTheFakeResolves(t *testing.T) {
 		}
 	}
 }
+
+// edgeOfTheRange is a relative timestamp on the day the dashboards' default
+// range begins: "@DAYS_AGO_30@" with a time of day after it.
+var edgeOfTheRange = regexp.MustCompile(`@DAYS_AGO_30@T\d\d:\d\d`)
+
+// edgeExempt are the fixtures whose day-30 timestamp no range panel reads:
+// the co-authored walk counts by merged: day, whatever the range.
+var edgeExempt = map[string]bool{"graphql_coauthored_pulls.json": true}
+
+// TestNoFixtureStandsOnTheEdgeOfTheRange keeps a row the panels read off the
+// first day of now-30d. A timestamp there is inside the range before its time
+// of day and outside it after: the fixture's one star given, at 20:00 on day
+// thirty, left the SQL stores' "Recently starred" every evening at 20:00 UTC
+// while the Prometheus exporter, which holds the current value, kept it, and
+// the cross-store comparison failed or passed by the hour it ran.
+func TestNoFixtureStandsOnTheEdgeOfTheRange(t *testing.T) {
+	t.Parallel()
+	for name, body := range everyFixture(t) {
+		if edgeExempt[name] {
+			continue
+		}
+		for _, stamp := range edgeOfTheRange.FindAllString(string(body), -1) {
+			t.Errorf("%s stamps %s, on the day now-30d begins: move it a day "+
+				"later so the panels read it whatever the hour", name, stamp)
+		}
+	}
+}
