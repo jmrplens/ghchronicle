@@ -122,6 +122,9 @@ func (l *Lock) Release() error {
 	if l == nil || l.f == nil {
 		return nil
 	}
+	// The unlock's own error is not the caller's concern: the close that
+	// follows lets go of the lock whatever the unlock said.
+	_ = unlockFile(l.f)
 	err := l.f.Close()
 	l.f = nil
 	return err

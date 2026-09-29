@@ -21,3 +21,7 @@ func lockFile(f *os.File) (held bool, err error) {
 	}
 	return false, err
 }
+
+// unlockFile lets go of the flock before the descriptor is closed. Closing
+// would drop it too; saying so keeps the release in one place with the take.
+func unlockFile(f *os.File) error { return unix.Flock(int(f.Fd()), unix.LOCK_UN) }

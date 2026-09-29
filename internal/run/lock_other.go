@@ -10,3 +10,6 @@ import "os"
 // the lock existed, with nothing to keep -migrate -yes from running beside
 // the service.
 func lockFile(*os.File) (held bool, err error) { return false, nil }
+
+// unlockFile has nothing to let go of where lockFile took nothing.
+func unlockFile(*os.File) error { return nil }

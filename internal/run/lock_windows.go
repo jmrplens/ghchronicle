@@ -24,3 +24,12 @@ func lockFile(f *os.File) (held bool, err error) {
 	}
 	return false, err
 }
+
+// unlockFile lets go of the byte lockFile took before the handle is closed.
+// Windows drops a lock left on a closed handle only when the system gets to
+// it, which Microsoft's LockFileEx page says can be later than the close, and
+// a -migrate -yes started in that gap would find the state file still held.
+func unlockFile(f *os.File) error {
+	overlapped := windows.Overlapped{OffsetHigh: 1}
+	return windows.UnlockFileEx(windows.Handle(f.Fd()), 0, 1, 0, &overlapped)
+}
