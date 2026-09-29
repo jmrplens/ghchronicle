@@ -108,7 +108,15 @@ menos Graphite, que dibujaba sus cuatro nombres sin nada al lado. Antes de la
 nada, dibujaba tres de los grupos como un panel sin nada, ni siquiera los
 nombres, y Elasticsearch dibujaba los cuatro nombres de Sponsorship sin nada al
 lado. Un año sin ninguno de los cuatro tipos de contribución tampoco tiene
-mezcla que dibujar, y sus barras también dicen "not read".
+mezcla que dibujar. Las barras leen la instantánea más reciente del rango, como
+la tarjeta Contributions, así que cuando esa instantánea no tiene ninguno de los
+cuatro cada barra dice "not read" junto a una tarjeta Contributions de 0, en
+todos los almacenes y aunque una instantánea anterior del rango sí tuviera
+alguno. Hasta la 2.6.4 los almacenes SQL y Graphite dibujaban ahí la mezcla de
+esa instantánea anterior: los almacenes SQL dejaban fuera toda instantánea
+cuyos cuatro tipos sumaban 0, y las barras de Graphite tomaban la última
+proporción que tenía el rango, pasando por alto la instantánea que no tiene
+ninguna.
 
 ## Overview
 

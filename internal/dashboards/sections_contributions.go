@@ -600,17 +600,31 @@ const calendarDesc = "The profile's green squares, as GitHub draws them: a colum
 // the panel drawing "No data" there in four stores and four names with nothing
 // beside them in Graphite (Grafana 13.2.1, over 26 July to 25 August 2025 on
 // the containerised suite).
+//
+// The newest snapshot decides even when it holds none of the four, which is
+// no mix, and every bar reads "not read" beside a Contributions tile of 0.
+// The SQL stores used to skip such a row, and Graphite, whose share of a sum
+// of 0 is null, used to skip that null, so both drew the mix of an older
+// snapshot in the range while Prometheus and Elasticsearch, which divide the
+// newest one, drew no share (the review of the 2.6.4 details, a reading of 0
+// written after the suite's own). So the SQL divides by NULLIF rather than
+// filtering the row out, and Graphite's bars take the last value of the
+// series rather than the last one that is not null: keepLastValue carries the
+// newest reading to the end of the range, where only a range no sweep
+// reached or a sum of 0 leaves a null. graphite-web averages the points it
+// consolidates into one, skipping nulls, so where a panel is too narrow for
+// the range's hourly points the one point that holds both the last share and
+// the null after it still reads the share, until the next point.
 func contributionMix(b *builder) Panel {
 	// The four kinds of contribution as shares of their sum, the mix
 	// GitHub draws as a radar on the profile. Computed here, so every store
 	// hands the panel a percentage and the panel needs no arithmetic.
 	mixOf := func(field string) string {
-		return fmt.Sprintf("100.0 * %s / %s", field, mixTotal)
+		return fmt.Sprintf("100.0 * %s / NULLIF(%s, 0)", field, mixTotal)
 	}
 	mix := `SELECT ` + mixOf("commits") + ` AS "Commits", ` + mixOf("pull_requests") +
 		` AS "Pull requests", ` + mixOf("issues") + ` AS "Issues", ` + mixOf("reviews") +
-		` AS "Code review" FROM gh_contributions_total WHERE $__timeFilter(time)` +
-		" AND " + mixTotal + " > 0 ORDER BY time DESC LIMIT 1"
+		` AS "Code review" FROM gh_contributions_total` + overviewNewestRow
 	// Graphite: each of the four fields as a percentage of the four summed,
 	// the newest value of each.
 	mixPath := gp("gh_contributions_total", "{commits,pull_requests,issues,reviews}")
@@ -645,12 +659,15 @@ func contributionMix(b *builder) Panel {
 			Desc: "The four kinds of contribution as shares of their sum over the last " +
 				"year, the mix the profile draws as a radar: commits, pull requests, " +
 				"issues and code review. The percentages are computed from the totals " +
-				"beside this, and the four add up to a hundred. Each bar reads \"not read\" " +
-				"over a range no sweep reached, as the totals do, and so does a year with " +
-				"none of the four, which has no mix to draw.",
-			Prom: mixProm,
-			GR:   mixGR,
-			ES:   mixES, ESTF: mixEStf, ESOpts: Opts{"unit": "percentunit", "maxv": 1.0},
+				"beside this, and the four add up to a hundred. The bars read the newest " +
+				"snapshot of the range, the one the Contributions tile of Account reads, " +
+				"and each reads \"not read\" over a range no sweep reached, as that tile " +
+				"does, and when that snapshot holds none of the four, which is no mix to " +
+				"draw, even where an older one in the range had some.",
+			Prom:   mixProm,
+			GR:     mixGR,
+			GROpts: Opts{"calc": "last"},
+			ES:     mixES, ESTF: mixEStf, ESOpts: Opts{"unit": "percentunit", "maxv": 1.0},
 			Overrides: overrides,
 		})
 }

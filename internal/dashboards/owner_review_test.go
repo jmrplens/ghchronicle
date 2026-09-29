@@ -255,7 +255,7 @@ func TestContributionMixIsFourSharesOfTheTotal(t *testing.T) {
 	}
 	sql := sqlOf(t, mustPanel(t, rendered(t, "influxdb"), "Contribution mix (last year)"))
 	for _, part := range mixParts {
-		if !strings.Contains(sql, "100.0 * "+part.From+" / "+mixTotal+` AS "`+part.To+`"`) {
+		if !strings.Contains(sql, "100.0 * "+part.From+" / NULLIF("+mixTotal+`, 0) AS "`+part.To+`"`) {
 			t.Errorf("%s is not a percentage of the four summed: %s", part.To, sql)
 		}
 	}

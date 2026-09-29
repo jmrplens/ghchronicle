@@ -3904,7 +3904,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "The four kinds of contribution as shares of their sum over the last year, the mix the profile draws as a radar: commits, pull requests, issues and code review. The percentages are computed from the totals beside this, and the four add up to a hundred. Each bar reads \"not read\" over a range no sweep reached, as the totals do, and so does a year with none of the four, which has no mix to draw.",
+          "description": "The four kinds of contribution as shares of their sum over the last year, the mix the profile draws as a radar: commits, pull requests, issues and code review. The percentages are computed from the totals beside this, and the four add up to a hundred. The bars read the newest snapshot of the range, the one the Contributions tile of Account reads, and each reads \"not read\" over a range no sweep reached, as that tile does, and when that snapshot holds none of the four, which is no mix to draw, even where an older one in the range had some.",
           "fieldConfig": {
             "defaults": {
               "color": {

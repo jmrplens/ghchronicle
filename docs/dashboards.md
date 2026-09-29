@@ -438,7 +438,13 @@ with nothing beside them. Before 2.6.2 Graphite, whose paths answer a range
 they hold nothing in with nulls, drew three of the groups as a panel with
 nothing in it, not even the names, and Elasticsearch drew the four names of
 Sponsorship with nothing beside them. A year with none of the four kinds of
-contribution has no mix to draw either, and its bars read "not read" too.
+contribution has no mix to draw either. The bars read the newest snapshot of
+the range, as the Contributions tile does, so when that snapshot holds none of
+the four every bar reads "not read" beside a Contributions tile of 0, in every
+store and even where an older snapshot in the range held some. Until 2.6.4 the
+SQL stores and Graphite drew that older snapshot's mix there: the SQL stores
+left out every snapshot whose four kinds added up to 0, and Graphite's bars
+took the last share the range held, passing over the snapshot that has none.
 
 ### Overview
 
