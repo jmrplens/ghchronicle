@@ -2482,7 +2482,7 @@
         },
         {
           "datasource": "${DS_INFLUXDB}",
-          "description": "The four kinds of contribution as shares of their sum over the last year, the mix the profile draws as a radar: commits, pull requests, issues and code review. The percentages are computed from the totals beside this, and the four add up to a hundred.",
+          "description": "The four kinds of contribution as shares of their sum over the last year, the mix the profile draws as a radar: commits, pull requests, issues and code review. The percentages are computed from the totals beside this, and the four add up to a hundred. The bars read the newest snapshot of the range, the one the Contributions tile of Account reads, and each reads \"not read\" over a range no sweep reached, as that tile does, and when that snapshot holds none of the four, which is no mix to draw, even where an older one in the range had some.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2493,7 +2493,104 @@
               "min": 0,
               "unit": "percent"
             },
-            "overrides": []
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Commits"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Pull requests"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Issues"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Code review"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
           },
           "gridPos": {
             "h": 5,
@@ -2525,7 +2622,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT 100.0 * commits / (commits + pull_requests + issues + reviews) AS \"Commits\", 100.0 * pull_requests / (commits + pull_requests + issues + reviews) AS \"Pull requests\", 100.0 * issues / (commits + pull_requests + issues + reviews) AS \"Issues\", 100.0 * reviews / (commits + pull_requests + issues + reviews) AS \"Code review\" FROM gh_contributions_total WHERE $__timeFilter(time) AND (commits + pull_requests + issues + reviews) \u003e 0 ORDER BY time DESC LIMIT 1",
+              "rawSql": "SELECT newest.* FROM (SELECT 1 AS one) AS always LEFT JOIN (SELECT 100.0 * commits / NULLIF((commits + pull_requests + issues + reviews), 0) AS \"Commits\", 100.0 * pull_requests / NULLIF((commits + pull_requests + issues + reviews), 0) AS \"Pull requests\", 100.0 * issues / NULLIF((commits + pull_requests + issues + reviews), 0) AS \"Issues\", 100.0 * reviews / NULLIF((commits + pull_requests + issues + reviews), 0) AS \"Code review\" FROM gh_contributions_total WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 1) AS newest ON true",
               "refId": "A"
             }
           ],

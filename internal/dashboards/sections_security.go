@@ -208,14 +208,16 @@ func openAlerts(b *builder) []Panel {
 				grNamed("A", "Dependabot", latestSum(depOpen)),
 				grNamed("B", securityCodeScanning, latestSum(rp(cs, "open"))),
 			},
-			ES: append(
-				esRefs("A", b.esLatestSum(da, "open", "severity", "ecosystem")),
-				esRefs("B", b.esLatestSum(cs, "open", "severity", "tool"))...,
-			),
-			ESOver: []any{frameName("A", "Dependabot"), frameName("B", securityCodeScanning)},
-			ESOpts: Opts{"calc": "sum"},
-			ESDesc: esLeftOut("an alert count", esNewestAddedUp("alert")),
-			Opts:   Opts{"thresholds": plainSteps},
+			// Each count is the newest document of each repository, severity
+			// and ecosystem or tool, added up by the panel.
+			ES: func() []Target {
+				dependabot := b.esLatestSum("A", "Dependabot", da, "open", "severity", "ecosystem")
+				out := []Target{dependabot, b.esNameOnly(dependabot, "C", "Dependabot")}
+				scanning := b.esLatestSum("B", securityCodeScanning, cs, "open", "severity", "tool")
+				return append(out, scanning, b.esNameOnly(scanning, "D", securityCodeScanning))
+			}(),
+			ESTF: esSumPerName(),
+			Opts: Opts{"thresholds": plainSteps},
 			Overrides: []any{
 				fieldThresholds("Dependabot", "short", alertThresholds),
 				fieldThresholds(securityCodeScanning, "short", alertThresholds),

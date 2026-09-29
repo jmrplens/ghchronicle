@@ -119,13 +119,18 @@ Que falle un repositorio es normal; que fallen todos es el token, la red o una
 caída.
 
 **`collector failed` que nombra un `500`, un `502 Bad Gateway`, un `503` o un
-`504 Gateway Timeout`.** GitHub no terminó la respuesta a una petición REST, en
-su pasarela o en la aplicación, o no la terminó el almacenamiento del que se lee
+`504 Gateway Timeout`.** GitHub no terminó la respuesta a una petición, en su
+pasarela o en la aplicación, o no la terminó el almacenamiento del que se lee
 el log de un job. El cliente pregunta una vez más dos segundos después y no dice
 nada de ello, así que una línea como esta es una petición que falló dos veces, y
-la siguiente pasada vuelve a preguntar. La pasarela GraphQL de GitHub se rinde igual con una
-consulta demasiado grande para sus diez segundos, y ahí los colectores vuelven
-a preguntar con una página más pequeña.
+la siguiente pasada vuelve a preguntar. Una consulta GraphQL se vuelve a
+preguntar del mismo modo, salvo por una respuesta: un `502` o un `504` que tardó
+los diez segundos de GitHub en volver es una consulta demasiado grande, que los
+colectores que tienen una página más pequeña vuelven a preguntar con ella. Una
+línea que dice que la consulta es demasiado grande para una sola petición es
+una que agotó el tiempo incluso con la página más pequeña, o en un recorrido
+sin página más pequeña que pedir. Lo leído antes se escribe, un relleno no
+anota ese repositorio como recorrido, y la pasada siguiente lo vuelve a leer.
 
 **`state not saved` o `cache file not saved`.** El usuario con el que corre el
 colector no pudo poner el fichero en su sitio. Cada uno de los dos se escribe

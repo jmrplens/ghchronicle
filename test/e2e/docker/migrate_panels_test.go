@@ -295,10 +295,11 @@ type panelsNS struct {
 	uids map[string]string
 }
 
-// seedPanels writes 2.6.0's shape into a namespace of every store through
-// the sinks, and makes the datasources that read it. Everything it makes is
-// removed when the test ends.
-func seedPanels(ctx context.Context, t *testing.T, s *Stack, ns string, old []sink.Point, dir string) *panelsNS {
+// seedPanels writes points into a namespace of every store through the
+// sinks, and makes the datasources that read it: here 2.6.0's shape, and the
+// contributions snapshots TestTheContributionMixReadsTheNewestSnapshot asks
+// the mix about. Everything it makes is removed when the test ends.
+func seedPanels(ctx context.Context, t *testing.T, s *Stack, ns string, points []sink.Point, dir string) *panelsNS {
 	t.Helper()
 	n := &panelsNS{
 		s: s, name: ns, sql: filepath.Join(dir, ns+".sql"), uids: map[string]string{},
@@ -324,8 +325,8 @@ func seedPanels(ctx context.Context, t *testing.T, s *Stack, ns string, old []si
 		sink.NewGraphite(s.GraphiteAddr, ns, 1000, 30*time.Second),
 		sink.NewSQL("postgres", n.sql, 0, 0),
 	} {
-		if written, err := w.Write(ctx, old); err != nil || written != len(old) {
-			t.Fatalf("2.6.0's shape through the %s sink into %s: %d of %d, %v", w.Name(), ns, written, len(old), err)
+		if written, err := w.Write(ctx, points); err != nil || written != len(points) {
+			t.Fatalf("the seed through the %s sink into %s: %d of %d, %v", w.Name(), ns, written, len(points), err)
 		}
 		if err := w.Close(); err != nil {
 			t.Fatal(err)
@@ -337,7 +338,7 @@ func seedPanels(ctx context.Context, t *testing.T, s *Stack, ns string, old []si
 	}
 	n.before = string(body)
 	storeCall(ctx, t, http.MethodPost, s.ElasticsearchURL+"/"+ns+"-*/_refresh", "", "")
-	n.awaitCarbon(ctx, t, graphiteFilesSent(ctx, t, ns, old))
+	n.awaitCarbon(ctx, t, graphiteFilesSent(ctx, t, ns, points))
 	n.datasources(ctx, t)
 	return n
 }
@@ -659,6 +660,16 @@ func (n *panelsNS) wantTakenBack(ctx context.Context, t *testing.T, store string
 // drawn is what each comment panel of one store draws over the namespace.
 func (n *panelsNS) drawn(ctx context.Context, t *testing.T, store string) map[string]grafana.Picture {
 	t.Helper()
+	return n.drawnPanels(ctx, t, store, commentPanels, "discussion_comment")
+}
+
+// drawnPanels is what each panel of those titles in one store's dashboard
+// draws over the namespace, each target turned from the suite's own index
+// prefix and the Graphite paths of measurement to the namespace's.
+func (n *panelsNS) drawnPanels(ctx context.Context, t *testing.T, store string, titles []string,
+	measurement string,
+) map[string]grafana.Picture {
+	t.Helper()
 	dashboard, plugin := store, map[string]string{
 		"influxdb": "influxdb", "postgres": "grafana-postgresql-datasource", "sql": "grafana-postgresql-datasource",
 		"elasticsearch": "elasticsearch", "graphite": "graphite",
@@ -672,7 +683,7 @@ func (n *panelsNS) drawn(ctx context.Context, t *testing.T, store string) map[st
 	}
 	var panels []grafana.PanelQuery
 	for _, p := range grafana.Panels(doc["panels"]) {
-		if !slices.Contains(commentPanels, p.Title) {
+		if !slices.Contains(titles, p.Title) {
 			continue
 		}
 		targets := make([]map[string]any, 0, len(p.Targets))
@@ -681,7 +692,7 @@ func (n *panelsNS) drawn(ctx context.Context, t *testing.T, store string) map[st
 			for _, key := range []string{"query", "target"} {
 				if q, ok := rewritten[key].(string); ok {
 					q = strings.ReplaceAll(q, "_index:"+elasticsearchPrefix+"-", "_index:"+n.name+"-")
-					rewritten[key] = strings.ReplaceAll(q, "github.discussion_comment.", n.name+".discussion_comment.")
+					rewritten[key] = strings.ReplaceAll(q, "github."+measurement+".", n.name+"."+measurement+".")
 				}
 			}
 			targets = append(targets, rewritten)
@@ -689,8 +700,8 @@ func (n *panelsNS) drawn(ctx context.Context, t *testing.T, store string) map[st
 		p.Targets = targets
 		panels = append(panels, p)
 	}
-	if len(panels) != len(commentPanels) {
-		t.Fatalf("the %s dashboard has %d of the panels %v", dashboard, len(panels), commentPanels)
+	if len(panels) != len(titles) {
+		t.Fatalf("the %s dashboard has %d of the panels %v", dashboard, len(panels), titles)
 	}
 	client := grafana.Client{URL: n.s.GrafanaURL, Token: n.s.GrafanaToken}
 	vars := dashboardVars(doc, dashboardStore{name: dashboard, uid: n.uids[store], plugin: plugin}, nil)

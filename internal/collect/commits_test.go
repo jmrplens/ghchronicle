@@ -220,3 +220,49 @@ func TestCommitsRateLimitIsReported(t *testing.T) {
 		t.Fatalf("err = %v, want the rate limit reported", err)
 	}
 }
+
+// TestCommitsWalkOnPastAQuickRefusal is what happened to three commit walks
+// in production on 2026-09-13 and 2026-09-18: a page answered 503 in about a
+// second, the client read it as a query too large, and the walk took that
+// for the end of the history, stopped there and reported success. Asked
+// again, the page is read and the walk goes on; refused twice, it is a
+// failure, handed up with the page read before it, which the runner reports
+// and does not record as walked.
+func TestCommitsWalkOnPastAQuickRefusal(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name     string
+		refusals int
+		failed   bool
+		commits  int
+	}{
+		{"refused once", 1, false, 3},
+		{"refused twice", 2, true, 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			f := newFixtureServer(t)
+			refused := 0
+			f.graphQL(func(w http.ResponseWriter, _ *http.Request, _ string, vars map[string]any) {
+				if vars["after"] == nil {
+					f.write(w, "graphql_commits_page1.json")
+					return
+				}
+				if refused < tc.refusals {
+					refused++
+					w.WriteHeader(http.StatusServiceUnavailable)
+					_, _ = w.Write([]byte(`{"message":"Service Unavailable"}`))
+					return
+				}
+				f.write(w, "graphql_commits_page2.json")
+			})
+			points, err := Commits{Walk: Unbounded}.Collect(ctx(t), f.Client, testRepo, testNow)
+			if (err != nil) != tc.failed {
+				t.Errorf("err = %v, want a failure: %v", err, tc.failed)
+			}
+			if got := len(only(t, points, "gh_commit")); got != tc.commits {
+				t.Errorf("got %d commits, want %d", got, tc.commits)
+			}
+		})
+	}
+}

@@ -1679,8 +1679,9 @@ func TestCoauthoredWalkDoesNotShrinkThePageForAnyOtherRefusal(t *testing.T) {
 	}
 }
 
-// The page is halved down to ten and no further: a gateway that refuses
-// every size is a failure after the fifth query, not a loop.
+// The page is halved while it is larger than ten and no further, so a hundred
+// ends at six: a gateway that refuses every size is a failure after the fifth
+// query, not a loop.
 func TestCoauthoredWalkGivesUpBelowAPageOfTen(t *testing.T) {
 	t.Parallel()
 	f := newFixtureServer(t)

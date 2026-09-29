@@ -529,6 +529,35 @@ func TestPullsSendsBothConnectionsOnTheFirstPage(t *testing.T) {
 	}
 }
 
+// TestPullsAskAQuickRefusalAgainAtTheSameSize: a 503 in about a second is not
+// the gateway giving up on a query that ran out of time, and halving the page
+// for it would ask for twice the queries for the rest of the walk for nothing.
+// The client asks it once more, as it was.
+func TestPullsAskAQuickRefusalAgainAtTheSameSize(t *testing.T) {
+	t.Parallel()
+	f := newFixtureServer(t)
+	var firsts []any
+	f.graphQL(func(w http.ResponseWriter, _ *http.Request, _ string, vars map[string]any) {
+		firsts = append(firsts, vars["first"])
+		if len(firsts) == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(`{"message":"Service Unavailable"}`))
+			return
+		}
+		f.write(w, "graphql_pulls.json")
+	})
+	points, err := Pulls{First: 50}.Collect(ctx(t), f.Client, testRepo, testNow)
+	if err != nil {
+		t.Fatalf("a refusal answered on the second attempt failed the walk: %v", err)
+	}
+	if len(firsts) != 2 || firsts[0] != float64(50) || firsts[1] != float64(50) {
+		t.Errorf("page sizes asked for = %v, want 50 twice", firsts)
+	}
+	if len(only(t, points, "gh_pull_request")) != 2 {
+		t.Error("the page asked again must be rendered")
+	}
+}
+
 func TestPullsHalvesThePageWhenTheGatewayGivesUp(t *testing.T) {
 	t.Parallel()
 	f := newFixtureServer(t)

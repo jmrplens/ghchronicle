@@ -80,17 +80,20 @@ func isPaginationLimit(err error) bool {
 // stay this narrow. A rate limit, a canceled sweep and a bad token also
 // arrive here, and reading those as "nothing here" would make every remaining
 // collector return no points and report success.
+//
+// GitHub's timeout is not "nothing here" either, and it used to be read as it:
+// a query the gateway gave up on after ten seconds is one too large to finish,
+// and each walk that took it for the end of its data stopped there and
+// reported success. Twelve commit walks did in production between 2026-09-11
+// and 2026-09-18, and a backfill recorded each of those repositories as
+// walked, so nothing past the page was ever read. A caller with a smaller page
+// or batch to ask asks it (Pulls, Commits, the co-authored walk, aliasBatch,
+// Branches); every other one hands the timeout up with what it read.
 func isSkippableGraphQL(err error) bool {
 	if err == nil {
 		return false
 	}
 	if isSkippable(err) {
-		return true
-	}
-	// A query the gateway gave up on is a request too large, not a repository
-	// that went away, so the caller keeps the pages it already walked. Asking
-	// again for the same query would only time out again.
-	if _, ok := errors.AsType[*ghapi.TooLargeError](err); ok {
 		return true
 	}
 	msg := err.Error()

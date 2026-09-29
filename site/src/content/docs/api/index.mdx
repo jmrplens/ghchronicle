@@ -177,6 +177,22 @@ four, storage alone is asked again, on the same signed URL and without the
 brake, because it is not GitHub's API and spends no budget. The API is not
 asked for a new redirect.
 
+A GraphQL query is asked once more the same way, two seconds later and
+through the brake, with one answer left out. GitHub documents its GraphQL
+timeout as a `502` or a `504` once a query has run for more than ten seconds,
+and that one is a query too large for one request. The rest of the four are
+asked again as they were, on the same page: a `500`, a `503`, and a `502` or a
+`504` that came back sooner than ten seconds, which cannot be that timeout.
+Measured on the same sweeps, of 66,821 queries GitHub answered 42 with a
+`502` after 10.45 to 11.20 seconds, 9 with a `504` after 11.03 to 11.23, and 3
+with a `503` after 0.70 to 1.08 seconds. Each of those three cost a point and
+was a page of a commit history, which is why a quick failure is not read as a
+query too large: the commit walk took one, at the time, as the end of what it
+could read, and each of the three stopped its walk there and reported success. A
+query that fails twice is a failure the collector reports, and the next sweep
+asks again; so is an answer that is not JSON and is not that timeout, which is
+no GraphQL answer at all.
+
 What is not asked again:
 
 - **A refusal.** Any `4xx`, and a `501` or a `505`, is the answer the same
@@ -188,9 +204,20 @@ What is not asked again:
   again. No connection refused, reset or TLS handshake timeout appeared, and a
   request whose kept-alive connection closed before it was answered is sent
   again by Go's HTTP client itself.
-- **GraphQL.** Its gateway error means a query too large to answer in ten
-  seconds, which the same query would meet again; the collectors ask again on
-  the same cursor with a smaller page instead.
+- **GitHub's GraphQL timeout.** A `502` or a `504` to a query that ran for
+  ten seconds means a query too large to answer in them, which the same query
+  would meet again. The pull request, commit and co-authored pull request walks
+  ask again on the same cursor at half the page while it is larger than ten, so
+  a page of fifty is asked again at twenty-five, twelve and six, and a query
+  about several repositories at once is asked again with half of them, down to
+  one. What still times out at the smallest, and every other walk or single
+  query, is a failure the collector reports with the rows it read before it, never the end
+  of what there is to read: a backfill does not record that repository as
+  walked, and the next sweep reads it again. Up to 2.6.3 a walk with no smaller
+  page to ask took the timeout for the end of its data and reported success,
+  which on the author's account stopped twelve commit walks, all at a page of
+  fifty; asked by hand, twenty-five of the same commits answered in under five
+  seconds.
 
 ## The budget in the log
 

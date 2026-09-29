@@ -587,17 +587,44 @@ const calendarDesc = "The profile's green squares, as GitHub draws them: a colum
 	"a week."
 
 // contributionMix is the radar the profile draws, as four shares of one sum.
+//
+// It reads the newest snapshot of the range, as the Account group beside it
+// reads the same one, and over a range no sweep reached each bar says so as
+// that group's tiles do, in every store: the SQL stores join the newest row
+// to a row that is always there (alwaysARow), Prometheus reads the largest
+// series of each gauge or NaN (promNewest), Graphite keeps its series of
+// nulls with a fallback for a path never written (grNamed), and Elasticsearch
+// reads esNewest's bucket and makes a field of each part (esSumPerName) for
+// the arithmetic of the row. Each store read the newest reading alone before,
+// which such a range answers with nothing, and the last review of 2.6.4 found
+// the panel drawing "No data" there in four stores and four names with nothing
+// beside them in Graphite (Grafana 13.2.1, over 26 July to 25 August 2025 on
+// the containerised suite).
+//
+// The newest snapshot decides even when it holds none of the four, which is
+// no mix, and every bar reads "not read" beside a Contributions tile of 0.
+// The SQL stores used to skip such a row, and Graphite, whose share of a sum
+// of 0 is null, used to skip that null, so both drew the mix of an older
+// snapshot in the range while Prometheus and Elasticsearch, which divide the
+// newest one, drew no share (the review of the 2.6.4 details, a reading of 0
+// written after the suite's own). So the SQL divides by NULLIF rather than
+// filtering the row out, and Graphite's bars take the last value of the
+// series rather than the last one that is not null: keepLastValue carries the
+// newest reading to the end of the range, where only a range no sweep
+// reached or a sum of 0 leaves a null. graphite-web averages the points it
+// consolidates into one, skipping nulls, so where a panel is too narrow for
+// the range's hourly points the one point that holds both the last share and
+// the null after it still reads the share, until the next point.
 func contributionMix(b *builder) Panel {
 	// The four kinds of contribution as shares of their sum, the mix
 	// GitHub draws as a radar on the profile. Computed here, so every store
 	// hands the panel a percentage and the panel needs no arithmetic.
 	mixOf := func(field string) string {
-		return fmt.Sprintf("100.0 * %s / %s", field, mixTotal)
+		return fmt.Sprintf("100.0 * %s / NULLIF(%s, 0)", field, mixTotal)
 	}
 	mix := `SELECT ` + mixOf("commits") + ` AS "Commits", ` + mixOf("pull_requests") +
 		` AS "Pull requests", ` + mixOf("issues") + ` AS "Issues", ` + mixOf("reviews") +
-		` AS "Code review" FROM gh_contributions_total WHERE $__timeFilter(time)` +
-		" AND " + mixTotal + " > 0 ORDER BY time DESC LIMIT 1"
+		` AS "Code review" FROM gh_contributions_total` + overviewNewestRow
 	// Graphite: each of the four fields as a percentage of the four summed,
 	// the newest value of each.
 	mixPath := gp("gh_contributions_total", "{commits,pull_requests,issues,reviews}")
@@ -606,29 +633,43 @@ func contributionMix(b *builder) Panel {
 		mixGR[i] = grNamed(ref(i), part.To, fmt.Sprintf("asPercent(keepLastValue(%s), sumSeries(keepLastValue(%s)))",
 			gp("gh_contributions_total", part.From), mixPath))
 	}
-	mixProm := make([]Target, len(mixParts))
+	// Each gauge is read as promNewest reads one, the largest of its series,
+	// which is what lets the division stand beside `or`: a quotient of plain
+	// selectors keeps their labels.
+	newest := func(field string) string { return "max(github_contributions_total_" + field + ")" }
+	whole := make([]string, len(mixParts))
 	for i, part := range mixParts {
-		mixProm[i] = promNamed(ref(i), part.To, fmt.Sprintf(
-			"100 * github_contributions_total_%s / (github_contributions_total_commits"+
-				" + github_contributions_total_pull_requests + github_contributions_total_issues"+
-				" + github_contributions_total_reviews)", part.From,
-		))
+		whole[i] = newest(part.From)
+	}
+	mixProm := make([]Target, len(mixParts))
+	overrides := make([]any, len(mixParts))
+	for i, part := range mixParts {
+		mixProm[i] = promAggregated(ref(i), part.To, fmt.Sprintf("100 * %s / (%s)",
+			newest(part.From), strings.Join(whole, " + ")))
+		overrides[i] = noValueOf(part.To, notRead)
 	}
 	// Elasticsearch hands back the four counts of the newest document, and
 	// the percentages are the panel's own arithmetic: the sum of the row,
-	// then each count over it, then the counts and the sum dropped.
-	mixES, mixEStf := esTbl("gh_contributions_total", []any{b.one()},
-		[]any{b.mNewest(fieldsOf(mixParts)...)}, mixParts, nil)
-	mixEStf = append(mixEStf, mixShares()...)
-	return panel("bargauge", "Contribution mix (last year)", box{W: 14, H: 5, X: 10, Y: 7}, []Target{sqlT(mix)}, &P{
-		Desc: "The four kinds of contribution as shares of their sum over the last " +
-			"year, the mix the profile draws as a radar: commits, pull requests, " +
-			"issues and code review. The percentages are computed from the totals " +
-			"beside this, and the four add up to a hundred.",
-		Prom: mixProm,
-		GR:   mixGR,
-		ES:   mixES, ESTF: mixEStf, ESOpts: Opts{"unit": "percentunit", "maxv": 1.0},
-	})
+	// then each count over it, then the counts and the sum dropped. The row
+	// is esSumPerName's, since esNewest answers a series per count.
+	mixES, mixEStf := b.esNewest("gh_contributions_total", mixParts,
+		append(esSumPerName(), mixShares()...)...)
+	return panel("bargauge", "Contribution mix (last year)", box{W: 14, H: 5, X: 10, Y: 7},
+		[]Target{sqlT(alwaysARow(mix))}, &P{
+			Desc: "The four kinds of contribution as shares of their sum over the last " +
+				"year, the mix the profile draws as a radar: commits, pull requests, " +
+				"issues and code review. The percentages are computed from the totals " +
+				"beside this, and the four add up to a hundred. The bars read the newest " +
+				"snapshot of the range, the one the Contributions tile of Account reads, " +
+				"and each reads \"not read\" over a range no sweep reached, as that tile " +
+				"does, and when that snapshot holds none of the four, which is no mix to " +
+				"draw, even where an older one in the range had some.",
+			Prom:   mixProm,
+			GR:     mixGR,
+			GROpts: Opts{"calc": "last"},
+			ES:     mixES, ESTF: mixEStf, ESOpts: Opts{"unit": "percentunit", "maxv": 1.0},
+			Overrides: overrides,
+		})
 }
 
 // sundayWeek bins a time to the Sunday that starts its week. date_bin aligns

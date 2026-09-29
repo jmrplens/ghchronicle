@@ -722,29 +722,29 @@ func TestGraphQLWithNilOutSkipsDecoding(t *testing.T) {
 	}
 }
 
-func TestGraphQLMapsAnHTMLGatewayFailureToTooLarge(t *testing.T) {
+// TestGraphQLReadsANonJSONAnswerAsAFailure: an answer that is not JSON is not
+// a GraphQL answer, and unless it is a 502 or a 504 that took GitHub's
+// timeout window it is not that timeout either, however long it took. As a
+// query too large, a login page in front of an Enterprise server would have
+// ended every walk that stops at one as though it had read everything.
+func TestGraphQLReadsANonJSONAnswerAsAFailure(t *testing.T) {
 	t.Parallel()
+	var calls atomic.Int32
 	c, _ := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-		w.WriteHeader(http.StatusBadGateway)
-		_, _ = w.Write([]byte("<html><body>502</body></html>"))
-	})
-	err := c.GraphQL(context.Background(), "{}", nil, nil)
-	var tl *TooLargeError
-	if !errors.As(err, &tl) || tl.Status != 502 {
-		t.Errorf("err = %v, want TooLargeError 502", err)
-	}
-}
-
-func TestGraphQLMapsANonJSONAnswerToTooLarge(t *testing.T) {
-	t.Parallel()
-	c, _ := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		calls.Add(1)
 		w.Header().Set("Content-Type", "text/plain")
 		_, _ = w.Write([]byte("nope"))
 	})
-	var tl *TooLargeError
-	if err := c.GraphQL(context.Background(), "{}", nil, nil); !errors.As(err, &tl) {
-		t.Errorf("err = %v, want TooLargeError", err)
+	c.SetTimeoutWindow(0)
+	err := c.GraphQL(context.Background(), "{}", nil, nil)
+	if _, tooLarge := errors.AsType[*TooLargeError](err); tooLarge {
+		t.Errorf("err = %v, read as a query too large", err)
+	}
+	if se, ok := errors.AsType[*StatusError](err); !ok || se.Code != http.StatusOK || se.Body != "nope" {
+		t.Errorf("err = %v, want the answer as a StatusError with its body", err)
+	}
+	if n := calls.Load(); n != 1 {
+		t.Errorf("the server saw %d queries, want one: a 200 is the same answer asked again", n)
 	}
 }
 
@@ -2120,11 +2120,10 @@ func TestAnUncachedRequestCarriesNoIfNoneMatchAtAll(t *testing.T) {
 	}
 }
 
-// TestGraphQLMapsA500ToTooLargeWhateverItsBody: the gateway's failure is
-// recognized by the status as well as by the content type, so a 5xx is a
-// query to shrink even when it arrives dressed as JSON. The boundary is the
-// first 5xx.
-func TestGraphQLMapsA500ToTooLargeWhateverItsBody(t *testing.T) {
+// TestGraphQLNeverDecodesTheBodyOfA5xx: a failure is recognized by the status
+// as well as by the content type, so a 5xx is a failure even when it arrives
+// dressed as JSON. The boundary is the first 5xx.
+func TestGraphQLNeverDecodesTheBodyOfA5xx(t *testing.T) {
 	t.Parallel()
 	c, _ := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -2133,8 +2132,8 @@ func TestGraphQLMapsA500ToTooLargeWhateverItsBody(t *testing.T) {
 	})
 	var out map[string]any
 	err := c.GraphQL(context.Background(), "{ viewer { login } }", nil, &out)
-	if tl, ok := errors.AsType[*TooLargeError](err); !ok || tl.Status != http.StatusInternalServerError {
-		t.Errorf("err = %v, want TooLargeError 500", err)
+	if se, ok := errors.AsType[*StatusError](err); !ok || se.Code != http.StatusInternalServerError {
+		t.Errorf("err = %v, want the 500 as a StatusError", err)
 	}
 	if out != nil {
 		t.Errorf("the body of a 500 was decoded: %v", out)
@@ -2509,7 +2508,7 @@ func TestGraphQLRateReportsAFailureRatherThanAnEmptyBudget(t *testing.T) {
 		w.WriteHeader(http.StatusBadGateway)
 	})
 	st, err := c.GraphQLRate(context.Background())
-	if _, ok := errors.AsType[*TooLargeError](err); !ok {
+	if se, ok := errors.AsType[*StatusError](err); !ok || se.Code != http.StatusBadGateway {
 		t.Errorf("err = %v, want the gateway's failure", err)
 	}
 	if st != (RateState{}) {

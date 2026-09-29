@@ -114,18 +114,21 @@ func releases(b *builder) []Panel {
 					rp(rl, "downloads"),
 				)),
 			},
-			ES: append(
-				esRefs("A", b.esLatestSum(rl, "downloads", "tag")),
-				esRef("B", b.esTotal(rl, b.mUniq("tag"), ESF)),
-			),
-			ESOver: []any{frameName("A", "Total"), frameName("B", "Releases")},
+			// The total is the newest document of each release added up by
+			// the panel, and the release count one value beside it.
+			ES: func() []Target {
+				total := b.esLatestSum("A", "Total", rl, "downloads", "tag")
+				return []Target{
+					total, b.esNameOnly(total, "C", "Total"),
+					b.esNamedTotal("B", "Releases", rl, b.mUniq("tag"), ESF),
+				}
+			}(),
+			ESTF: esSumPerName(),
 			// Every release is a row each time the releases are read, 0
 			// downloads and all, so no row is no release.
 			Overrides: []any{noValueOf("Total", "no releases")},
-			ESOpts:    Opts{"calc": "sum"},
 			ESDesc: "In Elasticsearch the second counts distinct tags, downloaded or not: a " +
-				"cardinality cannot be filtered on the newest value. " +
-				esLeftOut("the download total", esNewestAddedUp("release")),
+				"cardinality cannot be filtered on the newest value.",
 		}),
 		panel("barchart", "Downloads by release", box{W: 18, H: 8, X: 6, Y: 0}, []Target{sqlT(byTag)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(

@@ -115,12 +115,17 @@ repository failing is normal; all of them is the token, the network or an
 outage.
 
 **`collector failed` naming a `500`, a `502 Bad Gateway`, a `503` or a `504
-Gateway Timeout`.** GitHub did not finish the answer to a REST request, at its
+Gateway Timeout`.** GitHub did not finish the answer to a request, at its
 gateway or in the application, or the storage a job log is read from did not.
 The client asks once more two seconds later and says nothing about it, so a
 line like this is a request that failed twice, and the next sweep asks again.
-GitHub's GraphQL gateway gives up the same way on a query too large for its ten
-seconds, and there the collectors ask again with a smaller page instead.
+A GraphQL query is asked again the same way, but for one answer: a `502` or a
+`504` that took GitHub's ten seconds to come back is a query too large, which
+the collectors that have a smaller page ask again with it. A line that says the
+query is too large for one request is one that timed out even at the smallest
+page, or in a walk with no smaller page to ask. What was read before it is
+written, a backfill does not record that repository as walked, and the next
+sweep reads it again.
 
 **`state not saved` or `cache file not saved`.** The user the collector runs as
 could not put the file in place. Each of the two is written under a temporary

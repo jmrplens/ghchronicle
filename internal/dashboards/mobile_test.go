@@ -100,8 +100,8 @@ var (
 
 // namedValues counts the values a store's answer names: SQL column aliases,
 // Prometheus legends, Graphite alias() calls, and for Elasticsearch the
-// columns an organize transformation renames plus the queries an override
-// names by refId.
+// names an organize transformation gives columns and an alias gives series,
+// plus the queries an override names by refId.
 func namedValues(store string, st *store, p *Panel) int {
 	n := 0
 	switch store {
@@ -122,18 +122,35 @@ func namedValues(store string, st *store, p *Panel) int {
 			}
 		}
 	case "elasticsearch":
-		for _, raw := range st.TF {
-			tf, _ := raw.(map[string]any)
-			options, _ := tf["options"].(map[string]any)
-			rename, _ := options["renameByName"].(map[string]any)
-			n += len(rename)
+		n = esNamedValues(st, p)
+	}
+	return n
+}
+
+// esNamedValues is namedValues for Elasticsearch: the names an organize
+// transformation gives columns and an alias gives series, each once, and the
+// queries an override names by refId.
+func esNamedValues(st *store, p *Panel) int {
+	named := map[any]bool{}
+	for _, raw := range st.TF {
+		tf, _ := raw.(map[string]any)
+		options, _ := tf["options"].(map[string]any)
+		rename, _ := options["renameByName"].(map[string]any)
+		for _, to := range rename {
+			named[to] = true
 		}
-		for _, raw := range append(append([]any{}, p.Overrides...), st.Overrides...) {
-			o, _ := raw.(map[string]any)
-			matcher, _ := o["matcher"].(map[string]any)
-			if matcher["id"] == "byFrameRefID" {
-				n++
-			}
+	}
+	for i := range st.Q {
+		if st.Q[i].Alias != "" {
+			named[st.Q[i].Alias] = true
+		}
+	}
+	n := len(named)
+	for _, raw := range append(append([]any{}, p.Overrides...), st.Overrides...) {
+		o, _ := raw.(map[string]any)
+		matcher, _ := o["matcher"].(map[string]any)
+		if matcher["id"] == "byFrameRefID" {
+			n++
 		}
 	}
 	return n

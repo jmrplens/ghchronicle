@@ -255,7 +255,7 @@ func TestContributionMixIsFourSharesOfTheTotal(t *testing.T) {
 	}
 	sql := sqlOf(t, mustPanel(t, rendered(t, "influxdb"), "Contribution mix (last year)"))
 	for _, part := range mixParts {
-		if !strings.Contains(sql, "100.0 * "+part.From+" / "+mixTotal+` AS "`+part.To+`"`) {
+		if !strings.Contains(sql, "100.0 * "+part.From+" / NULLIF("+mixTotal+`, 0) AS "`+part.To+`"`) {
 			t.Errorf("%s is not a percentage of the four summed: %s", part.To, sql)
 		}
 	}
@@ -264,7 +264,7 @@ func TestContributionMixIsFourSharesOfTheTotal(t *testing.T) {
 		t.Errorf("Elasticsearch divides the counts itself and shows the fraction as %v", unit)
 	}
 	raw := asJSON(t, es["transformations"])
-	if !strings.Contains(raw, `"reducer":"sum"`) || strings.Count(raw, `"operator":"/"`) != len(mixParts) {
+	if !strings.Contains(raw, `"reducer":"sum"`) || strings.Count(raw, `"operator":"/","right":"Total"`) != len(mixParts) {
 		t.Errorf("the Elasticsearch shares are not each count over the row's sum: %s", raw)
 	}
 }

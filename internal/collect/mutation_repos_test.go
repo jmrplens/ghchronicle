@@ -73,7 +73,9 @@ func TestOnlyNothingHereIsSkippableInGraphQL(t *testing.T) {
 		{"no error at all", nil, false},
 		{"a feature switched off", &ghapi.UnavailableError{Path: "/x", Status: 404}, true},
 		{"a statistic still being computed", &ghapi.NotReadyError{Path: "/x"}, true},
-		{"a query the gateway gave up on", &ghapi.TooLargeError{Status: 502}, true},
+		// A request too large, not an answer: read as nothing here, it ended
+		// walks as though their data had run out and reported success.
+		{"a query the gateway gave up on", &ghapi.TooLargeError{Status: 502}, false},
 		{"a repository renamed away", errors.New("graphql: NOT_FOUND: Could not resolve to a Repository"), true},
 		{"a repository no longer visible", errors.New("graphql: FORBIDDEN: Resource not accessible"), true},
 		{"a spent budget in the errors array", errors.New("graphql: RATE_LIMITED: API rate limit exceeded"), false},

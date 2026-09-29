@@ -1253,6 +1253,82 @@ func (b *builder) esNewest(m string, fields []named, extra ...any) (targets []Ta
 	return []Target{esq(m, []any{b.mNewest(fieldsOf(fields)...)}, []any{bucket}, "A", nil, "")}, tf
 }
 
+// esNameOnly is a query that answers a series named `name` with no value in
+// it over any range: the tile's name for a value whose own query answers a
+// range with no document in it with no field at all, which esSumPerName then
+// draws as the words its panel gives a value that is not there.
+//
+// It asks `like`'s documents for esNewest's one bucket a century wide, and in
+// it for a bucket script that answers null, since a count is never below 0.
+// Over a range with a document in it the datasource returns no row for a
+// bucket whose script answers null, and over one with none there is no bucket
+// to return, and either way it answers the series, named by the alias
+// (measured against Grafana 13.2.1). The script reads the count because one
+// that reads nothing does not compile: Painless cannot make a number of a
+// bare null.
+func (b *builder) esNameOnly(like Target, ref, name string) Target {
+	bucket := b.dh(esWholeRange)
+	settings, _ := agg(bucket)["settings"].(map[string]any)
+	settings["min_doc_count"] = "1"
+	count := agg(b.mCount())
+	count["hide"] = true
+	never := b.metric("bucket_script", "", map[string]any{"script": "params.n < 0 ? params.n : null"})
+	agg(never)["pipelineVariables"] = []any{map[string]any{"name": "n", "pipelineAgg": count["id"]}}
+	return Target{Kind: "es", Query: like.Query, Metrics: []any{count, never}, Buckets: []any{bucket}, Ref: ref, Alias: name}
+}
+
+// esSumPerName is the transformations that draw one field per name out of
+// every frame an Elasticsearch stat's queries answer: the sum of the values
+// read under that name, and no value where none was, which the tile draws as
+// the words its panel gives a value that is not there.
+//
+// It is the calculation per value that a stat does not have. A stat reduces
+// every value with one calculation, and the sum that adds up the newest
+// document of each repository reads a field with no value as 0 (a reducer's
+// answer to an empty field is its emptyInputResult, which is 0 for a sum in
+// Grafana 13.2.1), so a group that summed some values and read the rest as
+// they stood had to add all of them up, and over a range no sweep reached its
+// repository count read 0, a median of nothing read 0, and a total with no
+// field to draw left the group. Here each field becomes a row of its sum and
+// of how many values it holds, and the rows of one name are added up: a
+// column of a table, a series per repository, release or alert that
+// esLatestSum answers, and the empty series of esNameOnly, which holds none.
+// The sum then becomes NaN where the name holds no value, as 0/0 is, and a
+// value of null is none, since Grafana 13.2.1 counts a field's values leaving
+// nulls out unless the field says otherwise. The rows turn back into one
+// field each, in the order their names were first met, each read as its last
+// value that is not null, which makes a NaN no value, and the stat reads each
+// field as its last value.
+//
+// A string field would be a row of its own, so a table's bucket columns are
+// excluded before this runs.
+func esSumPerName() []any {
+	const read, value = "Read", "Value"
+	// A groupBy names what it aggregates "<field> (<reducer>)".
+	const total, count = "Total (sum)", "Count (sum)"
+	return []any{
+		map[string]any{"id": "reduce", "options": map[string]any{
+			"mode": "seriesToRows", "reducers": []any{"sum", "count"},
+		}},
+		byField(map[string]string{"Total": "sum", "Count": "sum"}),
+		binaryField(read, count, "/", count),
+		binaryField(value, total, "*", read),
+		byField(map[string]string{value: "lastNotNull"}),
+		map[string]any{"id": "rowsToFields", "options": map[string]any{}},
+	}
+}
+
+// byField is a groupBy of the rows the reduce transformation makes, one group
+// per name in its Field column, keeping each field `aggregate` names reduced
+// by its reducer and dropping the rest.
+func byField(aggregate map[string]string) any {
+	fields := map[string]any{"Field": map[string]any{"operation": "groupby", "aggregations": []any{}}}
+	for field, reducer := range aggregate {
+		fields[field] = map[string]any{"operation": "aggregate", "aggregations": []any{reducer}}
+	}
+	return map[string]any{"id": "groupBy", "options": map[string]any{"fields": fields}}
+}
+
 // esRaw is the newest documents as rows. `names` maps document keys, in the
 // order the columns should appear, to their headings.
 func (b *builder) esRaw(m string, size int, names []named, where []string) (targets []Target, tf []any) {
@@ -1491,13 +1567,26 @@ func (b *builder) esSnapshotStack(m, field string) Target {
 // is about.
 var esStacked = Opts{"stack": true, "legend": "hidden"}
 
-// esLatestSum is the newest value per repository (and further tags), which the
-// stat sums across rows: the twin of latestSumSQL, the repository filter
-// included. Without it every tile built on this read the whole store,
-// whatever the picker held. A repository is a bucket by its full name, since
-// two owners' repositories of one name bucketed by the short one were one,
-// read at whichever of the two had the newer document.
-func (b *builder) esLatestSum(m, field string, by ...string) []Target {
+// esLatestSum is the newest value of each repository, and of each value of
+// the further tags, as a series named `name`, which esSumPerName adds up: the
+// twin of latestSumSQL, the repository filter included. Without the filter
+// every tile built on this read the whole store, whatever the picker held. A
+// repository is a bucket by its full name, since two owners' repositories of
+// one name bucketed by the short one were one, read at whichever of the two
+// had the newer document.
+//
+// The newest document is esNewest's top_metrics in one date histogram bucket
+// a century wide, under the terms buckets, which makes a series of each item
+// that the alias names. A top_metrics right under the terms answered a table,
+// whose column is "Top Metrics" whatever the query and whatever its alias, so
+// a panel that asks two of them, the artifact storage and the cache or the
+// two kinds of alert, had no way to tell them apart before adding each up
+// (measured against Grafana 13.2.1). The bucket has to hold a document, since
+// the datasource fails outright on a newest-document aggregation over a
+// bucket with nothing in it (a 500, "An error occurred within the plugin",
+// for the whole panel), so over a range with no document in it this answers
+// nothing at all, and the panel asks esNameOnly for the name beside it.
+func (b *builder) esLatestSum(ref, name, m, field string, by ...string) Target {
 	// The metric before the buckets, because the ids are handed out in the
 	// order they are asked for and a panel's targets are compared as text.
 	metrics := []any{b.mNewest(field)}
@@ -1505,15 +1594,36 @@ func (b *builder) esLatestSum(m, field string, by ...string) []Target {
 	for _, tag := range by {
 		buckets = append(buckets, b.tm(tag, 500))
 	}
-	return []Target{esq(m, metrics, buckets, "A", []string{ESF}, "")}
+	newest := b.dh(esWholeRange)
+	settings, _ := agg(newest)["settings"].(map[string]any)
+	settings["min_doc_count"] = "1"
+	return esq(m, metrics, append(buckets, newest), ref, []string{ESF}, name)
+}
+
+// esNamedTotal is one value of a stat that esSumPerName draws, over the
+// dashboard range, as a series named `name`. A count is taken in
+// esOverRange's one date histogram bucket a century wide rather than in the
+// terms bucket esOverRange takes it in, which answers a table whose column
+// is named after the metric and not the alias: the century bucket is there
+// whether or not a document falls in it, and its count is 0 over nothing, as
+// COUNT(*) is (measured against Grafana 13.2.1, a count and a cardinality
+// both). Anything else is esOverRange's own, null over nothing, which
+// esSumPerName reads as no value.
+func (b *builder) esNamedTotal(ref, name, m string, met any, where ...string) Target {
+	if answersNothingAsSQL[fmt.Sprint(agg(met)["type"])] {
+		return esq(m, []any{met}, []any{b.dh(esWholeRange)}, ref, where, name)
+	}
+	t := b.esOverRange(m, met, where...)[0]
+	t.Ref, t.Alias = ref, name
+	return t
 }
 
 // esOverRange is one value of an Elasticsearch stat over the dashboard range,
 // answering a range with nothing in it the way the SQL stores do: 0 for a
 // count, and no value for anything else, which the tile draws as the words
 // its panel gives a value that is not there. It is for a stat that reads the
-// last value of each field; one that adds its values up reads no value as 0
-// (see esLeftOut).
+// last value of each field; one that adds its values up reads no value as 0,
+// and esSumPerName is how a group adds some of its values up.
 //
 // A count asks its terms bucket for the empty buckets as well, which
 // answersNothingAsSQL explains. Anything else is taken over one date
@@ -1572,32 +1682,6 @@ func (b *builder) esTotal(m string, met any, where ...string) []Target {
 // percentile of an empty bucket as 0 and a sum of nothing is 0 where SQL's
 // SUM is null. esOverRange asks those over a bucket that answers null.
 var answersNothingAsSQL = map[string]bool{"count": true, "cardinality": true}
-
-// esLeftOut is the sentence an Elasticsearch stat that adds its values up owes
-// its reader for the values it leaves out over a range, or a repository, with
-// nothing in them, where the other stores draw the tile without a value.
-//
-// Such a stat adds up the newest document of each repository, release or
-// alert, since a bucket cannot take the newest of each and add them, and the
-// datasource fails outright on that newest-document aggregation over a bucket
-// with nothing in it (measured against Grafana 13.2.1: a 500, "An error
-// occurred within the plugin", for the whole panel), so the query cannot ask
-// for the empty one and the tile has no field. What else the stat reads is
-// added up as well, and Grafana's sum reads a value that is not there as 0, so
-// a median or a share of nothing is not asked for either rather than drawn as
-// 0: a wrong number is worse than a tile left out.
-func esLeftOut(value, why string) string {
-	return "In Elasticsearch " + value + " leaves its group when the range holds no document " +
-		"of it, where the other stores draw it without a value: " + why
-}
-
-// esNewestAddedUp is esLeftOut's reason for a value added up from the newest
-// document of each item.
-func esNewestAddedUp(item string) string {
-	return "it is the newest document of each " + item + " added up by the panel, and the " +
-		"datasource fails on a newest-document aggregation that finds nothing, so the query " +
-		"cannot ask for the empty one."
-}
 
 // binaryField is a column computed from two others of the same row, which is
 // how an Elasticsearch table derives what a SQL statement selects as an

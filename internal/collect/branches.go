@@ -102,7 +102,12 @@ func (b Branches) Collect(ctx context.Context, c *ghapi.Client, now time.Time) (
 
 		var res map[string]json.RawMessage
 		if graphQLErr := c.GraphQL(ctx, q.String(), nil, &res); graphQLErr != nil {
-			if !isSkippableGraphQL(graphQLErr) {
+			// A batch the gateway gave up on is halved as aliasBatch halves
+			// one. A repository it still gives up on alone has no smaller
+			// query left, and is a failure rather than a repository with no
+			// branches.
+			_, tooLarge := errors.AsType[*ghapi.TooLargeError](graphQLErr)
+			if tooLarge && len(batch) == 1 || !tooLarge && !isSkippableGraphQL(graphQLErr) {
 				failed = errors.Join(failed, graphQLErr)
 				continue
 			}

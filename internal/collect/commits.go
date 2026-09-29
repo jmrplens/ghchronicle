@@ -2,6 +2,7 @@ package collect
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/jmrplens/ghchronicle/v2/internal/ghapi"
@@ -25,9 +26,10 @@ type Commits struct {
 	Since time.Time
 	// First is how many commits to ask for, capped by GitHub at 100.
 	First int
-	// Walk pages further back through the history, a hundred commits at a
-	// time. One page is the increment a sweep needs; a backfill walks it all,
-	// because without that the lines-changed series begins on install day.
+	// Walk pages further back through the history, fifty commits at a time,
+	// or fewer once the gateway has given up on a page. One page is the
+	// increment a sweep needs; a backfill walks it all, because without that
+	// the lines-changed series begins on install day.
 	Walk Walk
 }
 
@@ -162,8 +164,10 @@ func (cm Commits) Collect(ctx context.Context, c *ghapi.Client, repo Repo, _ tim
 	base := repoTags(repo.Owner, repo.Name)
 	var points []sink.Point
 	after := ""
-	most := w.limit(1)
-	for range most {
+	// What the walk may read is counted in commits rather than in pages, so a
+	// page halved below reads the span it was given in more requests: a sweep
+	// asks one page, and at twenty-five that is two.
+	for left := w.limit(1) * first; left > 0; {
 		vars := map[string]any{"owner": repo.Owner, "name": repo.Name, "first": first}
 		if !cm.Since.IsZero() {
 			vars["since"] = cm.Since.UTC().Format(time.RFC3339)
@@ -172,15 +176,33 @@ func (cm Commits) Collect(ctx context.Context, c *ghapi.Client, repo Repo, _ tim
 			vars["after"] = after
 		}
 		if err := c.GraphQL(ctx, commitsQuery, vars, &res); err != nil {
+			if _, tooLarge := errors.AsType[*ghapi.TooLargeError](err); tooLarge && first > 10 {
+				// Same cursor, half the page, while it is larger than ten, as
+				// the pull request walk does: fifty is asked again at 25, 12
+				// and 6. The contexts of a busy repository's checks are what
+				// outlast the gateway: the production proxy's log from
+				// 2026-09-11 to 2026-09-29 holds twelve of this query's pages
+				// answered with GitHub's timeout, all of fifty commits, in six
+				// repositories, and each ended its walk as though the history
+				// had run out. Measured on 2026-09-29 on the newest commits of
+				// jmrplens/phonometry: fifty answered 502 after 10.9 s, and the
+				// same page at twenty-five answered in 4.8 s, the next
+				// twenty-five in 7.8 s and twelve in 3.9 s.
+				first /= 2
+				continue
+			}
 			// An empty repository has no default branch, which is not a
-			// failure. Neither is a page that times out on a large history.
-			// A spent budget or a canceled sweep is, and returning the
-			// pages walked so far with no error would hide it.
+			// failure. A page the gateway still gives up on at the smallest
+			// size the halving reaches, six from fifty, is, and so are a
+			// spent budget and a canceled sweep: each is handed up with the
+			// pages walked so far, which the runner writes, reports and keeps
+			// out of a backfill's checkpoint.
 			if isSkippableGraphQL(err) {
 				return points, nil
 			}
 			return points, err
 		}
+		left -= first
 		pts, next := commitPoints(res.Repository.DefaultBranchRef, base)
 		points = append(points, pts...)
 		// The since argument already bounds the server side; this stops the

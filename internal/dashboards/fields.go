@@ -53,15 +53,6 @@ func namedValue(sql, name string) string {
 	return strings.Replace(sql, " AS value ", fmt.Sprintf(" AS %q ", name), 1)
 }
 
-// esRefs is esRef for a value whose Elasticsearch answer is more than one
-// target, which is what a sum over the newest reading of each series is.
-func esRefs(ref string, ts []Target) []Target {
-	for i := range ts {
-		ts[i].Ref = ref
-	}
-	return ts
-}
-
 // flagWords is the value mapping that draws a flag as a word, yes in green
 // for set and `no` in noColor for unset. The SQL twins cast a flag to
 // 1 or 0, the exporter publishes a gauge of one that way, and an
