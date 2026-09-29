@@ -84,11 +84,14 @@ func TestAProcessStartsFromWhatThePreviousOneLearned(t *testing.T) {
 
 	second, log2 := restartedRunner(t, first, fake, statePath)
 	second.loadCache(time.Now())
-	// The day's whole page is the read the counts size, and the one the
-	// production service paid 328 points for instead of 139.
+	// The day's reads are the ones the counts size most, and the day's page
+	// was what the production service paid 328 points for instead of 139.
 	delete(second.State.LastFull, "issues")
 	if got := second.pulls(collect.Repo{FullName: "octocat/hello-world"}, time.Now()).First; got != 5 {
 		t.Errorf("the second process asks for a page of %d, want the 5 the first one's count sizes", got)
+	}
+	if got := second.openPulls(collect.Repo{FullName: "octocat/hello-world"}).First; got != 5 {
+		t.Errorf("the second process asks for every open item %d a page, want the 5 the first one's open counts size", got)
 	}
 	if err := second.Once(t.Context()); err != nil {
 		t.Fatalf("second Once: %v\n%s", err, log2)

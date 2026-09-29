@@ -134,9 +134,10 @@ Nine things, and deleting the file costs a different one for each:
 - `last_head`, the commit each repository was on when the dependency diff last
   ran. Without it the dependency changes in the gap are gone: the next sweep
   has the photograph and no diff.
-- `last_full`, when each family that normally reads what changed last read a
-  whole page. Without it a family reads as due, so the next sweep reads them
-  all whole.
+- `last_full`, when each family that normally reads what changed last took
+  the day's read: for `issues`, every open item and what moved since the day's
+  read before it. Without it a family reads as due, so the next sweep takes
+  it, reaching back a month.
 - `last_notified`, where the inbox window was cut. Without it zero asks for the
   whole inbox.
 - `last_event`, the newest event the feed had. Without it empty reads the whole
@@ -865,7 +866,7 @@ the same membership.
 | `work`      | `commits`      | `1h`    | one GraphQL point per repository whose default branch has a commit from the last two cadences, which 38 of 999 answers measured had, and one per twenty-five repositories, shared with issues and issueevents, to ask which, so the hour is how soon a push is charted                                                                                     |
 | `work`      | `discussions`  | `1h`    | a discussion is answered over hours or days and few repositories have a forum, and a pass is two GraphQL points for each that does and nothing for the rest                                                                                                                                                                                                |
 | `work`      | `issueevents`  | `1h`    | the timeline of what moved in two cadences, one GraphQL point for each repository where an issue or a pull request moved and nothing for the rest, so the hour is how soon a transition is worth seeing                                                                                                                                                    |
-| `work`      | `issues`       | `1h`    | one or two GraphQL points per repository whose issues or pull requests moved in two cadences, nothing for the rest, and up to about nine once a day for a whole page of every repository, so the hour is how soon a review or a merge is charted                                                                                                           |
+| `work`      | `issues`       | `1h`    | one or two GraphQL points per repository whose issues or pull requests moved in two cadences, nothing for the rest, and once a day a point or more for its open items and up to four a page for what moved in the day, so the hour is how soon a review or a merge is charted                                                                              |
 | `work`      | `planning`     | `6h`    | labels and milestones are edited by hand, a few times a week at most                                                                                                                                                                                                                                                                                       |
 | `work`      | `stats`        | `12h`   | GitHub recomputes these slowly anyway, so asking more often returns the same numbers                                                                                                                                                                                                                                                                       |
 

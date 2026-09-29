@@ -13,6 +13,71 @@ day the tag was pushed, with two exceptions: 2.5.2 has a section and no tag,
 and its changes shipped in 2.6.0; 2.6.2 has a tag and no release, since its
 release stopped at the containerised suite, and its changes shipped in 2.6.3.
 
+## 2.6.5 - 2026-09-30
+
+A check of 2.6.4 in production found that the read which writes each open pull
+request and issue its row of the day asked GitHub for the fifty items of any
+state updated last, so an open item that fifty others had moved past went
+without its row, and that on the busiest repository the same read met GitHub's
+GraphQL timeout every day and read half of what it asked for. The day's read
+now asks for the open items themselves, and reads what moved by date.
+
+- **Every open pull request and issue gets its row every day.** An open item
+  is stamped at 00:00 UTC of each day it is open, and one nobody touches keeps
+  its `updatedAt`, so the hourly read, which walks by `updatedAt`, never
+  reaches it again; the day's read is what writes it. That read was one page of
+  the fifty items updated last, of any state: in production, 3 of the 26 open
+  issues of `jmrplens/gitlab-mcp-server` had no row for one to five days
+  between 23 and 29 September, and on the 30th the oldest of them was 59th by
+  `updatedAt`. No open pull request had lost a day. The first sweep of each UTC
+  day now asks for the open items only, `states: OPEN` on both connections,
+  and walks every page, sized from the open counts of the last totals. The
+  rows those days missed are not written after the fact: GitHub serves no past
+  day's state of an item.
+- **The day's read of what moved reaches back to the day before, whatever
+  moved.** The fifty items of any state were also a net for what closed: the
+  family is marked run when one repository failed and the others answered, so
+  two failed sweeps in a row on one repository leave what moved between them
+  outside the next window, and only the day's page read it again, while fewer
+  than fifty had moved. The first sweep of each day now also reads everything
+  that moved since a cadence before the day's read before it, by `updatedAt`
+  and every page, and a month back on a state file that has none, as the first
+  sweep of actions does. A close moves `updatedAt` (the eight pull requests of
+  `jmrplens/phonometry` closed last moved 2 to 223 seconds after they closed),
+  so a closed item is read by the hourly read after it, or by this a day later
+  at most, and needs no reading after that: its row is dated when it closed.
+- **The busiest repository's day's read fits the gateway again.** Fifty pull
+  requests of `jmrplens/phonometry` with their reviews and review threads met
+  GitHub's ten seconds on every day from 19 to 29 September, and the read went
+  on at twenty-five, half the page it was meant to cover. Its open read asks for
+  its 10 open pull requests on a page of ten, and the read of what moved asks
+  for pages of twenty-five, which answered there in 3 to 9 seconds. A page of 5,
+  10, 20, 25 or 50 costs 1, 2, 3, 4 or 9 points, with the state filter or
+  without it (asked with `dryRun` on 2026-09-30).
+- **An item both of the day's reads find is written once.** An open item that
+  moved in the day is in both, and a batch must carry each row once: the write
+  ledger reserves a batch whole and lets both through, and the Reducer's count
+  and sum rules would add both. `sink.Distinct` keeps the later of the two.
+
+`TestTheDaysReadWritesAnOpenItemFiftyOthersMovedPast` puts an open issue last
+touched two months ago 60th, behind fifty-eight closed in the last minutes, and
+fails on 2.6.4, whose day's read writes it no row, where this one writes it one
+and writes the open issue both reads find once. The tests of the query filtered
+to the open items on both connections and walked to its last page, of the
+day's window reaching back to the day's read before it and a month on a new
+state file, of the open items read in a repository the movement query says has
+not moved while what moved is gated as before, and of `sink.Distinct` are new.
+The fake GitHub of the end-to-end suites now answers a query filtered to the
+open items with the open items of its fixture only.
+
+Not verified:
+
+- Production had not run this release when it was written. Its first day's read
+  is what writes `jmrplens/gitlab-mcp-server`'s open issue 961 its first row
+  since 28 September.
+- The net for two failed sweeps in a row is tested as the window it reads, not
+  by failing a repository twice against GitHub.
+
 ## 2.6.4 - 2026-09-30
 
 A review of 2.6.3 in production on the day it was released: the service's

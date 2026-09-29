@@ -1,6 +1,7 @@
 package sink
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -146,5 +147,33 @@ func TestOneLineFoldsEveryControlCharacterItNames(t *testing.T) {
 	// one has to become a space, not only the line feed the others resemble.
 	if got := oneLine("a\nb\rc\td\ve\ff"); got != "a b c d e f" {
 		t.Errorf("oneLine = %q", got)
+	}
+}
+
+// TestDistinctKeepsTheLastOfEachIdentity: two reads that both render a row
+// hand it on once, the later read's, in the place of the first, and a point
+// that differs in a tag, a time or the measurement is another row.
+func TestDistinctKeepsTheLastOfEachIdentity(t *testing.T) {
+	t.Parallel()
+	day := time.Date(2026, 9, 30, 0, 0, 0, 0, time.UTC)
+	row := func(m, number string, at time.Time, comments int) Point {
+		return Point{Measurement: m, Tags: map[string]string{"repo": "r", "number": number, "state": "OPEN"}, Fields: map[string]any{"comments": comments}, Time: at}
+	}
+	got := Distinct([]Point{
+		row("gh_issue", "1", day, 1),
+		row("gh_issue", "2", day, 1),
+		row("gh_issue", "1", day, 2),
+		row("gh_issue", "1", day.Add(time.Hour), 3),
+		row("gh_pull_request", "1", day, 4),
+	})
+	var comments []any
+	for _, p := range got {
+		comments = append(comments, p.Fields["comments"])
+	}
+	if want := []any{2, 1, 3, 4}; !reflect.DeepEqual(comments, want) {
+		t.Errorf("comments of what was kept = %v, want %v", comments, want)
+	}
+	if none := Distinct(nil); len(none) != 0 {
+		t.Errorf("Distinct(nil) = %v", none)
 	}
 }

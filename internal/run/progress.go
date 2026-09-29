@@ -97,7 +97,7 @@ type Progress struct {
 	// end; a walk that was stopped saves none of it. Everything the first half
 	// learned would otherwise die with the process: which repository was on
 	// which commit when the dependency diff last ran, which families had taken
-	// a whole page, how far the inbox and the event feed had been read. The
+	// the day's read, how far the inbox and the event feed had been read. The
 	// completion instants alone are not that, and Restore says it leaves the
 	// same state behind as an uninterrupted walk.
 	//

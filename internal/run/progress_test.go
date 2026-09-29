@@ -895,7 +895,7 @@ func TestAResumedWalkGetsBackEverythingTheStoppedOneLearned(t *testing.T) {
 		t.Errorf("the commit the dependency diff ran from came back as %q, want %q; the next diff is a guess", got, "abc123")
 	}
 	if _, ok := fresh.LastFull["dependencies"]; !ok {
-		t.Error("the whole-page mark did not come back, so the resume takes the whole page again")
+		t.Error("the day's-read mark did not come back, so the resume takes the day's read again")
 	}
 	if _, ok := fresh.FirstSaw["octocat/one"]; !ok {
 		t.Error("the first-seen instant did not come back")

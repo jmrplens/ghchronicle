@@ -39,8 +39,10 @@ import (
 //     the first sweep after an upgrade read every history whole.
 //   - last_head: the commit each repository was on when the dependency diff
 //     last ran. Without it the next sweep has only the photograph, no diff.
-//   - last_full: when each family that normally reads what changed last read a
-//     whole page. Absent reads as due, so the next sweep takes them all.
+//   - last_full: when each family that normally reads what changed last took
+//     the day's read, which for issues is every open item and what moved since
+//     the day's read before it. Absent reads as due, so the next sweep takes
+//     it.
 //   - last_notified: where the inbox window was cut. Zero asks for the whole
 //     inbox.
 //   - last_event: the newest event the feed had. Empty reads the whole feed.
@@ -64,9 +66,9 @@ type State struct {
 	// LastHead is the commit each repository was on when the dependency diff
 	// last ran, which is what makes the next diff a range rather than a guess.
 	LastHead map[string]string `json:"last_head"`
-	// LastFull is when each family that normally reads what changed last read
-	// a whole page instead. Absent in an older state file, which reads as
-	// due, so the first sweep after an upgrade takes the whole page once.
+	// LastFull is when each family that normally reads what changed last took
+	// the day's read as well: see Runner.openPulls. Absent in an older state
+	// file, which reads as due, so the first sweep after an upgrade takes it.
 	LastFull map[string]time.Time `json:"last_full"`
 	// LastNotified is the latest updated_at the inbox has answered with, which
 	// is where the next sweep's `since` window is cut from. Zero, which is

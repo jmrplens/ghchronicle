@@ -246,7 +246,7 @@ empties the read: the default branch head's `committedDate` is what
 `history(since:)` filters on, and the newest `updatedAt` of issues and pull
 requests is what the other two order by and stop at. Change a collector's
 window or filter and change the gate with it. Never gated: a backfill, the
-daily whole page of `issues`, and a repository the query did not answer for.
+day's read of every open item of `issues`, and a repository the query did not answer for.
 
 **The slow families take turns, in the loop only.** The running service starts
 one family of six hours or more a sweep at the built-in cadences (`takeTurns`),

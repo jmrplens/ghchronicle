@@ -49,6 +49,17 @@ type Pulls struct {
 	// the items are older than its bound, which the UPDATED_AT ordering makes
 	// a single cursor walk per connection.
 	Walk Walk
+	// Open asks for the open pull requests and issues only, whatever they
+	// were last updated. An open item is stamped at the start of each UTC
+	// day it is open, and one nobody touches keeps its updatedAt, so a read
+	// by updatedAt reaches it only while fewer items moved after it than the
+	// read asks for. With the newest fifty of every state as the day's read,
+	// 3 of the 26 open issues of jmrplens/gitlab-mcp-server had no row for
+	// one to five days between 2026-09-23 and 29, and on the 30th the oldest
+	// of them was 59th by updatedAt. GitHub filters by state in the same
+	// connection, so asking for the open ones reads each of them however
+	// long ago it moved.
+	Open bool
 }
 
 const pullsQuery = `
@@ -115,6 +126,14 @@ query($owner: String!, $name: String!, $first: Int!, $threads: Int!, $prAfter: S
     }
   }
 }`
+
+// openPullsQuery is pullsQuery asking both connections for the open items
+// only: see Pulls.Open. Derived rather than written out, so the fields the
+// two read cannot drift apart.
+var openPullsQuery = strings.NewReplacer(
+	"after: $prAfter, orderBy:", "after: $prAfter, states: OPEN, orderBy:",
+	"after: $issueAfter, orderBy:", "after: $issueAfter, states: OPEN, orderBy:",
+).Replace(pullsQuery)
 
 type pullNode struct {
 	UpdatedAt      time.Time  `json:"updatedAt"`
@@ -326,7 +345,11 @@ func (p Pulls) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now time
 		if issueAfter != "" {
 			vars["issueAfter"] = issueAfter
 		}
-		if err := c.GraphQL(ctx, pullsQuery, vars, &res); err != nil {
+		query := pullsQuery
+		if p.Open {
+			query = openPullsQuery
+		}
+		if err := c.GraphQL(ctx, query, vars, &res); err != nil {
 			var tooLarge *ghapi.TooLargeError
 			if errors.As(err, &tooLarge) && first > 10 {
 				// Same cursor, half the page. A pull request carries its
@@ -673,10 +696,21 @@ func (p Pulls) issuePoints(nodes []issueNode, base map[string]string, now time.T
 type ItemCounts struct {
 	Pulls  int
 	Issues int
+	// OpenPulls and OpenIssues are what the day's read of every open item
+	// asks for. A cache file written before they existed decodes them as
+	// zero, which sizes that read at five a page until the totals family
+	// runs again, within the hour, and loses nothing: the read walks every
+	// page.
+	OpenPulls  int
+	OpenIssues int
 }
 
 // Most is the larger of the two, which is the page both connections share.
 func (c ItemCounts) Most() int { return max(c.Pulls, c.Issues) }
+
+// MostOpen is the larger of the two open counts, the page the day's read of
+// every open item shares between its connections.
+func (c ItemCounts) MostOpen() int { return max(c.OpenPulls, c.OpenIssues) }
 
 // ReadItemCounts reads the lifetime counts out of the points the totals
 // family emitted, keyed by full name, and writes them over into.
@@ -696,8 +730,10 @@ func ReadItemCounts(points []sink.Point, into map[string]ItemCounts) {
 			continue
 		}
 		into[full] = ItemCounts{
-			Pulls:  fieldSum(p.Fields, "pulls_open", "pulls_merged", "pulls_closed"),
-			Issues: fieldSum(p.Fields, "issues_open", "issues_closed"),
+			Pulls:      fieldSum(p.Fields, "pulls_open", "pulls_merged", "pulls_closed"),
+			Issues:     fieldSum(p.Fields, "issues_open", "issues_closed"),
+			OpenPulls:  fieldSum(p.Fields, "pulls_open"),
+			OpenIssues: fieldSum(p.Fields, "issues_open"),
 		}
 	}
 }

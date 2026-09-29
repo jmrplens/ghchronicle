@@ -129,8 +129,9 @@ los números interesantes son duraciones. Cuánto tardó alguien en revisarlo,
 cuánto tardó en fusionarse, cómo de grande era el diff, cuántas rondas de
 revisión hicieron falta. Una consulta de GraphQL por repositorio cubre ambos:
 una pasada recorre lo que cambió en las dos últimas cadencias, de diez en diez,
-y una vez al día lee una página completa dimensionada al repositorio, que es la
-única lectura que reescribe una pull request abierta que nadie ha tocado.
+y la primera pasada de cada día UTC llega hasta la lectura del día anterior y
+lee además cada elemento abierto, sea cual sea su última actualización, que es
+la única lectura que reescribe una pull request abierta que nadie ha tocado.
 
 **`commits`** recoge la historia de commits con su tamaño y su firma. Esto es lo
 que sustituye a `stats/code_frequency`, que responde 202 con cuerpo vacío para
@@ -161,8 +162,8 @@ la cabeza de su rama por defecto y cuándo se actualizaron su issue y su pull
 request más recientes, y una familia no pregunta nada a un repositorio donde
 nada se movió desde su propia ventana: en la cuenta donde se midió, cerca de la
 mitad de las consultas de `issues` y de `issueevents` y el 96 por ciento de las
-de `commits`. La página entera diaria de `issues` y un backfill se leen en todas
-partes.
+de `commits`. La lectura diaria de cada elemento abierto de `issues` y un
+backfill se leen en todas partes.
 [Coste de una pasada](/ghchronicle/es/api/cost/#preguntar-primero-qué-se-movió)
 tiene la cuenta.
 

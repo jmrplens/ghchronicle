@@ -351,8 +351,8 @@ every:
 # What a sweep remembers between runs: when each family last ran, which
 # repositories have already had their one-off full stargazer walk and which
 # their one whole read of the daily star history, the commit each
-# dependency diff starts from, when each family last read a whole page instead
-# of what changed, where the notification window was cut, the newest event the
+# dependency diff starts from, when each family last took the day's read beside
+# what changed, where the notification window was cut, the newest event the
 # feed had, and the co-authored pull request count with the day it covers.
 # Deleting it makes the next sweep take every one of those from the beginning
 # and pay for it; everything re-collected overwrites what is already stored,

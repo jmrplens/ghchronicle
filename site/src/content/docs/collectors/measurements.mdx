@@ -482,7 +482,8 @@ A merged one keeps answering `CONFLICTING` long after it was merged, which is
 stale rather than false but reads as a repository full of conflicts. A sweep
 reads only what was updated in the last two cadences, so an open pull request
 nobody touches has its `seconds_open`, `mergeable` and `merge_state` rewritten
-once a day by the whole-page read rather than every hour; anything that moves
+once a day by the day's read of every open item rather than every hour, however
+long ago it last moved; anything that moves
 `updatedAt`, a review, a comment, a push, a close, is rewritten by the sweep
 that follows it.
 

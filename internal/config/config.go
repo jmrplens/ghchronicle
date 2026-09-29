@@ -623,7 +623,7 @@ var defaultEvery = map[string]family{
 	},
 	"issues": {
 		every: 1 * time.Hour, group: "work",
-		why: "one or two GraphQL points per repository whose issues or pull requests moved in two cadences, nothing for the rest, and up to about nine once a day for a whole page of every repository, so the hour is how soon a review or a merge is charted",
+		why: "one or two GraphQL points per repository whose issues or pull requests moved in two cadences, nothing for the rest, and once a day a point or more for its open items and up to four a page for what moved in the day, so the hour is how soon a review or a merge is charted",
 	},
 	"events": {
 		every: 15 * time.Minute, group: "feeds",

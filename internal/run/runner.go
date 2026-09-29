@@ -609,12 +609,12 @@ func (r *Runner) repoFamilies(ctx context.Context, now time.Time) error {
 			r.checkpointFamily(family, len(r.repos), 0)
 		}
 		// Marked after the repositories ran, so every one of them saw the
-		// same answer to "is the whole page due" that the first did; and
-		// only when every one of them answered, because the whole page is
-		// the one read that rewrites an open pull request nobody touched,
+		// same answer to "is the read of every open item due" that the
+		// first did; and only when every one of them answered, because that
+		// read is the one that rewrites an open pull request nobody touched,
 		// and a repository it failed on would otherwise wait a day for the
-		// next. Left unrecorded, the next sweep reads the whole page again,
-		// which costs one more daily pass and loses nothing.
+		// next. Left unrecorded, the next sweep reads every open item again,
+		// which costs one more daily read and loses nothing.
 		if pass.failed == 0 && r.fullPassDue(family, now) {
 			r.State.MarkFull(family, now)
 		}
@@ -994,13 +994,16 @@ func (r *Runner) sinceWindow(ctx context.Context, family string, repo collect.Re
 		read  interface {
 			Collect(context.Context, *ghapi.Client, collect.Repo, time.Time) ([]sink.Point, error)
 		}
+		open *collect.Pulls
 	)
 	switch family {
 	case "issues":
-		// The daily whole page has no bound and is never skipped: it is the
-		// read for the items nobody touched.
 		pulls := r.pulls(repo, now)
 		since, read = pulls.Walk.Since, pulls
+		if !r.Backfill && r.fullPassDue(family, now) {
+			every := r.openPulls(repo)
+			open = &every
+		}
 	case "issueevents":
 		events := r.issueEvents(now)
 		since, read = events.From(now), events
@@ -1008,35 +1011,49 @@ func (r *Runner) sinceWindow(ctx context.Context, family string, repo collect.Re
 		commits := r.commits(now)
 		since, read = commits.Since, commits
 	}
-	if r.stayedPut(ctx, family, repo, since) {
-		return nil, nil
+	var (
+		points  []sink.Point
+		openErr error
+	)
+	if open != nil {
+		// Never skipped: an open item nobody touched is exactly what the
+		// movement query says has not moved. A failure here does not stop
+		// the read of what moved, which has a window of its own to keep.
+		points, openErr = open.Collect(ctx, r.API, repo, now)
 	}
-	return read.Collect(ctx, r.API, repo, now)
+	if r.stayedPut(ctx, family, repo, since) {
+		return points, openErr
+	}
+	moved, err := read.Collect(ctx, r.API, repo, now)
+	// An open item that moved in the window is in both reads, and a batch
+	// carries each row once.
+	return sink.Distinct(append(points, moved...)), errors.Join(openErr, err)
 }
 
-// pulls is the pull request collector for this run.
+// pulls is the pull request collector for this run's read of what moved.
 //
 // A backfill walks every page. A sweep reads what was updated since the sweep
 // before it, twice the cadence back the way actions and commits do so a late
 // sweep still overlaps, and further when the family last ran earlier than
-// that, walking pages until the updatedAt ordering is past that mark. Once a
-// day it reads a whole page with no bound instead: an open pull request
-// nobody touches keeps its updatedAt, so nothing else would rewrite its
-// seconds_open and mergeable. That is what the daily pass is for, and it is
-// the only thing that waits for it; a close, a merge, a review or a comment
-// moves updatedAt and is seen by the sweep that follows it.
+// that, walking pages until the updatedAt ordering is past that mark. A close,
+// a merge, a review or a comment moves updatedAt and is seen by the sweep that
+// follows it. An open item nobody touches keeps its updatedAt, so this read
+// never reaches it again, and nothing else would rewrite its seconds_open and
+// mergeable or write its row of the day: that is what openPulls reads, once a
+// day, beside this.
+//
+// The first sweep of each UTC day reaches back further, to a cadence before
+// the day's read before it, and a month on a state file that has none, as the
+// first sweep of actions does. The family is marked run when one repository
+// failed and the others answered, so its window moves on: two failed sweeps
+// in a row on one repository leave what moved between them unread, and this
+// is what reads it, a day later at most. The newest fifty of every state did
+// that before 2.6.5, and missed it on a day more than fifty had moved.
 //
 // GitHub charges the query for the page asked for, not for what it returns:
 // measured on 2026-09-11, fifty costs eight points on a repository with no
 // pull requests at all. So the page is sized from the last lifetime totals
-// where they are known, and never smaller than the repository, which is what
-// makes the daily page exactly the page of fifty it replaces on every
-// repository that had fewer than fifty. The totals are up to an hour old by
-// default, and older where a configuration slows them down, so a repository
-// that crossed a page size since they ran holds more than the page asked
-// for: the daily pass is allowed one page more, which it only takes when the
-// first came back full with more behind it. A page of fifty is never
-// followed; fifty is where today's read stopped too.
+// where they are known.
 func (r *Runner) pulls(repo collect.Repo, now time.Time) collect.Pulls {
 	if r.Backfill {
 		// Fifty, not the hundred this used to ask for. A pull request now
@@ -1048,27 +1065,51 @@ func (r *Runner) pulls(repo collect.Repo, now time.Time) collect.Pulls {
 		// per page of every busy repository.
 		return collect.Pulls{First: 50, Walk: r.walk()}
 	}
-	first := 50
+	// Ten at a time, because ten is what a repository touches in two hours
+	// and costs two points against the eight of fifty; the walk goes on to
+	// the next page whenever more than ten were, so a mass relabel is a
+	// longer walk rather than a lost row. The day's read covers a day and
+	// asks for twenty-five: fifty of jmrplens/phonometry's pull requests met
+	// the gateway's ten seconds on every day from 2026-09-19 to 29, and
+	// twenty-five answered in 3 to 9 s.
+	first, daily := 10, 25
 	if counts, known := r.counts[repo.FullName]; known {
-		first = collect.PageFor(counts.Most())
-	}
-	if r.fullPassDue("issues", now) {
-		daily := collect.Pulls{First: first}
-		if first < 50 {
-			daily.Walk.Pages = 2
-		}
-		return daily
+		size := collect.PageFor(counts.Most())
+		first, daily = min(size, first), min(size, daily)
 	}
 	every, _ := r.Cfg.Interval("issues")
 	since := now.Add(-2 * every)
 	if last, ran := r.State.LastRun["issues"]; ran && last.Before(since) {
 		since = last.Add(-every)
 	}
-	// Ten at a time, because ten is what a repository touches in two hours
-	// and costs two points against the eight of fifty; the walk goes on to
-	// the next page whenever more than ten were, so a mass relabel is a
-	// longer walk rather than a lost row.
-	return collect.Pulls{First: min(first, 10), Walk: collect.Walk{Pages: -1, Since: since}}
+	if r.fullPassDue("issues", now) {
+		from := now.AddDate(0, -1, 0)
+		if last, read := r.State.LastFull["issues"]; read {
+			from = last.Add(-every)
+		}
+		if from.Before(since) {
+			since = from
+		}
+		first = daily
+	}
+	return collect.Pulls{First: first, Walk: collect.Walk{Pages: -1, Since: since}}
+}
+
+// openPulls is the day's read of every open pull request and issue of a
+// repository, beside the read of what moved: see collect.Pulls.Open. It walks
+// every page, sized from the open counts the totals family last read, and
+// twenty-five a page, the day's read of what moved, until it has read any.
+// Until 2.6.5 this was the newest fifty of
+// every state instead, which missed an open item once fifty others had moved
+// after it, and read half of that on a day the gateway gave up on fifty, as it
+// did on jmrplens/phonometry every day from 2026-09-19, where the 10 open pull
+// requests fit a page of ten.
+func (r *Runner) openPulls(repo collect.Repo) collect.Pulls {
+	first := 25
+	if counts, known := r.counts[repo.FullName]; known {
+		first = collect.PageFor(counts.MostOpen())
+	}
+	return collect.Pulls{First: first, Open: true, Walk: collect.Walk{Pages: -1}}
 }
 
 // outboundMoved is how far back a sweep's closed outbound searches read: a
@@ -1119,8 +1160,8 @@ func (r *Runner) discussions() collect.Discussions {
 	return d
 }
 
-// fullPassDue reports whether this sweep of family reads a whole page rather
-// than what changed. Only issues has the two shapes.
+// fullPassDue reports whether this sweep of family reads every open item as
+// well as what changed. Only issues has the two reads: see openPulls.
 //
 // Due once per UTC day, not once every twenty-four hours. An open pull
 // request nobody touches is stamped at the start of the UTC day and this pass
@@ -1258,8 +1299,9 @@ func (r *Runner) commits(now time.Time) collect.Commits {
 // starts two cadences back.
 //
 // Nothing is skipped on an answer that is not there. A repository the query
-// did not answer for, a query that failed, and a window with no start, which
-// is the daily whole page, are all read as they were before it existed. Nor is
+// did not answer for, a query that failed, and a window with no start are all
+// read as they were before it existed, and the day's read of every open item
+// of issues is never put to it: see sinceWindow. Nor is
 // anything skipped in a backfill, which is asked for once to read everything,
 // and is the one run where a skip that turned out wrong would not be read
 // again by the next pass.
