@@ -5,13 +5,19 @@ package docker
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 // What a real Loki does with the event lines.
@@ -167,6 +173,92 @@ func TestLokiHoldsTheEventsAndNothingElse(t *testing.T) {
 			t.Errorf("the sink held entries back:\n%s", tail(sweep.Log))
 		}
 	})
+}
+
+// TestLokiIsNotThrottledByTheHostsDisk keeps the suite's Loki from answering
+// by how full the machine's disk is. Loki's write-ahead log refuses every push
+// once the filesystem under it passes wal.disk_full_threshold, 90% by default,
+// and that filesystem is the host's. On 2026-09-29 the suite passed at 02:40
+// UTC and failed at 05:10 and 05:25 with nothing changed but the host's disk,
+// which had reached 90.2%: every Loki test timed out on an empty store and the
+// Elasticsearch suite failed on the Loki sink's "sink write failed". Either the
+// log is off, which config/loki.yaml does because nothing here outlives the
+// run, or its threshold is zero, which is Loki's word for never.
+//
+// It reads the file rather than the stack, so it needs no containers.
+func TestLokiIsNotThrottledByTheHostsDisk(t *testing.T) {
+	t.Parallel()
+	body, err := os.ReadFile(filepath.Join("config", "loki.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cfg struct {
+		Ingester struct {
+			WAL struct {
+				Enabled   *bool    `yaml:"enabled"`
+				Threshold *float64 `yaml:"disk_full_threshold"`
+			} `yaml:"wal"`
+		} `yaml:"ingester"`
+	}
+	if err = yaml.Unmarshal(body, &cfg); err != nil {
+		t.Fatal(err)
+	}
+	wal := cfg.Ingester.WAL
+	off := wal.Enabled != nil && !*wal.Enabled
+	unthrottled := wal.Threshold != nil && *wal.Threshold == 0
+	if !off && !unthrottled {
+		t.Error("config/loki.yaml leaves Loki's write-ahead log on with its disk threshold: " +
+			"on a host whose disk is past it, every push is refused with \"Ingester is shutting down\"; " +
+			"set ingester.wal.enabled to false, or ingester.wal.disk_full_threshold to 0")
+	}
+}
+
+// TestTheHarnessRefusesALokiThatTakesNoWrite is the other half of that guard:
+// whatever the next reason a Loki takes no write, the stack does not start on
+// it. The answers are the ones Loki 3.7.7 gave with the log throttled: /ready
+// said ready, and the push was a 500.
+func TestTheHarnessRefusesALokiThatTakesNoWrite(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name   string
+		status int
+		body   string
+		want   string
+	}{
+		{
+			name: "a throttled ingester", status: http.StatusInternalServerError,
+			body: "rpc error: code = Unknown desc = Ingester is shutting down\n",
+			want: "Ingester is shutting down",
+		},
+		{name: "a loki that takes the write", status: http.StatusNoContent},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pushed := 0
+			loki := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/ready":
+					_, _ = io.WriteString(w, "ready\n")
+				case "/loki/api/v1/push":
+					pushed++
+					w.WriteHeader(tc.status)
+					_, _ = io.WriteString(w, tc.body)
+				default:
+					http.NotFound(w, r)
+				}
+			}))
+			defer loki.Close()
+			err := lokiReady(t.Context(), strings.TrimPrefix(loki.URL, "http://"))
+			if pushed != 1 {
+				t.Errorf("the probe pushed %d times, want once: /ready is not the question", pushed)
+			}
+			switch {
+			case tc.want == "" && err != nil:
+				t.Errorf("a Loki that took the write was refused: %v", err)
+			case tc.want != "" && (err == nil || !strings.Contains(err.Error(), tc.want)):
+				t.Errorf("err = %v, want Loki's own reason, %q", err, tc.want)
+			}
+		})
+	}
 }
 
 // ── Reading Loki back ───────────────────────────────────────────────────────

@@ -372,7 +372,7 @@ var checks = []check{
 	{"graphite-carbon", portRef{"graphite", 2003}, dialTCP},
 	{"graphite-render", portRef{"graphite", 80}, httpGet("/render?target=carbon.agents.*.metricsReceived&format=json")},
 	{"prometheus", portRef{"prometheus", 9090}, httpGet("/-/ready")},
-	{"loki", portRef{"loki", 3100}, httpGet("/ready")},
+	{"loki", portRef{"loki", 3100}, lokiReady},
 	{"otelcol", portRef{"otelcol", 13133}, httpGet("/")},
 	{"otelcol-otlp", portRef{"otelcol", 4318}, dialTCP},
 	{"telegraf", portRef{"telegraf", 8186}, telegrafReady},
@@ -477,6 +477,42 @@ func telegrafReady(ctx context.Context, addr string) error {
 	defer res.Body.Close()
 	if res.StatusCode >= http.StatusInternalServerError {
 		return fmt.Errorf("POST /telegraf: %s", res.Status)
+	}
+	return nil
+}
+
+// lokiProbeStream is the stream lokiReady writes to. It carries neither the
+// job nor the kind label the sink writes, so no test and no dashboard query
+// selects it.
+const lokiProbeStream = `{"harness":"readiness"}`
+
+// lokiReady asks Loki for what the tests need from it, a write, and not only
+// for /ready. The two part ways: an ingester whose write-ahead log finds its
+// disk past the threshold refuses every push with a 500 "Ingester is shutting
+// down" and still answers /ready with a 200. Gated on /ready alone, that stack
+// passed its start, every Loki test waited out its two minutes for entries
+// that were never taken, and the sweep's own "sink write failed" failed the
+// Elasticsearch suite. Asked here, it is one failure at the start, in Loki's
+// own words.
+func lokiReady(ctx context.Context, addr string) error {
+	if err := httpGet("/ready")(ctx, addr); err != nil {
+		return err
+	}
+	body := fmt.Sprintf(`{"streams":[{"stream":%s,"values":[["%d","the harness asked whether loki takes a write"]]}]}`,
+		lokiProbeStream, time.Now().UnixNano())
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://"+addr+"/loki/api/v1/push", strings.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	res, err := stackClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusNoContent {
+		said, _ := io.ReadAll(io.LimitReader(res.Body, 512))
+		return fmt.Errorf("POST /loki/api/v1/push: %s: %s", res.Status, strings.TrimSpace(string(said)))
 	}
 	return nil
 }
