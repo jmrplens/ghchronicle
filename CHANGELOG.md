@@ -24,10 +24,13 @@ time GitHub answered its artifact listing with a 500, a job log whose storage
 was asked again through the API, a PostgreSQL dashboard that lists text in the
 database's order rather than in InfluxDB's, five groups of tiles and a bar
 gauge that draw nothing over a range no sweep reached, three commit walks that
-took a GraphQL 503 for the end of the history, and a migration's copy that an
-InfluxDB before 3.2 keeps for good while ghchronicle said the server would
-purge it. Each is fixed here; the last is the server's doing, and ghchronicle
-now says so wherever it matters, with what removes the copy.
+took a GraphQL 503 for the end of the history and twelve that took GitHub's
+GraphQL timeout for it, and a migration's copy that an InfluxDB before 3.2
+keeps for good while ghchronicle said the server would purge it. Each is fixed
+here, and so are the three Elasticsearch groups that 2.6.2 left without some of
+their tiles over a range no sweep reached; the migration's copy is the
+server's doing, and ghchronicle now says so wherever it matters, with what
+removes the copy.
 
 - **Six code scanning alerts are closed at their cause.** CodeQL's
   `go/incorrect-integer-conversion` stood at four lines of the card's
@@ -96,6 +99,58 @@ now says so wherever it matters, with what removes the copy.
   and the
   [troubleshooting page](https://jmrp.io/docs/ghchronicle/reference/troubleshooting/)
   say which answer is which.
+- **A commit page GitHub's GraphQL timeout answers is asked again at half the
+  size.** The commit walk asks fifty commits a page, each with the checks it
+  carries, and never asked a smaller page. Of the 51 queries the recording
+  proxy's log from 11 to 29 September holds answered with a 502 or a 504 after
+  more than ten seconds, 38 were pages of the pull request walk, which already
+  halves, one was a search of work in other people's repositories, and 12
+  were pages of fifty commits, the last on 18 September: six of
+  `jmrplens/phonometry`, sweeps reading the first month and walks, two of
+  `jmrplens/winget-pkgs` and one each of `jmrplens/gitlab-mcp-server`,
+  `jmrplens/kleidos`, `jmrplens/mcp-registry` and `jmrplens/ModBus_M5Stack`.
+  Each ended its walk there as though the history had run out. The log holds
+  no halved commit page, so the page was asked by hand on 29 September: the
+  newest fifty commits of `jmrplens/phonometry` answered 502 after 10.9
+  seconds, the same page at twenty-five answered in 4.8 seconds, the next
+  twenty-five in 7.8 and twelve in 3.9. The walk now asks the same cursor
+  again at half the page while it is larger than ten, fifty at 25, 12 and 6,
+  as the pull request walk does, and carries on at the size that answered.
+  What a sweep may read is counted in commits rather than in pages, so its one
+  page of fifty becomes two of twenty-five and reads the span it was given
+  rather than half of it. The
+  [cost page](https://jmrp.io/docs/ghchronicle/api/cost/) says so.
+- **A GraphQL timeout no smaller page gets past is a failure, not the end of
+  the data.** The collectors read GitHub's timeout as "nothing here", the
+  answer a switched-off feature or a renamed repository gives, so a walk with
+  no smaller page to ask took it for the end of its data and reported success,
+  and a backfill recorded the repository as walked: nothing past that page was
+  read on a resume. The twelve commit walks above did. So, by the code, did
+  the discussions, the issue events of a sweep and of a backfill, the labels
+  and milestones, the stars given and the searches of work in other people's
+  repositories, the merged pull requests' search meeting the timeout once, on
+  28 September; and Branches, having halved its batch down to one repository,
+  dropped one that still timed out as though it had no branches. Now the pull
+  request, commit and co-authored walks halve their page, and an aliased batch
+  and Branches their batch down to one, as before, and what still times out
+  at the smallest, and every other walk or single query, returns the rows it
+  read together with the timeout. The runner writes those rows, logs
+  `collector failed`, writes the family's `gh_collector_family` row with the
+  reason `query too large`, and keeps the repository out of a backfill's
+  checkpoint; a sweep reads it again on the next pass, since the commit, issue
+  event and outbound windows reach two cadences back and the movement gate
+  asks the head and the newest update rather than what the last pass read.
+  None of the walks that now hand the timeout up halves: only the outbound
+  search has met it, and the merged search answered the other 116 of its 117
+  asks from 11 to 29 September in at most 5.3 seconds, and the other four
+  searches all 468 of theirs in at most 3.5, so a smaller page is not its
+  remedy. The comments left anywhere handed the timeout up already. The
+  [API page](https://jmrp.io/docs/ghchronicle/api/#an-answer-github-could-not-finish-is-asked-once-more),
+  the
+  [backfill page](https://jmrp.io/docs/ghchronicle/how/backfill/#two-endpoints-that-needed-their-own-handling)
+  and the
+  [troubleshooting page](https://jmrp.io/docs/ghchronicle/reference/troubleshooting/)
+  say what a timeout does now.
 - **A request that got no answer is still not asked again, and a test says
   so.** The only such failure since 11 September was a name that could not be
   looked up, six times, three of them on 28 September on the way to a job
@@ -171,19 +226,50 @@ now says so wherever it matters, with what removes the copy.
   snapshots Grafana 13.2.1 sums a field with no value to 0. So over such a
   range the Overview drew "No data" where the other four stores read "not
   read". The panel now makes the calculation per value in its own
-  transformations: every field becomes a row of its sum and its count, the sum
-  becomes no value where the count is 0, the rows of one name are grouped into
-  the one that was read, and each turns back into a field. The repository
-  count is read as the account's other snapshots are, and two queries that
-  answer only the names Stars and Forks, over any range, stand in for the
-  table of repositories where it answers nothing. Checked on the containerised
-  suite's Grafana 13.2.1: over 26 July to 25 August 2025 the three tiles read
-  "not read" as in the other stores; over a repository with nothing in it the
-  count reads 42 and the stars and forks "not read", as in InfluxDB and
-  Graphite; over the suite's own range they read 42, 80 and 9 as before; and a
-  scratch index of four repositories, one written twice and two with no star,
-  read 37 stars and 6 forks, their newest documents added up. Three
-  Elasticsearch panels still leave a value out over nothing, and say so.
+  transformations: every field becomes a row of its sum and its count, the
+  rows of one name are added up, the sum becomes no value where the count is
+  0, and each name turns back into a field. The repository count is read as
+  the account's other snapshots are, and two queries that answer only the
+  names Stars and Forks, over any range, stand in for the table of
+  repositories where it answers nothing. Checked on the containerised suite's
+  Grafana 13.2.1: over 26 July to 25 August 2025 the three tiles read "not
+  read" as in the other stores; over a repository with nothing in it the count
+  reads 42 and the stars and forks "not read", as in InfluxDB and Graphite;
+  over the suite's own range they read 42, 80 and 9 as before; and a scratch
+  index of four repositories, one written twice and two with no star, read 37
+  stars and 6 forks, their newest documents added up.
+- **Runs in range, Downloads and Open alerts draw every tile in Elasticsearch
+  over a range no sweep reached.** Each adds up the newest document of each
+  repository, release or alert: the artifact storage and the cache, the
+  download total, and the Dependabot and code scanning counts. A terms bucket
+  answers that with nothing at all over nothing, and each stat added every
+  value up, so Runs in range did not ask for its success rate, run duration and
+  queue wait over nothing either, which a sum would have read as 0. Over such a
+  range the three drew two tiles, one and "No data", where the other four
+  stores drew seven, two and two, and each said so. They now go the way of the
+  Repositories group: each value arrives as a series under its tile's name, and
+  the panel adds up the values of each name and leaves no value where none was
+  read. The newest document of each item is read in a date histogram bucket a
+  century wide under the terms, since a newest-document metric right under the
+  terms answers a table whose column is "Top Metrics" whatever the query and
+  its alias, which would have made the artifact storage and the cache, or the
+  two kinds of alert, one name before anything could add them up; beside each
+  total a query answers only its name, over any range. The single values, the
+  run and release counts, the success rate and the two medians, are asked in
+  the century-wide bucket, where a count reads 0 over nothing and a mean or a
+  median no value, which the tile draws as its panel's word for it. Checked on
+  the containerised suite's Grafana 13.2.1: over 26 July to 25 August 2025 the
+  three draw every tile as the other four stores do, "0", "none decided", "no
+  runs", "no jobs", "not read", "no releases" and "none open"; over the suite's
+  own range they read 2, 50%, 0, 4.33 mins, 47.5 s, 200 KiB and 75.5 MiB, 16
+  and 2, and 1 and 2, as before; a scratch index of three repositories, two of
+  them one name under two owners and one read twice, read 300 B, 30 B, 100
+  downloads and 8 and 7 open alerts before and after; and over one repository
+  with a Dependabot alert and nothing else Open alerts reads 1 and "none
+  open", where it drew the one tile. The containerised check of tiles over
+  nothing now excuses no panel, and the
+  [panels page](https://jmrp.io/docs/ghchronicle/dashboards/panels/) no
+  longer says three are left.
 - **Each bar of Contribution mix (last year) says "not read" over a range no
   sweep reached.** The bar gauge draws four shares of the newest contributions
   snapshot, the one the Contributions tile of Account reads. Over such a range
@@ -256,33 +342,50 @@ asked once and read a query too large; an answer that is not JSON, and a 5xx
 dressed as JSON, which it read as too large as well; a commit walk refused once
 and twice, where it stopped at two commits of three and reported success; the
 pull request walk refused once, where it asked again for 25 where it had asked
-for 50; the three panels measured in PostgreSQL's order; every stat value over
-nothing, which failed on the six statements and 21 values of the five groups in
-the SQL stores, their 21 Graphite series, 21 Prometheus queries and five
-Elasticsearch buckets; the Elasticsearch Repositories group replayed over what
-its datasource answers, where over nothing it drew none of its three tiles;
-every value of the contribution mix over nothing, which failed on its statement
-in the SQL stores, its four Prometheus queries and its Elasticsearch bucket,
-and its Elasticsearch bars replayed over nothing, none of which drew; the mix
-over a newest snapshot holding none of the four, which failed on the statement
-of both SQL stores and on Graphite's four bars, drawn at 80, 10, 6 and 4 per
-cent; and the uninstall's note on a server before 3.2 and on one upgraded from
-it. Where such a test calls something the old code lacks, a helper, it was run
-there with that call stubbed. The tests of what did not change, a 4xx, a 501, a
-505 and each network failure asked once, a storage refusal and a failed lookup
-of storage asked once, GitHub's GraphQL timeout read as a query too large and
-asked once, and the pull request walk halving its page for it, pass against the
-old code and the new, as does the parity check's self-test. The tests of what
-the plan, applying and `-migrate` say on a server before 3.2 call fields and
-functions the old code lacks, and were not run against it; its plan said only
-that a server before 3.4.0 may keep the copy until somebody drops it. The
+for 50; a commit page the gateway gave up on at fifty, where the walk stopped
+at two commits of three and a sweep read none, each reporting success; a commit
+page it gave up on at every size, where the walk halved it down to six and
+reported success; the discussions, the issue events of a sweep and of a
+backfill, the labels and milestones, the stars given and the searches of work
+in other people's repositories cut short by the timeout, and Branches left with
+one repository the gateway gave up on alone, each of which reported success;
+the timeout read as nothing here; a backfill whose commit walk the gateway cut
+short, which it recorded as walked; the three panels measured in PostgreSQL's
+order; every stat value over nothing, which failed on the six statements and 21
+values of the five groups in the SQL stores, their 21 Graphite series, 21
+Prometheus queries and five Elasticsearch buckets; the Elasticsearch
+Repositories group replayed over what its datasource answers, where over
+nothing it drew none of its three tiles; every value of the contribution mix
+over nothing, which failed on its statement in the SQL stores, its four
+Prometheus queries and its Elasticsearch bucket, and its Elasticsearch bars
+replayed over nothing, none of which drew; the mix over a newest snapshot
+holding none of the four, which failed on the statement of both SQL stores and
+on Graphite's four bars, drawn at 80, 10, 6 and 4 per cent; Runs in range,
+Downloads and Open alerts replayed over what the Elasticsearch datasource
+answers, over nothing and over documents, where the old panels drew none of
+their tiles, since their values were the stat's own sum, which the replay does
+not make; the same check of every stat value over nothing, which refused the
+three for adding every value up; and the uninstall's note on a server before 3.2 and on one
+upgraded from it. Where such a test calls something the old code lacks, a
+helper, it was run there with that call stubbed. The tests of what did not
+change, a 4xx, a 501, a 505 and each network failure asked once, a storage
+refusal and a failed lookup of storage asked once, GitHub's GraphQL timeout
+read as a query too large and asked once, the pull request and co-authored
+walks and the aliased batches halving their page or batch for it and giving up
+below the smallest, and the comments left anywhere handing it up, pass against
+the old code and the new, as does the parity check's self-test. The tests of
+what the plan, applying and `-migrate` say on a server before 3.2 call fields
+and functions the old code lacks, and were not run against it; its plan said
+only that a server before 3.4.0 may keep the copy until somebody drops it. The
 containerised checks were run against the dashboards before each change when it
 was made: the Debian PostgreSQL drew three panels' rows in another order, the
 collation probes found 218 expressions of 103 panels left to the collation, and
 InfluxDB drew no tile of five panels, 21 tiles, over a range no sweep reached;
 with the Elasticsearch Repositories group no longer excused, the check of tiles
-over nothing failed on both of its questions; InfluxDB drew no bar of the
-contribution mix over such a range, and the stores disagreed about it; and
+over nothing failed on both of its questions, and with Runs in range, Downloads
+and Open alerts no longer excused, it found 226 of the 248 pairs of stores it
+compares alike, where the new dashboard has all 248; InfluxDB drew no bar of
+the contribution mix over such a range, and the stores disagreed about it; and
 where the newest snapshot holds none of the four kinds, InfluxDB, PostgreSQL
 and Graphite drew 80, 10, 6 and 4 per cent. The containerised suite passed on
 this release, without a GitHub token, against InfluxDB 3.11.2, PostgreSQL 18.6
@@ -291,14 +394,16 @@ Prometheus 3.14.0 and Loki 3.7.7, through Grafana 13.2.1.
 
 Not verified:
 
-- Production has run this release since 29 September at 17:08 CEST without
-  its last three changes, the GraphQL retry, the Elasticsearch Repositories
-  group and the contribution mix, which have run in the containerised suite
-  alone. By 20:40 GitHub had answered five of its REST requests with a gateway
-  error, four artifact listings of `jmrplens/jmrp.io` and
-  `jmrplens/phonometry` with a 502 after 10.4 to 11.0 seconds and the workflow
-  run listing of `jmrplens/winget-pkgs` with a 500 after 0.88 seconds, and
-  each was answered when asked again two seconds later; no collector failed.
+- Production has run this release since 29 September at 17:08 CEST without its
+  last six changes, the GraphQL retry, the halved commit page, the timeout
+  handed up as a failure, the Elasticsearch Repositories group, the three
+  Elasticsearch groups after it and the contribution mix, which have run in the
+  tests and the containerised suite alone. By 23:10 GitHub had answered five of
+  its REST requests with a gateway error, four artifact listings of
+  `jmrplens/jmrp.io` and `jmrplens/phonometry` with a 502 after 10.4 to 11.0
+  seconds and the workflow run listing of `jmrplens/winget-pkgs` with a 500
+  after 0.88 seconds, and each was answered when asked again two seconds later;
+  no collector failed, and GitHub answered every GraphQL query with a 200.
   Whether the artifact listing of `jmrplens/jmrp.io` answers a second attempt
   after a 500 is still not known: none came there, and the one asked again by
   hand answered 500 again.
@@ -310,6 +415,12 @@ Not verified:
   pages answered 503 has been asked for since, so whether a second attempt two
   seconds later is answered is not known, and GitHub has not been seen
   answering a query with a 502 or a 504 in less than ten seconds.
+- The halved commit page was asked by hand on one repository, a page or two at
+  each size. Whether a page of twenty-five, twelve or six gets past the
+  timeout in the other five repositories that met it, or further back in
+  `jmrplens/phonometry`, is not known. The walks that now hand the timeout up
+  are held to it by tests against a stand-in for GitHub alone: of them only
+  the outbound search has met it in production, once, under the old code.
 - A refused connection, a reset and a TLS handshake timeout were not seen, and
   are not asked again; whether a second attempt would get past one is not
   known.
@@ -324,9 +435,10 @@ Not verified:
   not run locally.
 - The "not read" tiles and bars were drawn through Grafana 13.2.1 alone. A
   datasource that answers the Elasticsearch century-wide bucket over nothing
-  otherwise would draw something else there, and the transformations the
-  Elasticsearch Repositories group and contribution mix make their values with
-  were measured on that release alone.
+  otherwise would draw something else there, and the transformations that
+  Runs in range, Downloads, Open alerts, the Elasticsearch Repositories group
+  and the contribution mix make their values with were measured on that
+  release alone.
 - Every InfluxDB measurement above was made on Core, in throwaway
   containers. Enterprise has still not been sent a delete, and no copy has
   been removed with `hard_delete_at=now` on a server that holds real data.
