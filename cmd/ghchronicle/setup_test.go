@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jmrplens/ghchronicle/v2/internal/config"
 )
 
 // The guided setup, driven from both ends: the answers go in as a string and
@@ -43,12 +45,16 @@ func converse(t *testing.T, answers, path, base string) (string, error) {
 // the questions and what comes out is a file the parser takes, not a draft.
 func TestTheGuidedSetupWritesAConfigurationThatLoads(t *testing.T) {
 	base := githubStub(t, "octocat", http.StatusOK)
-	path := filepath.Join(t.TempDir(), "config.yaml")
+	// A space in the path, which the command it says to try carries quoted.
+	path := filepath.Join(t.TempDir(), "my setup", "config.yaml")
 	// token, account (default), sink, address, database, token, dashboard? no,
 	// service? no.
 	said, err := converse(t, "ghp_atoken\n\n1\nhttp://influx:8181\ngithub\nitstoken\nn\nn\n", path, base)
 	if err != nil {
 		t.Fatalf("%v\n%s", err, said)
+	}
+	if try := " -config " + config.QuotePath(path) + " -once\n"; !strings.Contains(said, try) {
+		t.Errorf("the command it says to try is not %q:\n%s", try, said)
 	}
 	written, err := os.ReadFile(path)
 	if err != nil {

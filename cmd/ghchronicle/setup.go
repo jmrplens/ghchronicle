@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jmrplens/ghchronicle/v2/internal/config"
 	"github.com/jmrplens/ghchronicle/v2/internal/ghapi"
 	"github.com/jmrplens/ghchronicle/v2/internal/grafana"
 )
@@ -258,7 +259,7 @@ func writeSetup(ask *asker, answers setupAnswers, path string, now time.Time) er
 	ask.sayf("")
 	ask.sayf("Try it once, before anything runs on a timer:")
 	ask.sayf("")
-	ask.sayf("  %s -config %s -once", exeName(), path)
+	ask.sayf("  %s -config %s -once", exeName(), config.QuotePath(path))
 	return nil
 }
 

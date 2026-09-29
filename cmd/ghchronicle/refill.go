@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jmrplens/ghchronicle/v2/internal/config"
 	"github.com/jmrplens/ghchronicle/v2/internal/migrate"
 	"github.com/jmrplens/ghchronicle/v2/internal/run"
 	"github.com/jmrplens/ghchronicle/v2/internal/sink"
@@ -42,7 +43,7 @@ func refiller(m migration) migrate.Refiller {
 			if _, enabled := m.cfg.Interval(f); !enabled {
 				log.Warn("the refill cannot read a family this configuration switches off, so what it wrote "+
 					"into the stores cleared does not come back", "family", f,
-					"then", "give it a cadence and run "+commandLine(m.configPath, "-backfill", "-families", f))
+					"then", "give it a cadence and run "+config.CommandLine(m.configPath, "-backfill", "-families", f))
 			}
 		}
 		scope := run.ScopeOf(m.cfg, refillSince(w.Since)).Narrowed(w.Families, w.Keep)

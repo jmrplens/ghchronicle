@@ -81,6 +81,13 @@ pending, the plan ends with the command that applies it and with what a start
 does about it under the [`migrate`](https://jmrp.io/docs/ghchronicle/configuration/#migrate)
 setting.
 
+That command, and every other one ghchronicle prints for you to run next (the
+resume line of `-backfill-status`, the warnings of a start, the last line of
+`-setup`), names the configuration as it was given, quoted when a shell would
+read part of the path: in single quotes on Linux and macOS, and in double
+quotes on Windows, the one form PowerShell and `cmd` both read as a single
+argument.
+
 ```sh
 ghchronicle -config config.yaml -migrate -yes
 ```

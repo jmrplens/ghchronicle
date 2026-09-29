@@ -824,7 +824,7 @@ func reportBackfill(cfg *config.Config, configPath string, stdout io.Writer, now
 		fmt.Fprintf(stdout, "  the checkpoint one leaves behind is not there: %s\n", shownPath(path))
 	} else {
 		fmt.Fprintln(stdout, "backfill in progress")
-		reportWalk(progress, path, commandLine(configPath, resumeFlags(cfg, progress.Scope)...), stdout, now)
+		reportWalk(progress, path, config.CommandLine(configPath, resumeFlags(cfg, progress.Scope)...), stdout, now)
 	}
 	// The refill of a migration keeps a checkpoint of its own, and is said
 	// only when there is one: most runs never have a refill to make.
@@ -834,7 +834,7 @@ func reportBackfill(cfg *config.Config, configPath string, stdout io.Writer, now
 	}
 	fmt.Fprintln(stdout, "refill in progress, reading back what a migration cleared")
 	fmt.Fprintf(stdout, "  writing      %s\n", writtenBy(progress.Scope.Measurements))
-	reportWalk(progress, path, commandLine(configPath, "-migrate", "-yes")+
+	reportWalk(progress, path, config.CommandLine(configPath, flagMigrate, flagYes)+
 		", or the next start under migrate: auto", stdout, now)
 	return nil
 }

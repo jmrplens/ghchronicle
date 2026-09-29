@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/jmrplens/ghchronicle/v2"
+	"github.com/jmrplens/ghchronicle/v2/internal/config"
 )
 
 // oldInflux is an InfluxDB 3 that answers the catalog the way 3.11.2 does
@@ -402,7 +403,8 @@ func TestUnderWarnAStartOnlyAsks(t *testing.T) {
 	}
 	for _, want := range []string{
 		`not_applied="migrate: warn applies nothing on its own"`,
-		`plan="ghchronicle -config ` + cfg + ` -migrate" apply="ghchronicle -config ` + cfg + ` -migrate -yes"`,
+		"plan=" + strconv.Quote("ghchronicle -config "+config.QuotePath(cfg)+" -migrate") +
+			" apply=" + strconv.Quote("ghchronicle -config "+config.QuotePath(cfg)+" -migrate -yes"),
 	} {
 		if !strings.Contains(log, want) {
 			t.Errorf("the start does not say %q:\n%s", want, log)

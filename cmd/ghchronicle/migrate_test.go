@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -248,7 +249,8 @@ func TestAStartAppliesTheSafeOnesBeforeItsFirstSweep(t *testing.T) {
 	for _, want := range []string{
 		`level=WARN msg="applying a migration before the first sweep" sink=influxdb measurement=gh_discussion_comment migration=` + commentsID,
 		`level=WARN msg="migration pending" sink=graphite measurement=gh_discussion_comment migration=` + commentsID,
-		`plan="ghchronicle -config ` + cfg + ` -migrate" apply="ghchronicle -config ` + cfg + ` -migrate -yes"`,
+		"plan=" + strconv.Quote("ghchronicle -config "+config.QuotePath(cfg)+" -migrate") +
+			" apply=" + strconv.Quote("ghchronicle -config "+config.QuotePath(cfg)+" -migrate -yes"),
 		`level=INFO msg="migration applied" sink=influxdb`,
 	} {
 		if !strings.Contains(got.stderr, want) {
@@ -505,26 +507,13 @@ func TestTheDryRunSaysHowToApplyWhatItFound(t *testing.T) {
 		t.Fatalf("-migrate = %d:\n%s", got.status, got.stderr)
 	}
 	for _, want := range []string{
-		"Nothing was changed.\n\nTo apply every pending one, with the service stopped:\n  ghchronicle -config " + cfg + " -migrate -yes\n",
+		"Nothing was changed.\n\nTo apply every pending one, with the service stopped:\n  ghchronicle -config " +
+			config.QuotePath(cfg) + " -migrate -yes\n",
 		"unless -migrate-others is added too",
 		"Under migrate: warn, the setting this configuration has, a start applies none of them",
 	} {
 		if !strings.Contains(got.stdout, want) {
 			t.Errorf("the plan does not end with %q:\n%s", want, got.stdout)
-		}
-	}
-}
-
-// TestACommandLineNamesTheConfigurationSoTheShellReadsItBack: a path with a
-// space or a quote in it is quoted, and a plain one is not.
-func TestACommandLineNamesTheConfigurationSoTheShellReadsItBack(t *testing.T) {
-	for path, want := range map[string]string{
-		"/etc/ghchronicle/config.yaml": "ghchronicle -config /etc/ghchronicle/config.yaml -migrate",
-		"/srv/my config.yaml":          "ghchronicle -config '/srv/my config.yaml' -migrate",
-		"/srv/it's.yaml":               `ghchronicle -config '/srv/it'\''s.yaml' -migrate`,
-	} {
-		if got := commandLine(path, "-migrate"); got != want {
-			t.Errorf("commandLine(%q) = %q, want %q", path, got, want)
 		}
 	}
 }

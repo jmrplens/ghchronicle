@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -46,7 +47,7 @@ func TestBackfillStatusSaysWhereTheRefillIs(t *testing.T) {
 		"  writing      gh_discussion_comment to file\n",
 		"  left         discussions\n",
 		"  checkpoint   " + filepath.Join(dir, "state-refill.json") + "\n",
-		"  resume       ghchronicle -config " + path + " -migrate -yes, or the next start under migrate: auto\n",
+		"  resume       ghchronicle -config " + config.QuotePath(path) + " -migrate -yes, or the next start under migrate: auto\n",
 	} {
 		if !strings.Contains(got.stdout, want) {
 			t.Errorf("the status does not say %q:\n%s", want, got.stdout)
@@ -102,7 +103,7 @@ func TestARefillOwedIsPaidUnderAutoAndSaidUnderWarn(t *testing.T) {
 			if strings.Contains(got.stderr, said) == tc.paid {
 				t.Errorf("under %s the refill owed is said %v:\n%s", tc.name, !tc.paid, got.stderr)
 			}
-			if !tc.paid && !strings.Contains(got.stderr, `apply="ghchronicle -config `+path+` -migrate -yes"`) {
+			if !tc.paid && !strings.Contains(got.stderr, "apply="+strconv.Quote("ghchronicle -config "+config.QuotePath(path)+" -migrate -yes")) {
 				t.Errorf("the warning does not name the command that reads it:\n%s", got.stderr)
 			}
 		})

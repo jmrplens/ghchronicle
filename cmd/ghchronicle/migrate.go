@@ -18,10 +18,15 @@ import (
 	"github.com/jmrplens/ghchronicle/v2/internal/teardown"
 )
 
-// flagOthers is the flag that lets -migrate -yes clear a store holding rows
-// of accounts this configuration does not collect, named once because the
-// warnings, the report and the usage all say it.
-const flagOthers = "-migrate-others"
+// The flags of the command lines a warning, the plan and the report name,
+// each named once because they all say it.
+const (
+	flagMigrate = "-migrate"
+	flagYes     = "-yes"
+	// flagOthers lets -migrate -yes clear a store holding rows of accounts
+	// this configuration does not collect, which the usage says too.
+	flagOthers = "-migrate-others"
+)
 
 // storeQuestionTimeout bounds what a start asks each store about the
 // registry. A store that does not answer in that time is said to be
@@ -129,16 +134,6 @@ func purging(m migration, ask bool) migrate.Purging {
 	}
 }
 
-// commandLine is a command the reader can copy, with the configuration this
-// run was given. A path with a character the shell reads is quoted.
-func commandLine(configPath string, flags ...string) string {
-	path := configPath
-	if strings.ContainsAny(path, " \t'\"$`\\&;|<>()*?[]#~!{}") {
-		path = "'" + strings.ReplaceAll(path, "'", `'\''`) + "'"
-	}
-	return strings.Join(append([]string{"ghchronicle", "-config", path}, flags...), " ")
-}
-
 // migrateOnStart is what a run that writes to the stores does about the
 // registry before its first sweep: see migrate.Start for the rule. It never
 // stops the run. A store it cannot bring along is said and left as it is,
@@ -163,8 +158,8 @@ func migrateOnStart(ctx context.Context, m migration, service bool) {
 		// nothing of it until somebody runs a backfill, which is a loss a
 		// start may never cause on its own, however safe the set-aside.
 		CanApply: func(store string) bool { return ways[store] != nil && refill != nil },
-		DryRun:   commandLine(m.configPath, "-migrate"),
-		Apply:    commandLine(m.configPath, "-migrate", "-yes"),
+		DryRun:   config.CommandLine(m.configPath, flagMigrate),
+		Apply:    config.CommandLine(m.configPath, flagMigrate, flagYes),
 		Others:   flagOthers, Service: service, State: m.state, Now: time.Now(), Log: m.log,
 	}
 	chosen := start.Decide(ctx)
@@ -206,7 +201,7 @@ func migrateOnStart(ctx context.Context, m migration, service bool) {
 		_, _ = migrate.Applying{
 			Config: m.cfg, State: m.state, Save: m.state.Save, Appliers: ways, Refill: refill,
 			Readers: itemReaders(m), Cleared: forgetCleared(m), Log: m.log,
-			Resume: "the next start resumes it, and " + commandLine(m.configPath, "-migrate") + " says what is left",
+			Resume: "the next start resumes it, and " + config.CommandLine(m.configPath, flagMigrate) + " says what is left",
 		}.Apply(ctx, chosen)
 	}
 	purge.Now = time.Now()
@@ -295,7 +290,7 @@ func migratePlan(ctx context.Context, cfg *config.Config, api *ghapi.Client, con
 		return nil
 	}
 	fmt.Fprintf(stdout, "\nTo apply every pending one, with the service stopped:\n  %s\n",
-		commandLine(configPath, "-migrate", "-yes"))
+		config.CommandLine(configPath, flagMigrate, flagYes))
 	if len(held) > 0 {
 		fmt.Fprintf(stdout, "A store holding rows of accounts this configuration does not collect, or one whose "+
 			"rows could not be compared with it, is left alone unless %s is added too.\n", flagOthers)

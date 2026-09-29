@@ -85,6 +85,13 @@ decide cada almacén y qué significa cada línea. Cuando hay algo pendiente, el
 plan termina con la orden que lo aplica y con lo que hace un arranque con el
 ajuste [`migrate`](/ghchronicle/es/configuration/#migrate).
 
+Esa orden, y cualquier otra que ghchronicle imprime para que la ejecutes
+después (la línea de reanudar de `-backfill-status`, los avisos de un arranque,
+la última línea de `-setup`), nombra la configuración tal como se le dio, entre
+comillas cuando un shell leería parte de la ruta: comillas simples en Linux y
+macOS, y dobles en Windows, la única forma que PowerShell y `cmd` leen como un
+solo argumento.
+
 ```sh
 ghchronicle -config config.yaml -migrate -yes
 ```

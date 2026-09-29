@@ -112,7 +112,8 @@ func TestBackfillStatusSaysHowToResumeANarrowedWalk(t *testing.T) {
 	for _, want := range []string{
 		"backfill in progress\n",
 		"  families     1 of 2 complete\n",
-		"  resume       ghchronicle -config " + path + " -backfill -backfill-since 90d -families discussions,outbound\n",
+		"  resume       ghchronicle -config " + config.QuotePath(path) +
+			" -backfill -backfill-since 90d -families discussions,outbound\n",
 	} {
 		if !strings.Contains(got.stdout, want) {
 			t.Errorf("the status does not say %q:\n%s", want, got.stdout)
