@@ -8,7 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jmrplens/ghchronicle/v2/internal/config"
 	"github.com/jmrplens/ghchronicle/v2/internal/run"
+	"github.com/jmrplens/ghchronicle/v2/internal/teardown"
 )
 
 // Applier brings one store along for one migration: whatever that store's
@@ -58,10 +60,6 @@ type Chosen struct {
 	Item        Item
 }
 
-// Refiller reads the history of every cleared item again from GitHub and
-// writes it to the stores that were cleared, and to no other.
-type Refiller func(ctx context.Context, cleared []Chosen) error
-
 // Result is how one chosen item went.
 type Result struct {
 	Chosen
@@ -69,17 +67,32 @@ type Result struct {
 	Err     error
 }
 
+// Outcomes is what Apply did: every item, and the refill that followed, nil
+// when no store was owed one.
+type Outcomes struct {
+	Results []Result
+	Refill  *Refilled
+}
+
 // Applying is what applying needs besides the items: where to record each
 // one, the way each store is brought along, and the refill.
 type Applying struct {
-	State *run.State
+	// Config is the configuration whose stores are brought along, which says
+	// which records of the state file are about the stores its sinks write.
+	Config *config.Config
+	State  *run.State
 	// Save writes State. Called after every item, so a stop between the
-	// set-aside and the refill leaves the set-aside recorded.
+	// set-aside and the refill leaves the set-aside recorded, and the refill
+	// owed with it.
 	Save     func() error
 	Appliers map[string]Applier
-	// Refill reads the cleared items again. Nil is a build that cannot,
-	// which leaves every cleared item owing its history and says so.
+	// Refill reads the cleared history again. Nil is a build that cannot,
+	// which leaves every store cleared owing its history and says so.
 	Refill Refiller
+	// Readers are the stores that can say which items a table holds, by the
+	// sink's name, for the comparison with the copy of the old rows once the
+	// refill ends. A store with none is not compared.
+	Readers map[string]teardown.ItemReader
 	// Cleared, when set, is told of every item applied, once it is recorded
 	// and before the refill, so that what this process remembers of the
 	// measurement in that store is forgotten and the refill writes every row
@@ -98,28 +111,22 @@ var ErrNoRefill = errors.New("this build cannot read the history again: run a ba
 	"writing to the stores cleared")
 
 // Apply brings every chosen item along, store by store, in the order given,
-// recording each one as it goes, and then reads again the history of every
-// one that cleared a store. An item that fails is reported and the rest go
+// recording each one as it goes, and then pays every refill the state file
+// records as owed: the ones these items left, and any an earlier run was
+// stopped before it finished. An item that fails is reported and the rest go
 // on, the way -uninstall goes on: stopping at the first would leave the rest
-// unapplied for no reason of their own.
-func (a Applying) Apply(ctx context.Context, chosen []Chosen) ([]Result, error) {
-	results := make([]Result, 0, len(chosen))
-	var cleared []Chosen
+// unapplied for no reason of their own. The error is the refill's.
+func (a Applying) Apply(ctx context.Context, chosen []Chosen) (Outcomes, error) {
+	done := Outcomes{Results: make([]Result, 0, len(chosen))}
 	for _, c := range chosen {
 		r := Result{Chosen: c}
 		r.Outcome, r.Err = a.one(ctx, c)
-		results = append(results, r)
-		if r.Err == nil && len(c.Item.Refill) > 0 {
-			cleared = append(cleared, c)
-		}
+		done.Results = append(done.Results, r)
 	}
-	if len(cleared) == 0 {
-		return results, nil
+	if done.Refill = a.refill(ctx); done.Refill != nil {
+		return done, done.Refill.Err
 	}
-	if a.Refill == nil {
-		return results, ErrNoRefill
-	}
-	return results, a.Refill(ctx, cleared)
+	return done, nil
 }
 
 // one applies one item and records it.
@@ -149,6 +156,11 @@ func (a Applying) one(ctx context.Context, c Chosen) (Outcome, error) {
 	rec.MarkApplied(m.ID, a.now())
 	if out.Kept != nil {
 		rec.KeepAside(*out.Kept)
+	}
+	if len(c.Item.Refill) > 0 {
+		// Owed from here: the store no longer holds the history, and the
+		// store itself cannot say so once it is cleared.
+		rec.OweRefill(m.ID, m.Measurement, c.Item.Refill, c.Item.Since)
 	}
 	if a.Cleared != nil {
 		a.Cleared(c)

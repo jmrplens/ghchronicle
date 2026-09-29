@@ -141,7 +141,24 @@ that runs short is `core`, lengthen `artifacts` and then `actions`; if it is
 activity, not with
 size](https://jmrp.io/docs/ghchronicle/api/cost/#what-scales-with-activity-not-with-size).
 
+**`refill owed: a store a migration cleared does not hold that history yet`.**
+A migration cleared the measurement named in that store and reading its history
+back from GitHub did not finish: the run was stopped, a store refused a write,
+or GitHub did not answer. The store now looks like one that never held the old
+shape, so only the state file knows. Under `migrate: warn` a start says this
+and sweeps; `-migrate -yes`, named in the line, reads it back from where it
+stopped, and so does any start under `migrate: auto`. See [reading the history
+back](https://jmrp.io/docs/ghchronicle/install/upgrading/#reading-the-history-back).
+
 ## The data looks wrong
+
+**`reconciled` at `WARN`, with `not_served`.** After reading a cleared
+measurement back, ghchronicle compared the copy of the old rows with the table
+and found items GitHub no longer serves: a repository deleted or no longer
+covered, a comment deleted, an alert whose feature was switched off. `first`
+names a few, and `only_in` is the copy that still holds them, until it is
+purged 24 hours after the migration. Carrying them over is by hand, from that
+copy, while it is there.
 
 **A number is a multiple of the sweep count.** Something that is a snapshot is
 being summed over time. Referrers, paths, labels and milestones are snapshots

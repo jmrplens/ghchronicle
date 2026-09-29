@@ -83,16 +83,28 @@ type State struct {
 }
 
 func LoadState(path string) *State {
-	s := &State{
-		path: path, LastRun: map[string]time.Time{}, FirstSaw: map[string]time.Time{},
-		HistoryRead: map[string]time.Time{}, LastHead: map[string]string{}, LastFull: map[string]time.Time{},
-		Stores: map[string]*StoreRecord{},
+	s := readState(path)
+	s.path = path
+	return s
+}
+
+// readState is the state file at path, with every map there to write into
+// whatever the file held. A path with nothing readable at it reads as a state
+// file with nothing in it, which is a first run and not an error.
+func readState(path string) *State {
+	// A read that fails hands back nothing, which decodes as the empty state.
+	b, _ := os.ReadFile(path)
+	return decodeState(b)
+}
+
+// decodeState reads a state file's contents. What does not parse is left as
+// the empty state it would have been, since a first run is what a state file
+// nobody can read makes of it anyway.
+func decodeState(b []byte) *State {
+	s := &State{}
+	if len(b) > 0 {
+		_ = json.Unmarshal(b, s)
 	}
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return s // a missing state file is a first run, not an error
-	}
-	_ = json.Unmarshal(b, s)
 	if s.LastRun == nil {
 		s.LastRun = map[string]time.Time{}
 	}
@@ -116,7 +128,6 @@ func LoadState(path string) *State {
 			delete(s.Stores, name)
 		}
 	}
-	s.path = path
 	return s
 }
 
@@ -212,6 +223,27 @@ func syncDir(dir string) {
 	}
 	_ = d.Sync()
 	_ = d.Close()
+}
+
+// Detached is a copy of the state that is never saved: whatever a run marks
+// in it goes nowhere.
+//
+// The refill of a migration reads as a backfill reads, from what the state
+// file knows, and must leave none of its own marks there, for the reason a
+// card-only sweep leaves none: every field is a claim that something reached
+// the stores, and a refill hands the stores one measurement of each family
+// it runs. A family marked as run would skip its next sweep, which the
+// other measurements of that family wait for; a history marked as read would
+// leave the daily star counts it did not write unread for good.
+func (s *State) Detached() *State {
+	// What is marshaled here is what LoadState reads back, so it marshals;
+	// were it ever not to, the copy is a state with nothing in it, which a
+	// backfill reads as a first run and which is never saved either way.
+	b, err := json.Marshal(s)
+	if err != nil {
+		return decodeState(nil)
+	}
+	return decodeState(b)
 }
 
 // Due reports whether a family should run now.

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -148,6 +149,9 @@ type recordingWays struct {
 	fail     error
 	// noRefill installs no way to read the history again.
 	noRefill bool
+	// during, when set, is run inside the refill, which then ends the way the
+	// real one ends when the run is stopped: with the context's error.
+	during func()
 }
 
 func (r *recordingWays) Apply(_ context.Context, it migrate.Item) (migrate.Outcome, error) {
@@ -172,13 +176,22 @@ func (r *recordingWays) install(t *testing.T) {
 			return ways, nil
 		}
 		return ways,
-			func(_ context.Context, cleared []migrate.Chosen) error {
+			func(ctx context.Context, w migrate.RefillWalk) error {
 				r.mu.Lock()
-				defer r.mu.Unlock()
-				for _, c := range cleared {
-					r.refilled = append(r.refilled, c.Store+":"+c.Item.Migration.ID)
+				for _, store := range slices.Sorted(maps.Keys(w.Keep)) {
+					r.refilled = append(r.refilled, store+":"+strings.Join(w.Keep[store], ","))
 				}
-				return nil
+				r.mu.Unlock()
+				if r.during == nil {
+					return nil
+				}
+				r.during()
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(10 * time.Second):
+					return errors.New("the run was not stopped")
+				}
 			}
 	}
 	t.Cleanup(func() { storeWays = previous })
@@ -220,7 +233,7 @@ func TestAStartAppliesTheSafeOnesBeforeItsFirstSweep(t *testing.T) {
 	if got.status != notExited {
 		t.Fatalf("-once = %d:\n%s", got.status, got.stderr)
 	}
-	if !slices.Equal(ways.applied, []string{commentsID}) || !slices.Equal(ways.refilled, []string{"influxdb:" + commentsID}) {
+	if !slices.Equal(ways.applied, []string{commentsID}) || !slices.Equal(ways.refilled, []string{"influxdb:gh_discussion_comment"}) {
 		t.Errorf("the start applied %v and read again %v, want the comments in InfluxDB", ways.applied, ways.refilled)
 	}
 	if store.wrote.IsZero() || !ways.at.Before(store.wrote) {

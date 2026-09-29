@@ -47,12 +47,14 @@ type migration struct {
 	// fresh says the state file had recorded nothing before this run, so it
 	// cannot name a copy an earlier run set aside, and the stores are asked.
 	fresh bool
+	// retry is -backfill-retry, which a refill honors as a backfill does.
+	retry time.Duration
 }
 
 // storeWays is how this build brings each store along, by the sink's name,
-// and how it reads the history of what it cleared again. A store with no
-// entry is one this build has no way to change: its items are said and left
-// pending.
+// and how it reads the history of what it cleared again: see refiller. A
+// store with no entry is one this build has no way to change: its items are
+// said and left pending.
 //
 // InfluxDB, PostgreSQL and Elasticsearch clear the measurement themselves,
 // keeping the old rows aside for a day where they can; the SQL file is told
@@ -76,7 +78,7 @@ var storeWays = func(m migration) (map[string]migrate.Applier, migrate.Refiller)
 	if q, ok := sinkOf[*sink.SQL](m.sinks); ok && m.cfg.Sinks.SQL != nil {
 		ways[q.Name()] = migrate.Dropping{Sink: q, Path: m.cfg.Sinks.SQL.Path}
 	}
-	return ways, nil
+	return ways, refiller(m)
 }
 
 // sinkOf is the sink of one type among a run's sinks, behind whatever ledger
@@ -166,8 +168,16 @@ func migrateOnStart(ctx context.Context, m migration, service bool) {
 		Others:   flagOthers, Service: service, State: m.state, Now: time.Now(), Log: m.log,
 	}
 	chosen := start.Decide(ctx)
+	// A refill an earlier run left owed is the rest of a migration somebody
+	// already applied, which only migrate: auto lets a start carry on with;
+	// under warn it is said, like everything else a start does not do.
+	owed := migrate.OwedIn(m.state, m.cfg)
+	if len(owed) > 0 && !start.Auto {
+		sayOwed(m.log, owed, "migrate: warn reads nothing again on its own", start.Apply, service)
+		owed = nil
+	}
 	purge := purging(m, m.fresh)
-	if len(chosen) == 0 && !purge.Owed() {
+	if len(chosen) == 0 && len(owed) == 0 && !purge.Owed() {
 		return
 	}
 	// The service holds the state file for as long as it runs. A one-shot
@@ -177,20 +187,27 @@ func migrateOnStart(ctx context.Context, m migration, service bool) {
 	if !service {
 		lock, err := run.TakeLock(m.cfg.LockFile(), run.HeldByStart, version, time.Now())
 		if err != nil {
-			start.Held(chosen, "the state file is not this run's to change: "+err.Error())
+			reason := "the state file is not this run's to change: " + err.Error()
+			start.Held(chosen, reason)
+			sayOwed(m.log, owed, reason, start.Apply, service)
 			return
 		}
 		defer func() { _ = lock.Release() }()
 	}
-	if len(chosen) > 0 {
-		resume := "the next start tries again, and " + commandLine(m.configPath, "-migrate") + " says what is left"
-		_, err := migrate.Applying{
-			State: m.state, Save: m.state.Save, Appliers: ways, Refill: refill,
-			Cleared: forgetCleared(m), Log: m.log, Resume: resume,
-		}.Apply(ctx, chosen)
-		if err != nil {
-			m.log.Error("reading the history of what was cleared again did not finish", "err", err, "resume", resume)
+	if len(chosen)+len(owed) > 0 {
+		if len(owed) > 0 {
+			m.log.Warn("reading back, before the first sweep, the history a migration cleared and did not "+
+				"finish reading", "sinks", strings.Join(storesOwed(owed), ","))
 		}
+		// Whatever it comes to is in the log already, the refill's end
+		// included, and the sweep follows it either way: a store the refill
+		// did not finish gets this release's rows from the sweep, and the
+		// rest of its history from the next start.
+		_, _ = migrate.Applying{
+			Config: m.cfg, State: m.state, Save: m.state.Save, Appliers: ways, Refill: refill,
+			Readers: itemReaders(m), Cleared: forgetCleared(m), Log: m.log,
+			Resume: "the next start resumes it, and " + commandLine(m.configPath, "-migrate") + " says what is left",
+		}.Apply(ctx, chosen)
 	}
 	purge.Now = time.Now()
 	purge.Run(ctx)
@@ -318,13 +335,16 @@ func migrateApply(ctx context.Context, cfg *config.Config, api *ghapi.Client, o 
 		Resume: "Run the same command again once the cause is fixed: what was applied is recorded and is not " +
 			"done twice.",
 	}
-	m := migration{cfg: cfg, api: api, sinks: sinks, state: state, log: logger, configPath: o.path}
-	if len(chosen) > 0 {
+	m := migration{cfg: cfg, api: api, sinks: sinks, state: state, log: logger, configPath: o.path, retry: o.retry}
+	// Also with nothing pending: a refill an earlier run of this command, or
+	// a start, was stopped before it finished is paid here.
+	if len(chosen) > 0 || len(migrate.OwedIn(state, cfg)) > 0 {
 		ways, refill := storeWays(m)
-		report.Results, report.Refill = migrate.Applying{
-			State: state, Save: state.Save, Appliers: ways, Refill: refill, Cleared: forgetCleared(m),
-			Log: logger, Resume: report.Resume,
+		done, _ := migrate.Applying{
+			Config: cfg, State: state, Save: state.Save, Appliers: ways, Refill: refill,
+			Readers: itemReaders(m), Cleared: forgetCleared(m), Log: logger, Resume: report.Resume,
 		}.Apply(ctx, chosen)
+		report.Results, report.Refill = done.Results, done.Refill
 	}
 	// Copies set aside a day ago or more, by an earlier run of this command
 	// or by a service, are purged here as the service would purge them. The

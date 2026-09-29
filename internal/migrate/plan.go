@@ -106,6 +106,9 @@ type StorePlan struct {
 	// Kept is the copies of old rows a migration set aside here that the
 	// state file names and nobody has purged yet: what undoing it needs.
 	Kept []run.Aside
+	// Owed is the history a migration cleared here and has not read back,
+	// nil when there is none.
+	Owed *run.Refill
 }
 
 // Plan is every configured store and what this release would change in it.
@@ -226,7 +229,7 @@ func (in *Input) plan(ctx context.Context, st store, asker teardown.Inspector) S
 		return sp
 	}
 	if rec := in.State.Stores[st.name]; rec != nil && rec.Destination == st.destination {
-		sp.Kept = rec.SetAside
+		sp.Kept, sp.Owed = rec.SetAside, rec.Refill
 	}
 	if in.StoreTimeout > 0 {
 		var cancel context.CancelFunc
@@ -575,7 +578,7 @@ func action(st store, server string, m Migration) (what string, commands []strin
 		return "on the Graphite host, remove the old paths, one node deeper than the new ones:", graphiteCommands(st, m)
 	case "telegraf":
 		return "drop " + m.Measurement + " in the store behind Telegraf, then read " + quoted(m.Families) +
-			" again through it with a backfill", nil
+			" again through it with -backfill -families " + strings.Join(m.Families, ","), nil
 	}
 	return "", nil
 }

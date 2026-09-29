@@ -28,8 +28,8 @@ ghchronicle -config /etc/ghchronicle/config.yaml
 | `-groups`         | off           | Print the groups with the families in each, then exit                                                                                      |
 | `-backfill`       | off           | Reach as far back as each surface allows, waiting for the rate limit to reset rather than stopping                                         |
 | `-backfill-since` | none          | Bound the backfill: a date (`2024-01-01`), a duration (`720h`), days (`90d`) or years (`2y`)                                               |
-| `-backfill-status` | off          | Print how far the backfill in progress has got, then exit; it asks GitHub nothing, writes nothing, and needs no token                      |
-| `-backfill-retry` | `0`           | After a backfill ends with families left, wait this long and go back for them, until a pass records nothing new; `0` does not go back       |
+| `-backfill-status` | off          | Print how far the backfill in progress, and a migration's refill, have got, then exit; it asks GitHub nothing, writes nothing, and needs no token |
+| `-backfill-retry` | `0`           | After a backfill, or a migration's refill, ends with families left, wait this long and go back for them, until a pass records nothing new; `0` does not go back |
 | `-families`       | none          | With `-backfill`, walk only these families, comma separated, the names `-groups` prints; a name that is not a family, or the flag without `-backfill`, is refused with 2 |
 | `-publish-dashboard` | off        | Publish the Grafana dashboard and the datasource it reads from, then exit; it needs the `grafana` section, asks GitHub nothing and needs no token |
 | `-uninstall`      | none          | Remove what this put in place and exit: `dashboard`, `data`, `state`, `all`, comma separated; it lists and removes nothing without `-yes` |
@@ -54,8 +54,8 @@ configuration and asks GitHub which repositories the targets resolve to, which
 is the cheap way to check a change before spending quota on a sweep.
 `-backfill-status` reads the configuration to find the
 [backfill checkpoint](/ghchronicle/how/backfill/#seeing-how-far-it-has-got)
-and prints how far that walk has got; it asks GitHub nothing, so it needs no
-token.
+and prints how far that walk has got, and the refill of a migration after it
+when one is in progress; it asks GitHub nothing, so it needs no token.
 
 ```sh
 ghchronicle -version
@@ -90,7 +90,14 @@ ghchronicle -config config.yaml -migrate -yes
 
 With `-yes` it prints the same plan and then applies every pending change, the
 ones marked as needing somebody's word too, reads what it cleared again from
-GitHub, and says under the plan what happened to each. A store holding rows of
+GitHub, and says under the plan what happened to each. Reading it again is one
+backfill of the families that write what was cleared, writing that alone into
+the stores it was cleared from; `-backfill-retry` goes back for what it leaves,
+and where a store kept a copy of the old rows, the report compares the two and
+names what GitHub no longer serves. One cut short keeps a checkpoint of its
+own, and the same command resumes it, even with nothing left to apply:
+[reading the history back](/ghchronicle/install/upgrading/#reading-the-history-back).
+A store holding rows of
 accounts this configuration does not collect is held back unless
 `-migrate-others` is given as well. It needs a token and the repository list,
 and it takes the state file for as long as it runs: with the service running it

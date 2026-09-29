@@ -148,7 +148,25 @@ después `actions`; si es `graphql`, `issues`, `issueevents` y `commits`. Ver
 [qué crece con la actividad, no con el
 tamaño](/ghchronicle/es/api/cost/#qué-crece-con-la-actividad-no-con-el-tamaño).
 
+**`refill owed: a store a migration cleared does not hold that history yet`.**
+Una migración despejó la medida que se nombra en ese almacén y volver a leer su
+historial de GitHub no terminó: se paró la ejecución, un almacén rechazó una
+escritura o GitHub no respondió. Ahora el almacén parece uno que nunca guardó
+la forma antigua, así que solo lo sabe el fichero de estado. Bajo
+`migrate: warn` un arranque lo dice y hace su pasada; `-migrate -yes`, que la
+línea nombra, lo vuelve a leer desde donde se paró, y también cualquier
+arranque bajo `migrate: auto`. Ver [volver a leer el
+historial](/ghchronicle/es/install/upgrading/#volver-a-leer-el-historial).
+
 ## Los datos parecen mal
+
+**`reconciled` en `WARN`, con `not_served`.** Tras volver a leer una medida
+despejada, ghchronicle comparó la copia de las filas antiguas con la tabla y
+encontró elementos que GitHub ya no sirve: un repositorio borrado o que ya no
+se cubre, un comentario borrado, una alerta cuya función se apagó. `first`
+nombra unos pocos, y `only_in` es la copia que aún los guarda, hasta que se
+purga 24 horas después de la migración. Traspasarlos se hace a mano, desde esa
+copia, mientras está.
 
 **Un número es múltiplo del número de pasadas.** Algo que es una instantánea se
 está sumando en el tiempo. Los referrers, las rutas, las etiquetas y los hitos

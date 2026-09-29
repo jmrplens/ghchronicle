@@ -86,8 +86,11 @@ versión dejó allí con otra forma lo decide el registro del fichero de estado
 de la versión que lo escribió primero. Aplicar el cambio es que
 `-migrate -yes` diga qué hacer allí, borrar la medida en ese almacén y después
 volver a leer las familias que la escriben a través de Telegraf con un relleno
-histórico, y lo registre como aplicado. Un arranque nunca lo aplica por su
-cuenta, y a Telegraf no se le envía nada.
+histórico de esas familias solas, `-backfill -families`, y lo registre como
+aplicado. Un arranque nunca lo aplica por su cuenta, y a Telegraf no se le
+envía nada: la relectura que sigue a una migración solo escribe en los
+almacenes que ghchronicle vació por sí mismo, y un Telegraf que escribe en un
+fichero guardaría cada fila de ella dos veces.
 
 ## Por dónde seguir
 

@@ -129,6 +129,11 @@ the plan says what happened to each:
   collect. Set aside, those come back only when whoever collects them reads
   them again, so this takes `-migrate-others` as well as `-yes`.
 - `unreachable`: the store did not answer, so nothing was done there.
+- `refill`: what was read back from GitHub, from when and into which stores,
+  or why reading it back did not finish: see [reading the history
+  back](#reading-the-history-back).
+- `reconciled`: each copy of the old rows compared with what came back, and
+  the items GitHub no longer serves.
 
 It exits 0 when everything pending was applied and read again, and 1 when
 anything was left, with the sentence that says how to go on. It refuses before
@@ -177,6 +182,94 @@ keeping what it remembers, and the [cache file](/ghchronicle/configuration/#the-
 forgets what it claims about the families that write the measurement, their
 refusals and, when `actions` is among them, the workflow runs whose jobs it had
 written, so the sweeps after it ask everything a first sweep asks.
+
+### Reading the history back
+
+A store that was cleared holds none of the measurement's history until it is
+read again from GitHub. Right after applying, the same run reads it back with
+one backfill of its own, the refill: the families that write the measurement,
+`discussions` and `outbound` for the comments, `security` for the alert items,
+and no other; writing that measurement alone; into the stores that were cleared
+and no other.
+
+```text
+  refill      read discussions and outbound again, since 2023-11-14, writing gh_discussion_comment to
+              elasticsearch, influxdb and postgres
+```
+
+- **Only what was cleared.** A family asks GitHub everything it always asks,
+  and only the measurement cleared is written; the rest of what the family
+  collects is in the stores already. Each store gets what was cleared in that
+  store, so a store still holding a measurement in its old shape is never
+  handed that measurement's history beside it.
+- **Only where it was cleared.** InfluxDB, PostgreSQL, Elasticsearch, the SQL
+  file, after its `DROP`, and Graphite, at the new depth. Never Loki, the
+  Prometheus exporter, OTLP, the file sink or stdout, which were not cleared
+  and would hold every row of the refill a second time, nor a Telegraf, whose
+  store is somebody else's: the plan names the `-backfill -families` that sends
+  the history through it once that store has been cleared.
+- **As far back as the store held.** The day of the oldest row the store held,
+  read before it was cleared: a bound later than that would lose the
+  difference for good once the copy is purged. A store that cannot say, the SQL
+  file or Graphite, is read back to `backfill.since`, and with no bound when
+  there is none. One refill for several stores reads back as far as the
+  furthest.
+- **Waiting, as a backfill waits.** It has a GitHub client of its own that
+  waits for a spent rate limit to turn over, where a sweep skips, and
+  `-backfill-retry` goes back for what it leaves as it does for a backfill.
+  The containerised suite's whole `-migrate -yes`, clearing InfluxDB 3.11.2,
+  PostgreSQL 18.6 and Elasticsearch 9.5.3 and reading the comments back from
+  the fake GitHub, takes about 2 seconds; on the author's account, the
+  `outbound` walk it needs took 33 seconds when 2.6.1's was done by hand.
+
+The refill is owed from the moment a store is cleared, and the state file
+records it then, before anything is read, under the store's `refill` key: a
+store cleared and not read back looks, to anyone who asks it, exactly like one
+that never held the old shape, and only that record says the history is still
+to come. It goes when the refill reaches the end of every family. A refill cut
+short, by a stop, a store that refused a write or GitHub not answering, keeps a
+checkpoint of its own beside the state file, named with `-refill.json`, apart
+from a backfill's so neither refuses or overwrites the other, and is resumed
+from there: by `-migrate -yes` run again, even with nothing left to apply, and
+by any start under `migrate: auto`. Under `migrate: warn` a start says it is
+owed, at every start, with the command. `-backfill-status` prints how far it has
+got, and `-migrate` lists it under its store as `refill owed`.
+
+#### What the service does meanwhile
+
+Under `migrate: auto` the service applies what is safe and reads it back after
+its sinks are built and before its first sweep, so its sweeps start when the
+refill ends. The Prometheus exporter is up in that time and holds
+nothing until the first sweep, as after any restart. A service stopped during
+the refill exits at once, keeping what it wrote, and its next start carries on.
+The write ledger remembers what the refill wrote, so the first sweep after it
+does not send those rows again. Under `migrate: warn` nothing is read back and
+the service sweeps as it always did, writing this release's shape beside the
+old one, and `-migrate -yes` refuses to run beside it.
+
+#### What GitHub no longer serves
+
+A refill brings back what GitHub still serves for the targets configured now.
+When the refill ends, each store that kept a copy of the old rows and can be
+asked, InfluxDB 3, PostgreSQL and Elasticsearch, compares the copy with the
+table, item by item: the `comment` of each comment, the `full_name` and
+`number` of each alert. What the copy holds and the table does not is what
+GitHub no longer served, a repository deleted or no longer covered, a comment
+deleted, an alert whose feature was switched off; the report and the log name a
+few, and those rows stay only in the copy until it is purged. From the
+containerised suite, whose seeded comment the fake GitHub does not serve:
+
+```text
+  reconciled  gh_discussion_comment in postgres: 1 item in gh_discussion_comment-20260928T234418, 6 now; 1 GitHub
+              no longer serves, whose rows are only in the copy until it is purged: 1
+```
+
+Carrying them over is left to the reader, from the copy, while it is there: for
+an item whose old shape was two rows at one instant, which of the two was right
+is not something a program can tell offline. Measured read-only against
+production's InfluxDB 3.11.5, the copy InfluxDB kept of the table dropped by
+hand for 2.6.1 held 114 comments, and the table read back 121, none of the 114
+missing.
 
 ### What the state file remembers of each store
 

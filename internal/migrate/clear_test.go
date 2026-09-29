@@ -82,11 +82,11 @@ func TestApplyingRecordsTheCopy(t *testing.T) {
 	chosen, _ := Make(t.Context(), in).Pending(false)
 	chosen = slices.DeleteFunc(chosen, func(c Chosen) bool { return c.Store != "influxdb" })
 	a := Applying{
-		State: in.State, Save: func() error { return nil },
+		Config: in.Config, State: in.State, Save: func() error { return nil },
 		Appliers: map[string]Applier{"influxdb": Clearing{Store: &fakeClearer{
 			name: "influxdb", aside: teardown.Aside{Name: "x", ByServer: true},
 		}}},
-		Refill: func(context.Context, []Chosen) error { return nil },
+		Refill: func(context.Context, RefillWalk) error { return nil },
 		Log:    slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
 	}
 	if _, err := a.Apply(t.Context(), chosen); err != nil {

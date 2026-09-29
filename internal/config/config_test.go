@@ -364,6 +364,7 @@ sinks:
 		"the derived dedupe_file": {c.Sinks.DedupeFile, home + "/.ghchronicle/state-written.bin"},
 		"the derived cache file":  {c.CacheFile(), home + "/.ghchronicle/state-cache.bin"},
 		"the derived checkpoint":  {c.BackfillProgressFile(), home + "/.ghchronicle/state-progress.json"},
+		"the refill's checkpoint": {c.RefillProgressFile(), home + "/.ghchronicle/state-refill.json"},
 		"log.file":                {c.Log.File, "/srv/ghc/ghchronicle.log"},
 		"sinks.file.path":         {c.Sinks.File.Path, home + "/points.lp"},
 		"sinks.sql.path":          {c.Sinks.SQL.Path, "/srv/ghc/points.sql"},

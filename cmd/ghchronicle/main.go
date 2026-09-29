@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -397,6 +398,13 @@ func execute(args []string, stdout, stderr io.Writer) {
 		err = runBackfill(ctx, runner, cfg, accumulator, &o, logger)
 	case o.once || o.card != "":
 		err = runSweep(ctx, runner, accumulator, &o, logger)
+	case ctx.Err() != nil:
+		// A service stopped while a migration read back what it cleared,
+		// which can take minutes: what it wrote is in the stores and its
+		// checkpoint says where it got to, so the next start resumes it, and
+		// the first sweep would be one the stop has already cut. A one-shot
+		// run goes on to its sweep or its walk, which say how a stop left
+		// them.
 	default:
 		// A service runs for weeks, so what a migration set aside is purged
 		// between its sweeps once it has been kept its day, rather than at
@@ -787,10 +795,20 @@ func reportBackfill(cfg *config.Config, configPath string, stdout io.Writer, now
 	if !inProgress {
 		fmt.Fprintln(stdout, "no backfill in progress")
 		fmt.Fprintf(stdout, "  the checkpoint one leaves behind is not there: %s\n", shownPath(path))
-		return nil
+	} else {
+		fmt.Fprintln(stdout, "backfill in progress")
+		reportWalk(progress, path, commandLine(configPath, resumeFlags(cfg, progress.Scope)...), stdout, now)
 	}
-	fmt.Fprintln(stdout, "backfill in progress")
-	reportWalk(progress, path, commandLine(configPath, resumeFlags(cfg, progress.Scope)...), stdout, now)
+	// The refill of a migration keeps a checkpoint of its own, and is said
+	// only when there is one: most runs never have a refill to make.
+	path = cfg.RefillProgressFile()
+	if progress, inProgress, err = run.ReadProgress(path); err != nil || !inProgress {
+		return err
+	}
+	fmt.Fprintln(stdout, "refill in progress, reading back what a migration cleared")
+	fmt.Fprintf(stdout, "  writing      %s\n", writtenBy(progress.Scope.Measurements))
+	reportWalk(progress, path, commandLine(configPath, "-migrate", "-yes")+
+		", or the next start under migrate: auto", stdout, now)
 	return nil
 }
 
@@ -826,6 +844,15 @@ func resumeFlags(cfg *config.Config, scope run.Scope) []string {
 		flags = append(flags, "-families", strings.Join(scope.Families, ","))
 	}
 	return flags
+}
+
+// writtenBy names what a refill writes where.
+func writtenBy(measurements map[string][]string) string {
+	parts := make([]string, 0, len(measurements))
+	for _, store := range slices.Sorted(maps.Keys(measurements)) {
+		parts = append(parts, strings.Join(measurements[store], ",")+" to "+store)
+	}
+	return quotedList(parts)
 }
 
 // since is how long ago an instant was, rounded to the second, and never

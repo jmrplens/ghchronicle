@@ -337,8 +337,8 @@ cambio así; ver [Migraciones](/ghchronicle/es/install/upgrading/#migraciones).
 
 | Valor  | Qué hace un arranque                                                                                                |
 | ------ | ------------------------------------------------------------------------------------------------------------------- |
-| `auto` | El valor por omisión. Aplica por su cuenta un cambio pendiente que no pierde nada, lo dice en `WARN`, y avisa de todos los demás en cada arranque |
-| `warn` | No aplica nada, y avisa de cada cambio pendiente en cada arranque                                                    |
+| `auto` | El valor por omisión. Aplica por su cuenta un cambio pendiente que no pierde nada, lo dice en `WARN`, vuelve a leer lo que despejó, y lo que una ejecución anterior despejó y no terminó de leer, y avisa de todos los demás en cada arranque |
+| `warn` | No aplica nada ni vuelve a leer nada, y avisa de cada cambio pendiente, y de cada almacén al que aún se le debe su historial, en cada arranque |
 
 Un cambio no pierde nada cuando se cumplen las tres cosas: GitHub todavía sirve
 toda la historia, así que volver a leerla trae de vuelta cada fila que guarda

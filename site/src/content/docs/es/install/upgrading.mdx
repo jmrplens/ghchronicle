@@ -131,6 +131,11 @@ no se hace dos veces. Una línea bajo el plan dice qué pasó con cada uno:
   recoge. Apartadas, esas solo vuelven cuando quien las recoge las lee de
   nuevo, así que esto lleva `-migrate-others` además de `-yes`.
 - `unreachable`: el almacén no respondió, así que allí no se hizo nada.
+- `refill`: qué se volvió a leer de GitHub, desde cuándo y en qué almacenes,
+  o por qué la relectura no terminó: ver [volver a leer el
+  historial](#volver-a-leer-el-historial).
+- `reconciled`: cada copia de las filas antiguas comparada con lo que volvió,
+  y los elementos que GitHub ya no sirve.
 
 Sale con 0 cuando todo lo pendiente se aplicó y se volvió a leer, y con 1
 cuando quedó algo, con la frase que dice cómo seguir. Se niega antes de cambiar
@@ -183,6 +188,100 @@ olvida lo que afirma de las familias que escriben la medida, sus rechazos y,
 cuando `actions` está entre ellas, las ejecuciones de workflows cuyos jobs
 había escrito, así que las pasadas siguientes preguntan todo lo que pregunta
 una primera pasada.
+
+### Volver a leer el historial
+
+Un almacén despejado no guarda nada del historial de la medida hasta que se
+vuelve a leer de GitHub. Justo después de aplicar, la misma ejecución lo lee
+de nuevo con un relleno histórico propio, la relectura: las familias que
+escriben la medida, `discussions` y `outbound` para los comentarios, `security`
+para los elementos de alerta, y ninguna otra; escribiendo solo esa medida; en
+los almacenes que se despejaron y en ningún otro.
+
+```text
+  refill      read discussions and outbound again, since 2023-11-14, writing gh_discussion_comment to
+              elasticsearch, influxdb and postgres
+```
+
+- **Solo lo que se despejó.** Una familia pregunta a GitHub todo lo que
+  pregunta siempre, y solo se escribe la medida despejada; el resto de lo que
+  recoge la familia ya está en los almacenes. Cada almacén recibe lo que se
+  despejó en ese almacén, así que a un almacén que aún guarda una medida con su
+  forma antigua nunca se le entrega el historial de esa medida al lado.
+- **Solo donde se despejó.** InfluxDB, PostgreSQL, Elasticsearch, el fichero
+  SQL, después de su `DROP`, y Graphite, a la profundidad nueva. Nunca Loki, el
+  exportador de Prometheus, OTLP, el destino de fichero ni stdout, que no se
+  despejaron y guardarían cada fila de la relectura dos veces, ni un Telegraf,
+  cuyo almacén es de otro: el plan nombra el `-backfill -families` que envía el
+  historial a través de él cuando ese almacén se haya despejado.
+- **Tan atrás como llegaba el almacén.** El día de la fila más antigua que
+  guardaba el almacén, leída antes de despejarlo: un límite posterior perdería
+  la diferencia para siempre cuando se purgue la copia. Un almacén que no puede
+  decirlo, el fichero SQL o Graphite, se relee hasta `backfill.since`, y sin
+  límite cuando no lo hay. Una relectura para varios almacenes llega tan atrás
+  como el que más.
+- **Esperando, como espera un relleno histórico.** Tiene un cliente de GitHub
+  propio que espera a que se renueve un límite de peticiones gastado, donde una
+  pasada lo salta, y `-backfill-retry` vuelve a por lo que deja igual que en un
+  relleno histórico. El `-migrate -yes` entero de la batería con contenedores,
+  que despeja InfluxDB 3.11.2, PostgreSQL 18.6 y Elasticsearch 9.5.3 y vuelve a
+  leer los comentarios del GitHub falso, tarda unos 2 segundos; en la cuenta
+  del autor, el recorrido de `outbound` que necesita tardó 33 segundos cuando
+  el de la 2.6.1 se hizo a mano.
+
+La relectura se debe desde el momento en que se despeja un almacén, y el
+fichero de estado lo registra entonces, antes de leer nada, bajo la clave
+`refill` del almacén: un almacén despejado y no releído parece, a quien le
+pregunte, exactamente uno que nunca guardó la forma antigua, y solo ese
+registro dice que el historial aún está por llegar. Se va cuando la relectura
+llega al final de todas las familias. Una relectura cortada, por una parada,
+un almacén que rechazó una escritura o un GitHub que no respondió, guarda un
+punto de control propio junto al fichero de estado, con `-refill.json` en el
+nombre, aparte del de un relleno histórico para que ninguno rechace ni pise al
+otro, y se retoma desde ahí: con `-migrate -yes` otra vez, aunque no quede nada
+por aplicar, y con cualquier arranque bajo `migrate: auto`. Bajo
+`migrate: warn` un arranque dice que se debe, en cada arranque, con la orden.
+`-backfill-status` imprime hasta dónde ha llegado, y `-migrate` la lista bajo
+su almacén como `refill owed`.
+
+#### Qué hace el servicio mientras tanto
+
+Bajo `migrate: auto` el servicio aplica lo seguro y lo vuelve a leer después de
+construir sus destinos y antes de su primera pasada, así que sus pasadas
+empiezan cuando termina la relectura. El exportador de Prometheus está
+levantado durante ese tiempo y no guarda nada hasta la primera pasada, como
+tras cualquier reinicio. Un servicio parado durante la relectura sale en el
+acto, conservando lo que escribió, y su siguiente arranque continúa. El
+registro de escrituras recuerda lo que escribió la relectura, así que la
+primera pasada tras ella no vuelve a enviar esas filas. Bajo `migrate: warn` no
+se relee nada y el servicio hace sus pasadas como siempre, escribiendo la forma
+de esta versión junto a la antigua, y `-migrate -yes` se niega a correr a su
+lado.
+
+#### Lo que GitHub ya no sirve
+
+Una relectura trae de vuelta lo que GitHub aún sirve para los objetivos
+configurados ahora. Cuando termina, cada almacén que guardó una copia de las
+filas antiguas y al que se le puede preguntar, InfluxDB 3, PostgreSQL y
+Elasticsearch, compara la copia con la tabla, elemento a elemento: el `comment`
+de cada comentario, el `full_name` y el `number` de cada alerta. Lo que guarda
+la copia y no la tabla es lo que GitHub ya no sirvió, un repositorio borrado o
+que ya no se cubre, un comentario borrado, una alerta cuya función se apagó; el
+informe y el registro nombran unos pocos, y esas filas quedan solo en la copia
+hasta que se purga. De la batería con contenedores, cuyo comentario sembrado no
+sirve el GitHub falso:
+
+```text
+  reconciled  gh_discussion_comment in postgres: 1 item in gh_discussion_comment-20260928T234418, 6 now; 1 GitHub
+              no longer serves, whose rows are only in the copy until it is purged: 1
+```
+
+Traspasarlas queda en manos del lector, desde la copia, mientras está: para un
+elemento cuya forma antigua eran dos filas en un mismo instante, cuál de las
+dos era la buena no es algo que un programa pueda saber sin conexión. Medido
+en solo lectura contra el InfluxDB 3.11.5 de producción, la copia que guardó
+InfluxDB de la tabla borrada a mano para la 2.6.1 tenía 114 comentarios, y la
+tabla releída 121, sin que faltara ninguno de los 114.
 
 ### Lo que el fichero de estado recuerda de cada almacén
 

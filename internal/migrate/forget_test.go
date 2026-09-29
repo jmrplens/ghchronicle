@@ -45,13 +45,13 @@ func TestWhatWasAppliedIsForgottenBeforeTheRefill(t *testing.T) {
 	chosen = slices.DeleteFunc(chosen, func(c Chosen) bool { return c.Store != "influxdb" })
 	var order []string
 	a := Applying{
-		State: in.State, Save: func() error { return nil },
+		Config: in.Config, State: in.State, Save: func() error { return nil },
 		Appliers: map[string]Applier{"influxdb": &fakeApplier{}},
 		Cleared: func(c Chosen) {
 			salt := Salt(in.State.Stores[c.Store], c.Item.Migration.Measurement)
 			order = append(order, "forget "+c.Item.Migration.Measurement+" "+salt)
 		},
-		Refill: func(context.Context, []Chosen) error { order = append(order, "refill"); return nil },
+		Refill: func(context.Context, RefillWalk) error { order = append(order, "refill"); return nil },
 		Log:    slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
 	}
 	if _, err := a.Apply(t.Context(), chosen); err != nil {

@@ -46,6 +46,49 @@ type StoreRecord struct {
 	// what undoing the migration needs, and its instant is when it falls due
 	// to be purged.
 	SetAside []Aside `json:"set_aside,omitempty"`
+	// Refill is the history a migration cleared out of this store and has
+	// not read back yet, nil when none is owed. It is recorded with the
+	// migration, before anything is read, and goes when the reading ends
+	// complete. A store cleared and then left looks, to anyone who asks it,
+	// exactly like one that never held the old shape: this is the only thing
+	// that says its history is still to come.
+	Refill *Refill `json:"refill,omitempty"`
+}
+
+// Refill is what a store is owed after a migration cleared it.
+type Refill struct {
+	// Migrations is the IDs of the migrations whose clearing is owed.
+	Migrations []string `json:"migrations"`
+	// Families is every family that writes what was cleared.
+	Families []string `json:"families"`
+	// Measurements is what was cleared, and the only thing written back.
+	Measurements []string `json:"measurements"`
+	// Since is how far back the reading goes: the day of the oldest row the
+	// store held. Zero is no bound.
+	Since time.Time `json:"since,omitzero"`
+}
+
+// OweRefill records that a migration cleared a measurement here and that the
+// families named are to read it back as far as since. Owed twice, the
+// reading covers both: every family, every measurement, and the further
+// back of the two bounds, since a bound later than a row the store held is
+// that row lost.
+func (r *StoreRecord) OweRefill(migration, measurement string, families []string, since time.Time) {
+	if r.Refill == nil {
+		r.Refill = &Refill{Since: since.UTC()}
+	} else if since.IsZero() || since.Before(r.Refill.Since) {
+		r.Refill.Since = since.UTC()
+	}
+	r.Refill.Migrations = sortedUnion(r.Refill.Migrations, migration)
+	r.Refill.Measurements = sortedUnion(r.Refill.Measurements, measurement)
+	r.Refill.Families = sortedUnion(r.Refill.Families, families...)
+}
+
+// sortedUnion is list with more added, sorted, each once.
+func sortedUnion(list []string, more ...string) []string {
+	out := append(slices.Clone(list), more...)
+	slices.Sort(out)
+	return slices.Compact(out)
 }
 
 // Aside is one copy of a measurement's rows a migration set aside.

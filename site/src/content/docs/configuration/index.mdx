@@ -324,8 +324,8 @@ prints what each configured store holds of every such change; see
 
 | Value  | What a start does                                                                                                   |
 | ------ | ------------------------------------------------------------------------------------------------------------------- |
-| `auto` | The default. Applies on its own a pending change that loses nothing, says so at `WARN`, and warns about every other one at every start |
-| `warn` | Applies nothing, and warns about every pending change at every start                                                |
+| `auto` | The default. Applies on its own a pending change that loses nothing, says so at `WARN`, reads back what it cleared, and what an earlier run cleared and did not finish reading, and warns about every other one at every start |
+| `warn` | Applies nothing and reads nothing back, and warns about every pending change, and every store still owed its history, at every start |
 
 A change loses nothing when all three hold: GitHub still serves the whole
 history, so reading it again brings back every row the store holds; the old

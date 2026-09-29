@@ -33,7 +33,7 @@ telegraf  url=http://telegraf:8186/telegraf
   pending     2.6.1/gh_discussion_comment/is_answer
               written before the state file kept a record of which release first wrote it, so it may hold rows written before 2.6.1; this store cannot be asked
               why: is_answer was a tag, so a comment read before and after its acceptance is two rows at one instant
-              drop gh_discussion_comment in the store behind Telegraf, then read discussions and outbound again through it with a backfill
+              drop gh_discussion_comment in the store behind Telegraf, then read discussions and outbound again through it with -backfill -families discussions,outbound
               needs your word: ghchronicle cannot reach the store behind Telegraf
 
 graphite  addr=graphite:2003 prefix=github

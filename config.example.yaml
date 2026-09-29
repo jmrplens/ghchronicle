@@ -340,9 +340,11 @@ every:
 # lost by it: GitHub still serves the whole history, the old rows are set
 # aside for 24 hours rather than deleted (InfluxDB 3, PostgreSQL,
 # Elasticsearch), and every row is this configuration's. It says so at WARN,
-# per store. Anything else, and everything under warn, is a warning at every
-# start naming the two commands: -migrate for the plan, and -migrate -yes to
-# apply it, with the service stopped. No value applies the rest on its own.
+# per store, and reads what it cleared back from GitHub before the first sweep,
+# as it does what an earlier run cleared and did not finish reading. Anything
+# else, and everything under warn, is a warning at every start naming the two
+# commands: -migrate for the plan, and -migrate -yes to apply it, with the
+# service stopped. No value applies the rest on its own.
 #
 # migrate: auto
 

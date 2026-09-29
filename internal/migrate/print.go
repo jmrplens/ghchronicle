@@ -3,6 +3,7 @@ package migrate
 import (
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"time"
 
@@ -49,7 +50,9 @@ type Report struct {
 	// Unreached is every store or item the plan could not ask, which
 	// nothing was done about.
 	Unreached []string
-	Refill    error
+	// Refill is what reading the cleared history again came to, nil when no
+	// store was owed it.
+	Refill *Refilled
 	// Others is the flag that applies what was held back, and Resume how to
 	// carry on after a failure.
 	Others, Resume string
@@ -57,7 +60,7 @@ type Report struct {
 
 // Failed says whether anything was left undone.
 func (r Report) Failed() bool {
-	if r.Refill != nil || len(r.Held) > 0 || len(r.Unreached) > 0 {
+	if r.Refill != nil && r.Refill.Err != nil || len(r.Held) > 0 || len(r.Unreached) > 0 {
 		return true
 	}
 	for _, res := range r.Results {
@@ -71,11 +74,11 @@ func (r Report) Failed() bool {
 // Print writes the report.
 func (r Report) Print(w io.Writer) {
 	fmt.Fprintln(w)
-	if len(r.Results)+len(r.Held)+len(r.Unreached) == 0 {
+	if len(r.Results)+len(r.Held)+len(r.Unreached) == 0 && r.Refill == nil {
 		fmt.Fprintln(w, "Nothing to migrate.")
 		return
 	}
-	applied, failed, cleared := 0, 0, 0
+	applied, failed := 0, 0
 	for _, res := range r.Results {
 		id := res.Item.Migration.ID + " in " + res.Store
 		if res.Err != nil {
@@ -84,9 +87,6 @@ func (r Report) Print(w io.Writer) {
 			continue
 		}
 		applied++
-		if len(res.Item.Refill) > 0 {
-			cleared++
-		}
 		fmt.Fprintf(w, "  %-*s%s: %s\n", statusWidth, "applied", id, firstOf(res.Outcome.Did, "done"))
 		if res.Outcome.Aside != "" {
 			fmt.Fprintf(w, "%sthe old rows are kept as %s\n", indent, res.Outcome.Aside)
@@ -102,15 +102,18 @@ func (r Report) Print(w io.Writer) {
 	for _, u := range r.Unreached {
 		fmt.Fprintf(w, "  %-*s%s\n", statusWidth, "unreachable", u)
 	}
-	switch {
-	case cleared == 0:
-	case r.Refill != nil:
-		fmt.Fprintf(w, "  %-*sreading the history again did not finish: %s\n", statusWidth, "refill", oneLine(r.Refill.Error()))
-	default:
-		fmt.Fprintf(w, "  %-*sthe history of every store cleared was read again\n", statusWidth, "refill")
-	}
+	r.Refill.print(w)
 	fmt.Fprintln(w)
-	parts := []string{fmt.Sprintf("%d applied", applied)}
+	var parts []string
+	switch {
+	case len(r.Results) > 0 || r.Refill == nil:
+		parts = append(parts, fmt.Sprintf("%d applied", applied))
+	case r.Refill.Err == nil:
+		// A run that only paid what an earlier one left owed.
+		parts = append(parts, "Nothing to apply, and the refill owed was read")
+	default:
+		parts = append(parts, "Nothing to apply, and the refill is still owed")
+	}
 	if failed > 0 {
 		parts = append(parts, fmt.Sprintf("%d failed", failed))
 	}
@@ -125,6 +128,61 @@ func (r Report) Print(w io.Writer) {
 		line += " " + r.Resume
 	}
 	fmt.Fprintln(w, line)
+}
+
+// print is the refill's lines of the report: what was read again, and how
+// each copy of the old rows compares with it.
+func (r *Refilled) print(w io.Writer) {
+	if r == nil {
+		return
+	}
+	if r.Err != nil {
+		fmt.Fprintf(w, "  %-*sreading the history again did not finish, and is still owed: %s\n", statusWidth, "refill",
+			oneLine(r.Err.Error()))
+		return
+	}
+	fmt.Fprintf(w, "  %-*sread %s again, %s, writing %s\n", statusWidth, "refill", quoted(r.Walk.Families),
+		bound(r.Walk.Since), writing(r.Walk.Keep))
+	for _, c := range r.Reconciled {
+		id := c.Measurement + " in " + c.Store
+		switch {
+		case c.Err != nil:
+			fmt.Fprintf(w, "  %-*s%s: not compared with %s: %s\n", statusWidth, "reconciled", id, firstOf(c.Aside, "its copy"),
+				oneLine(c.Err.Error()))
+		case len(c.Gone) == 0:
+			fmt.Fprintf(w, "  %-*s%s: %d %s in %s, %d now; GitHub served every one again\n", statusWidth,
+				"reconciled", id, c.Before, plural(c.Before, "item", "items"), c.Aside, c.After)
+		default:
+			fmt.Fprintf(w, "  %-*s%s: %d %s in %s, %d now; %d GitHub no longer serves, whose rows are only "+
+				"in the copy until it is purged: %s\n", statusWidth, "reconciled", id, c.Before,
+				plural(c.Before, "item", "items"), c.Aside, c.After, len(c.Gone), sample(c.Gone))
+		}
+	}
+}
+
+// writing names what a refill writes where, the way a sentence does.
+// Stores cleared of the same measurements are named together, which is
+// every store of a migration of one measurement.
+func writing(keep map[string][]string) string {
+	stores := make([]string, 0, len(keep))
+	for s := range keep {
+		stores = append(stores, s)
+	}
+	slices.Sort(stores)
+	var order []string
+	to := map[string][]string{}
+	for _, s := range stores {
+		what := quoted(keep[s])
+		if _, seen := to[what]; !seen {
+			order = append(order, what)
+		}
+		to[what] = append(to[what], s)
+	}
+	parts := make([]string, 0, len(order))
+	for _, what := range order {
+		parts = append(parts, what+" to "+quoted(to[what]))
+	}
+	return strings.Join(parts, "; ")
 }
 
 // printStore is one store's heading and its items.
@@ -147,6 +205,11 @@ func printStore(w io.Writer, st StorePlan) {
 	fmt.Fprintln(w, heading)
 	for _, it := range st.Items {
 		printItem(w, it)
+	}
+	if o := st.Owed; o != nil {
+		fmt.Fprintf(w, "  %-*s%s, %s, writing %s: cleared by %s and not read back yet; -migrate -yes, "+
+			"or a start under migrate: auto, reads it\n", statusWidth, "refill owed", quoted(o.Families),
+			bound(o.Since), quoted(o.Measurements), quoted(o.Migrations))
 	}
 	for _, a := range st.Kept {
 		purged := "purged by ghchronicle after "
@@ -219,6 +282,15 @@ func (p Plan) summary() string {
 		if n := p.Count(c.s); n > 0 {
 			parts = append(parts, fmt.Sprintf("%d %s", n, c.word))
 		}
+	}
+	owed := 0
+	for _, st := range p.Stores {
+		if st.Owed != nil {
+			owed++
+		}
+	}
+	if owed > 0 {
+		parts = append(parts, fmt.Sprintf("%d %s owed a refill", owed, plural(owed, "store", "stores")))
 	}
 	for _, st := range p.Stores {
 		if st.Err != nil {

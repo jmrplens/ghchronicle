@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"maps"
 	"slices"
 	"strings"
 	"testing"
@@ -42,25 +43,33 @@ func TestApplyingRecordsEachItemAndRefillsOnlyWhatItCleared(t *testing.T) {
 	}
 	influx, postgres := &fakeApplier{}, &fakeApplier{err: errors.New("lock timeout")}
 	saves := 0
-	var refilled []Chosen
+	var refilled []RefillWalk
+	var owedAtRefill map[string]*run.Refill
 	var log bytes.Buffer
 	when := time.Date(2026, 10, 1, 9, 10, 4, 0, time.UTC)
 	a := Applying{
-		State: in.State, Save: func() error { saves++; return nil },
+		Config: in.Config, State: in.State, Save: func() error { saves++; return nil },
 		Appliers: map[string]Applier{
 			"influxdb": influx, "postgres": postgres,
 			"graphite": Instructions{}, "telegraf": Instructions{},
 		},
-		Refill: func(_ context.Context, cleared []Chosen) error { refilled = cleared; return nil },
-		Now:    func() time.Time { return when }, Log: slog.New(slog.NewTextHandler(&log, nil)),
+		Refill: func(_ context.Context, w RefillWalk) error {
+			refilled = append(refilled, w)
+			owedAtRefill = map[string]*run.Refill{}
+			for name, rec := range in.State.Stores {
+				owedAtRefill[name] = rec.Refill
+			}
+			return nil
+		},
+		Now: func() time.Time { return when }, Log: slog.New(slog.NewTextHandler(&log, nil)),
 		Resume: "run the same command again",
 	}
-	results, err := a.Apply(t.Context(), chosen)
+	done, err := a.Apply(t.Context(), chosen)
 	if err != nil {
 		t.Fatalf("the refill failed: %v", err)
 	}
 	var ok, failed []string
-	for _, r := range results {
+	for _, r := range done.Results {
 		id := r.Store + ":" + r.Item.Migration.ID
 		if r.Err != nil {
 			failed = append(failed, id)
@@ -73,8 +82,11 @@ func TestApplyingRecordsEachItemAndRefillsOnlyWhatItCleared(t *testing.T) {
 	if !slices.Equal(ok, wantOK) || !slices.Equal(failed, wantFailed) {
 		t.Errorf("applied %v and failed %v, want %v and %v", ok, failed, wantOK, wantFailed)
 	}
-	if saves != len(wantOK) {
-		t.Errorf("the state file was saved %d times, want once per item applied (%d)", saves, len(wantOK))
+	// Once per item applied, and once more when the refill ended and was
+	// no longer owed.
+	if saves != len(wantOK)+1 {
+		t.Errorf("the state file was saved %d times, want once per item applied (%d) and once after the refill",
+			saves, len(wantOK))
 	}
 	for _, id := range wantOK {
 		store, mig, _ := strings.Cut(id, ":")
@@ -88,14 +100,7 @@ func TestApplyingRecordsEachItemAndRefillsOnlyWhatItCleared(t *testing.T) {
 			t.Errorf("%s failed and is recorded as applied", id)
 		}
 	}
-	// Telegraf's history is read again through a backfill its reader runs,
-	// so it is not handed to the refill; a failed item has cleared nothing.
-	if got := chosenIDs(refilled); !slices.Equal(got, []string{
-		"influxdb:" + scanning, "influxdb:" + comments,
-		"graphite:" + comments,
-	}) {
-		t.Errorf("the refill was handed %v", got)
-	}
+	checkOneRefill(t, refilled, owedAtRefill, in.State)
 	for _, want := range []string{
 		`level=ERROR msg="migration failed" sink=postgres`, `err="lock timeout" resume="run the same command again"`,
 		`sink=sql`, `this build has no way to bring sql along`,
@@ -108,23 +113,67 @@ func TestApplyingRecordsEachItemAndRefillsOnlyWhatItCleared(t *testing.T) {
 	}
 }
 
+// checkOneRefill holds the refill of TestApplyingRecordsEachItemAndRefillsOnlyWhatItCleared
+// to what the items applied owed.
+func checkOneRefill(t *testing.T, refilled []RefillWalk, owedAtRefill map[string]*run.Refill, state *run.State) {
+	t.Helper()
+	// Telegraf's history is read again through a backfill its reader runs,
+	// so it owes no refill; a failed item has cleared nothing. One walk pays
+	// every store, and writes to each what was cleared there.
+	if len(refilled) != 1 {
+		t.Fatalf("the refill ran %d times, want once", len(refilled))
+	}
+	w := refilled[0]
+	wantKeep := map[string][]string{
+		"influxdb": {"gh_code_scanning_alert_item", "gh_discussion_comment"},
+		"graphite": {"gh_discussion_comment"},
+	}
+	if !maps.EqualFunc(w.Keep, wantKeep, slices.Equal) ||
+		!slices.Equal(w.Families, []string{"discussions", "outbound", "security"}) || !w.Since.IsZero() {
+		t.Errorf("the refill walks %+v, want %v from discussions, outbound and security with no bound, "+
+			"which Graphite's backfill.since, unset, gives", w, wantKeep)
+	}
+	for _, store := range []string{"influxdb", "graphite"} {
+		if owedAtRefill[store] == nil {
+			t.Errorf("%s was not recorded as owed a refill before it began", store)
+		}
+		if state.Stores[store].Refill != nil {
+			t.Errorf("%s is still owed a refill that ended complete", store)
+		}
+	}
+	for _, store := range []string{"telegraf", "postgres", "sql"} {
+		if owedAtRefill[store] != nil {
+			t.Errorf("%s is owed a refill: %+v", store, owedAtRefill[store])
+		}
+	}
+}
+
 // TestApplyingWithNoRefillSaysTheHistoryIsOwed: a build that cleared a store
 // and cannot read it again says so rather than reporting success; one that
 // cleared nothing owes nothing.
 func TestApplyingWithNoRefillSaysTheHistoryIsOwed(t *testing.T) {
 	t.Parallel()
-	state := &run.State{Stores: map[string]*run.StoreRecord{}}
+	in := upgradeInput(t, oldShape(), nil, nil)
+	Stamp(in.State, in.Config, in.Release)
+	chosen, _ := Make(t.Context(), in).Pending(false)
+	pick := func(store string) []Chosen {
+		return slices.DeleteFunc(slices.Clone(chosen), func(c Chosen) bool {
+			return c.Store != store || c.Item.Migration.ID != comments
+		})
+	}
 	a := Applying{
-		State: state, Save: func() error { return nil }, Log: slog.New(slog.DiscardHandler),
+		Config: in.Config, State: in.State, Save: func() error { return nil }, Log: slog.New(slog.DiscardHandler),
 		Appliers: map[string]Applier{"influxdb": &fakeApplier{}, "telegraf": Instructions{}},
 	}
-	cleared := Chosen{Store: "influxdb", Item: Item{Migration: Registry[3], Refill: []string{"outbound"}}}
-	if _, err := a.Apply(t.Context(), []Chosen{cleared}); !errors.Is(err, ErrNoRefill) {
+	if _, err := a.Apply(t.Context(), pick("telegraf")); err != nil {
+		t.Errorf("an item that cleared nothing owes a refill: %v", err)
+	}
+	done, err := a.Apply(t.Context(), pick("influxdb"))
+	if !errors.Is(err, ErrNoRefill) || done.Refill == nil || !errors.Is(done.Refill.Err, ErrNoRefill) {
 		t.Errorf("a store cleared with no refill = %v, want ErrNoRefill", err)
 	}
-	said := Chosen{Store: "telegraf", Item: Item{Migration: Registry[3]}}
-	if _, err := a.Apply(t.Context(), []Chosen{said}); err != nil {
-		t.Errorf("an item that cleared nothing owes a refill: %v", err)
+	if in.State.Stores["influxdb"].Refill == nil {
+		t.Error("the store cleared is not recorded as owed its history")
 	}
 }
 
@@ -137,12 +186,13 @@ func TestApplyingStopsTouchingStoresOnceItIsStopped(t *testing.T) {
 	cancel()
 	store := &fakeApplier{}
 	a := Applying{
-		State: &run.State{Stores: map[string]*run.StoreRecord{}}, Save: func() error { return nil },
+		Config: planConfig(t, t.TempDir(), nil),
+		State:  &run.State{Stores: map[string]*run.StoreRecord{}}, Save: func() error { return nil },
 		Log: slog.New(slog.DiscardHandler), Appliers: map[string]Applier{"influxdb": store},
 	}
-	results, _ := a.Apply(ctx, []Chosen{{Store: "influxdb", Item: Item{Migration: Registry[3]}}})
-	if len(store.done) != 0 || len(results) != 1 || !errors.Is(results[0].Err, context.Canceled) {
-		t.Errorf("a stopped run applied %v, results %+v", store.done, results)
+	done, _ := a.Apply(ctx, []Chosen{{Store: "influxdb", Item: Item{Migration: Registry[3]}}})
+	if len(store.done) != 0 || len(done.Results) != 1 || !errors.Is(done.Results[0].Err, context.Canceled) {
+		t.Errorf("a stopped run applied %v, results %+v", store.done, done.Results)
 	}
 }
 
@@ -163,18 +213,46 @@ func TestTheReportCountsWhatWasDoneAndSaysHowToGoOn(t *testing.T) {
 	held := Chosen{Store: "elasticsearch", Item: Item{Migration: Registry[3], Others: []string{"hubot"}}}
 
 	var out bytes.Buffer
-	r := Report{Results: []Result{applied, graphite}, Others: "-migrate-others", Resume: "Run it again."}
+	refilled := &Refilled{
+		Walk: RefillWalk{
+			Families: []string{"discussions", "outbound"}, Since: time.Date(2023, 11, 14, 0, 0, 0, 0, time.UTC),
+			Keep: map[string][]string{"influxdb": {"gh_discussion_comment"}, "graphite": {"gh_discussion_comment"}},
+		},
+		Reconciled: []Reconciliation{
+			{Store: "influxdb", Measurement: "gh_discussion_comment", Aside: "gh_discussion_comment-20261001T091004", Before: 3, After: 3},
+			{
+				Store: "postgres", Measurement: "gh_discussion_comment", Aside: "gh_discussion_comment-20261001T091004",
+				Before: 3, After: 2, Gone: []string{"DC_gone"},
+			},
+			{Store: "elasticsearch", Measurement: "gh_discussion_comment", Aside: "x", Err: errors.New("a\nrefusal")},
+		},
+	}
+	r := Report{Results: []Result{applied, graphite}, Refill: refilled, Others: "-migrate-others", Resume: "Run it again."}
 	r.Print(&out)
-	if r.Failed() || !strings.HasSuffix(out.String(), "\n2 applied.\n") ||
-		!strings.Contains(out.String(), "the old rows are kept as gh_discussion_comment-20261001T091004") ||
-		!strings.Contains(out.String(), "                find x -delete\n") ||
-		!strings.Contains(out.String(), "the history of every store cleared was read again") {
+	for _, want := range []string{
+		"the old rows are kept as gh_discussion_comment-20261001T091004",
+		"                find x -delete\n",
+		"  refill      read discussions and outbound again, since 2023-11-14, writing gh_discussion_comment to " +
+			"graphite and influxdb\n",
+		"  reconciled  gh_discussion_comment in influxdb: 3 items in gh_discussion_comment-20261001T091004, 3 now; " +
+			"GitHub served every one again\n",
+		"  reconciled  gh_discussion_comment in postgres: 3 items in gh_discussion_comment-20261001T091004, 2 now; " +
+			"1 GitHub no longer serves, whose rows are only in the copy until it is purged: DC_gone\n",
+		"  reconciled  gh_discussion_comment in elasticsearch: not compared with x: a refusal\n",
+	} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("a report of everything applied does not say %q:\n%s", want, out.String())
+		}
+	}
+	// What GitHub no longer serves is said, and is not a failure: the
+	// migration and the refill did all they can.
+	if r.Failed() || !strings.HasSuffix(out.String(), "\n2 applied.\n") {
 		t.Errorf("a report of everything applied:\n%s", out.String())
 	}
 
 	out.Reset()
 	r = Report{
-		Results: []Result{applied, failed}, Held: []Chosen{held}, Refill: errors.New("rate limited"),
+		Results: []Result{applied, failed}, Held: []Chosen{held}, Refill: &Refilled{Err: errors.New("rate limited")},
 		Unreached: []string{"loki did not answer"}, Others: "-migrate-others", Resume: "Run it again.",
 	}
 	r.Print(&out)
@@ -183,7 +261,7 @@ func TestTheReportCountsWhatWasDoneAndSaysHowToGoOn(t *testing.T) {
 		"  held back   " + Registry[3].ID + " in elasticsearch: it holds rows of hubot, which this configuration " +
 			"does not collect; -migrate-others applies it anyway\n",
 		"  unreachable loki did not answer\n",
-		"reading the history again did not finish: rate limited",
+		"reading the history again did not finish, and is still owed: rate limited",
 		"\n1 applied, 1 failed, 1 held back, 1 not asked. Run it again.\n",
 	} {
 		if !strings.Contains(out.String(), want) {
@@ -198,5 +276,22 @@ func TestTheReportCountsWhatWasDoneAndSaysHowToGoOn(t *testing.T) {
 	Report{}.Print(&out)
 	if out.String() != "\nNothing to migrate.\n" {
 		t.Errorf("an empty report reads %q", out.String())
+	}
+
+	// A run with nothing to apply that paid what an earlier one left owed,
+	// into stores cleared of different measurements.
+	out.Reset()
+	r = Report{Refill: &Refilled{Walk: RefillWalk{
+		Families: []string{"discussions", "outbound", "security"},
+		Keep: map[string][]string{
+			"influxdb": {"gh_code_scanning_alert_item", "gh_discussion_comment"},
+			"postgres": {"gh_discussion_comment"}, "sql": {"gh_discussion_comment"},
+		},
+	}}, Resume: "Run it again."}
+	r.Print(&out)
+	if want := "\n  refill      read discussions, outbound and security again, with no bound, writing " +
+		"gh_code_scanning_alert_item and gh_discussion_comment to influxdb; gh_discussion_comment to postgres and sql\n" +
+		"\nNothing to apply, and the refill owed was read.\n"; out.String() != want || r.Failed() {
+		t.Errorf("a report of a refill owed reads\n%s\nwant\n%s", out.String(), want)
 	}
 }

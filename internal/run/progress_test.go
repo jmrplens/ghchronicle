@@ -616,6 +616,11 @@ func TestTheCheckpointLivesBesideTheStateFileAndNotInIt(t *testing.T) {
 		if got := cfg.BackfillProgressFile(); got != want {
 			t.Errorf("a state file at %q keeps its checkpoint at %q, want %q", state, got, want)
 		}
+		// The refill of a migration beside it, and never in the same file:
+		// each walk refuses the other's checkpoint.
+		if got, refill := cfg.RefillProgressFile(), strings.Replace(want, "-progress.json", "-refill.json", 1); got != refill {
+			t.Errorf("a state file at %q keeps the refill's checkpoint at %q, want %q", state, got, refill)
+		}
 	}
 }
 

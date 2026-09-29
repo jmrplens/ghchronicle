@@ -494,7 +494,8 @@ ghchronicle -config config.yaml -backfill-status
 It reads the checkpoint and prints it: when the walk began, how long ago it
 last recorded anything, how many families are complete out of how many, the
 family it was inside and how far into it, and the command that carries it on,
-with the `-backfill-since` and the `-families` it was started with.
+with the `-backfill-since` and the `-families` it was started with. A
+migration's refill in progress is printed after it, with what it writes where.
 It asks GitHub nothing and writes nothing, so it is safe to run while a walk is
 going, and it needs no token: the credential is there because a sweep asks
 GitHub, and this asks nobody. When there is no walk in progress it says so and
@@ -580,6 +581,16 @@ Its checkpoint is the backfill's, and records the families it was asked for, so
 a backfill of other families, or of every family, refuses it and names the
 family that differs, and `-backfill-status` prints the resume line with the
 same `-families` in it.
+
+#### The refill of a migration
+
+A migration that cleared a store reads its history back with a backfill of its
+own, the refill: the families that write what was cleared, writing that alone
+into the stores it was cleared from; see [reading the history
+back](https://jmrp.io/docs/ghchronicle/install/upgrading/#reading-the-history-back). It keeps its
+checkpoint beside the backfill's, named with `-refill.json`, so a backfill in
+progress and a refill neither refuse nor overwrite each other's, and
+`-backfill-status` prints both.
 
 ### Run it once, first
 

@@ -973,6 +973,22 @@ func (c *Config) BackfillProgressFile() string {
 	return strings.TrimSuffix(c.StateFile, ".json") + "-progress.json"
 }
 
+// RefillProgressFile is where the refill of a migration keeps its checkpoint:
+// beside the state file, and apart from a backfill's. The two are different
+// walks, one of every family into every store and one of the families that
+// write what a migration cleared into the stores it cleared, so each would
+// refuse the other's checkpoint; kept in one file, a backfill in progress
+// would stop a migration from reading its history back, or the other way
+// round.
+//
+// Empty when there is no state file, and such a run keeps no checkpoint.
+func (c *Config) RefillProgressFile() string {
+	if c.StateFile == "" {
+		return ""
+	}
+	return strings.TrimSuffix(c.StateFile, ".json") + "-refill.json"
+}
+
 // CacheFile is where a run keeps what it learned about GitHub for the run
 // after it: the conditional cache, the workflow runs whose jobs were
 // written, the refusals and the pull request page sizes. Beside the state

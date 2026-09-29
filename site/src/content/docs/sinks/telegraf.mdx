@@ -84,8 +84,11 @@ ghchronicle cannot see the store behind Telegraf, so what a release left there
 in another shape is decided by the state file's record of the release that
 first wrote it. Applying the change is `-migrate -yes` saying what to do there,
 dropping the measurement in that store and then reading the families that
-write it again through Telegraf with a backfill, and recording it as applied.
-A start never applies it on its own, and Telegraf is sent nothing.
+write it again through Telegraf with a backfill of those families alone,
+`-backfill -families`, and recording it as applied. A start never applies it on
+its own, and Telegraf is sent nothing: the refill that follows a migration
+writes only into stores ghchronicle cleared itself, and a Telegraf that writes
+to a file would keep every row of it a second time.
 
 ## Where to go next
 
