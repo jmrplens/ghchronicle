@@ -717,14 +717,16 @@ Both were found by running it, not by reading documentation.
 **Dependabot refuses page numbers.** It answers an error to `page=` outright
 and pages by cursor instead, so the alert walk is written against cursors.
 
-**The GraphQL gateway gives up on a hundred pull requests.** Asking for a
-hundred pull requests with their reviews in one query answers an **HTML 502**
-after about ten seconds. The pull request walk halves its page size and retries
-on the same cursor, silently: the pull request collector carries no logger, so
-a backfill of a busy repository shows this only as a slower family, never as a
-line. Only that answer is halved for: a `503`, or a `502` that comes back
-sooner than ten seconds, is not a query the gateway ran out of time on, and
-[the client asks it once
+**The GraphQL gateway gives up on a hundred pull requests, and on fifty
+commits.** Asking for a hundred pull requests with their reviews in one query
+answers an **HTML 502** after about ten seconds, and so does asking for fifty
+commits of a busy repository with the checks each one carries: twelve pages of
+the author's own commit walks met it, in six repositories. Both walks halve
+their page size and retry on the same cursor, silently: neither collector
+carries a logger, so a backfill of a busy repository shows this only as a
+slower family, never as a line. Only that answer is halved for: a `503`, or a
+`502` that comes back sooner than ten seconds, is not a query the gateway ran
+out of time on, and [the client asks it once
 more](https://jmrp.io/docs/ghchronicle/api/#an-answer-github-could-not-finish-is-asked-once-more)
 at the same size.
 

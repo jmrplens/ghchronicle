@@ -192,16 +192,18 @@ of 100 and refuses the fourth.
 `collect.Walk{Pages, Since}`: zero pages means its own small default, a
 negative count means until the API runs out, and `Since` stops the walk once
 a newest-first list has gone past it. The runner hands `Walk{}` to a sweep and
-`Walk{Pages: -1, Since: BackfillSince}` to a backfill. Two endpoints needed
+`Walk{Pages: -1, Since: BackfillSince}` to a backfill. Three endpoints needed
 their own handling, found by running it: Dependabot refuses `page=` and pages
 by cursor, and the GraphQL gateway answers a hundred pull requests with their
-reviews with an HTML 502 after ten seconds (`ghapi.TooLargeError`), so `Pulls`
-halves its page and retries on the same cursor. The star history is handed
-`collect.Unbounded` instead until the state file records `history_read` for
-the repository, which only a walk that reached the end of the history sets
-(`StarHistory.Read` says whether it did), so the first sweep after upgrading
-and any walk cut short, by an error or by a 403 or 404 past page one, read the
-whole history once. A 404 on page one, which is every repository on GitHub
+reviews, and fifty commits of a busy repository with their checks, with an
+HTML 502 after ten seconds (`ghapi.TooLargeError`), so `Pulls` and `Commits`
+halve their page and retry on the same cursor; `Commits` counts what it may
+read in commits, so a sweep's one page of fifty is two of twenty-five. The
+star history is handed `collect.Unbounded` instead until the state file records
+`history_read` for the repository, which only a walk that reached the end of
+the history sets (`StarHistory.Read` says whether it did), so the first sweep
+after upgrading and any walk cut short, by an error or by a 403 or 404 past
+page one, read the whole history once. A 404 on page one, which is every repository on GitHub
 Enterprise Server, leaves it unset too.
 
 **A gateway error means one thing in REST and another in GraphQL.** A REST 502
@@ -217,14 +219,14 @@ collector must not add a retry of its own. In GraphQL only a 502 or 504 that
 took GitHub's documented ten seconds (`ghapi.GraphQLTimeoutWindow`; all 51 in
 the production proxy's log came after 10.45 to 11.23 s) is the query being too
 large (`TooLargeError`), which the same query would only time out on again, so
-`Pulls` and the co-authored walk halve their page on the same cursor, an
-aliased batch (`aliasBatch`) halves the batch, and the other walks keep what
-they read and stop. Any other 500, 502, 503 or 504 to a query is asked once
-more like a GET, on the same page: the log's three 503s came after 0.70 to
-1.08 s, and each, read as too large, ended a commit walk as though the history
-had run out and reported success. A query that fails twice, or an answer that
-is not JSON and not that timeout, is a `StatusError`, a failure. Do not port
-either remedy to the other.
+`Pulls`, `Commits` and the co-authored walk halve their page on the same
+cursor, an aliased batch (`aliasBatch`) halves the batch, and the other walks
+keep what they read and stop. Any other 500, 502, 503 or 504 to a query is
+asked once more like a GET, on the same page: the log's three 503s came after
+0.70 to 1.08 s, and each, read as too large, ended a commit walk as though the
+history had run out and reported success. A query that fails twice, or an
+answer that is not JSON and not that timeout, is a `StatusError`, a failure.
+Do not port either remedy to the other.
 
 **Three families read only what moved, and the gate is exact, not a guess.**
 `commits`, `issueevents` and the incremental pass of `issues` leave unread a
@@ -414,6 +416,12 @@ Verified, so nobody spends an afternoon on it again:
   movement aliases took up to 7.8 s on busy repositories, and fifty archived
   lifetime rows met the 502 twice at 10.7 and 11.1 s. Both batch 25
   (2026-09-26 and 27).
+- A commit history page is bounded the same way, by the check contexts each
+  commit carries. The production proxy's log from 2026-09-11 to 2026-09-29
+  holds twelve pages of fifty answered with GitHub's timeout, in six
+  repositories, and asked by hand on 2026-09-29 the newest fifty commits of
+  jmrplens/phonometry answered 502 after 10.9 s, the same twenty-five in
+  4.8 s, the next twenty-five in 7.8 s and twelve in 3.9 s.
 - The Dependabot alert list pages by cursor and declares no last page, so no
   single request says how long it is. Code scanning's pages by number, and the
   `rel="last"` page at `per_page=1` is the total: 1,393 on
