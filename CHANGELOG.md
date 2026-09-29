@@ -13,7 +13,7 @@ day the tag was pushed, with two exceptions: 2.5.2 has a section and no tag,
 and its changes shipped in 2.6.0; 2.6.2 has a tag and no release, since its
 release stopped at the containerised suite, and its changes shipped in 2.6.3.
 
-## 2.6.4 - 2026-09-29
+## 2.6.4 - 2026-09-30
 
 A review of 2.6.3 in production on the day it was released: the service's
 journal, the recording proxy's log of every request it sent GitHub, the stored
