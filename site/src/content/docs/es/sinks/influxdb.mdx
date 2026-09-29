@@ -97,9 +97,10 @@ DELETE /api/v3/configure/table
 
 Esta es la causa habitual de `influx write: 400`. El borrado no destruye la
 tabla en el acto: InfluxDB la renombra `<nombre>-<instante>`, la deja
-consultable y la purga 72 horas después por omisión, y el nombre acepta
-escrituras nuevas enseguida. Para los cambios que el binario conoce, lo envía `-migrate -yes`:
-mira más abajo.
+consultable y la purga 72 horas después por omisión, o nunca antes de la 3.2
+(ver [más abajo](#antes-de-la-32-la-copia-se-queda)), y el nombre acepta
+escrituras nuevas enseguida. Para los cambios que el binario conoce, lo envía
+`-migrate -yes`: mira más abajo.
 
 </Aside>
 
@@ -183,7 +184,14 @@ medida en otro bucket. Por eso un arranque nunca lo aplica por su cuenta;
 `-migrate -yes` sí.
 
 `-uninstall data` deja fuera las tablas que InfluxDB 3 ya ha borrado, y dice
-que purgarlas le toca al servidor, o, antes de la 3.2, que se quedan.
+de cada una si la purga el servidor o se queda: en un servidor anterior a la
+3.2 se quedan todas, y en uno posterior cada una que borró una versión anterior
+a la 3.2, preguntado a la tabla de sistema del servidor, con la petición que la
+quita donde la versión la acepta (ver [más
+abajo](#antes-de-la-32-la-copia-se-queda)). Las demás le toca purgarlas al
+servidor, y solo de una versión desde la 3.10 se dice que se niega a que se le
+pida antes. La tabla de sistema de la 3.2.0 no puede decir cuáles, y allí la
+nota lo dice.
 
 ### Antes de la 3.2 la copia se queda
 
@@ -219,9 +227,12 @@ su periodo de gracia de borrado, la 3.2.0 después de renombrarla otra vez; de
 la 3.10.0 a la 3.11.5 responden con un 409. Así que la petición se envía
 mientras el servidor ejecuta una versión de la 3.2 a la 3.9, de camino hacia
 arriba. Desde la 3.2.1, `-migrate` lista las copias que la tabla de sistema
-muestra sin hora de borrado definitivo, que es como se ve allí una copia así;
-la tabla de sistema de la 3.2.0 no tiene esa columna, así que en la 3.2.0 no
-lista ninguna. Medido también: la 3.11.5, arrancada sobre el directorio de datos
+muestra sin hora de borrado definitivo, que es como se ve allí una copia así, y
+`-uninstall data` dice que cada una se queda, con esa petición donde la versión
+la acepta (medido en la 3.4.0 con una copia hecha por la 3.1.0). La tabla de
+sistema de la 3.2.0 no tiene esa columna, y responde a la pregunta con un 500,
+así que en la 3.2.0 `-migrate` no lista ninguna y `-uninstall data` dice que no
+lo sabe. Medido también: la 3.11.5, arrancada sobre el directorio de datos
 de una 3.0.3, empezó con un catálogo vacío, mientras que la 3.4.0 y la 3.9.13
 leyeron los catálogos que habían dejado la 3.0.3 y la 3.1.0.
 

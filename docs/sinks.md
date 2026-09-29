@@ -274,9 +274,9 @@ of.
 >
 > This is the usual cause of `influx write: 400`. The delete does not destroy the
 > table at once: InfluxDB renames it `<name>-<instant>`, keeps it queryable and
-> purges it 72 hours later by default, and the name takes new writes straight
-> away. For the
-> changes the binary knows of, `-migrate -yes` sends it: see below.
+> purges it 72 hours later by default, or never before 3.2 (see
+> [below](https://jmrp.io/docs/ghchronicle/sinks/influxdb/#before-32-the-copy-stays)), and the name takes new writes straight
+> away. For the changes the binary knows of, `-migrate -yes` sends it: see below.
 
 ### Rejected lines
 
@@ -355,7 +355,13 @@ the same measurement in another bucket as they were. So a start never applies
 it on its own; `-migrate -yes` does.
 
 `-uninstall data` leaves out the tables InfluxDB 3 has already deleted, and
-says they are the server's to purge, or, before 3.2, that they stay.
+says of each whether the server purges it or it stays: on a server before 3.2
+every one stays, and on a later one each that a release before 3.2 deleted,
+asked of the server's system table, with the request that removes it where the
+release takes one (see [below](https://jmrp.io/docs/ghchronicle/sinks/influxdb/#before-32-the-copy-stays)). The rest are the
+server's to purge, and only a release from 3.10 on is said to refuse to be
+asked for that sooner. 3.2.0's system table cannot say which, and there the
+note says so.
 
 #### Before 3.2 the copy stays
 
@@ -389,10 +395,13 @@ once their delete grace period had passed, 3.2.0 after renaming it once more;
 3.10.0 to 3.11.5 answer it with a 409. So the request is sent while the server
 runs a release from 3.2 to 3.9, on the way up. From 3.2.1 on, `-migrate` lists
 the copies the system table shows with no hard deletion time, which is how
-such a copy looks there; 3.2.0's system table has no such column, so on 3.2.0
-it lists none. Measured as well: 3.11.5, started on the data directory of a
-3.0.3, began with an empty catalog, while 3.4.0 and 3.9.13 read the catalogs
-3.0.3 and 3.1.0 had left.
+such a copy looks there, and `-uninstall data` says each stays, with that
+request where the release takes it (measured on 3.4.0 with a copy 3.1.0 made).
+3.2.0's system table has no such column, and answers the question with a 500,
+so on 3.2.0 `-migrate` lists none and `-uninstall data` says it cannot tell.
+Measured as well: 3.11.5, started on the data directory of a 3.0.3, began with
+an empty catalog, while 3.4.0 and 3.9.13 read the catalogs 3.0.3 and 3.1.0 had
+left.
 
 ### Where to go next
 

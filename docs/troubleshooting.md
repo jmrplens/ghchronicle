@@ -254,12 +254,15 @@ ghchronicle -config config.yaml -once        # one sweep in the foreground, then
 journalctl -u ghchronicle -f                 # under systemd
 ```
 
-`debug` adds seven lines to that and nothing else: the size of the
-written-points ledger at start-up, a first start with no cache file, a start
-listing jobs again because a store keeps no ledger, the account-wide families
-skipped for want of a `targets.user`, the entries a sink left out for being too
-old, a card-only sweep leaving the state file alone, and each save of the cache
-file. There is no per-request log at any level. See
+`debug` adds these to that and nothing else: the size of the written-points
+ledger at start-up, a first start with no cache file, a start listing jobs
+again because a store keeps no ledger, the account-wide families skipped for
+want of a `targets.user`, the entries a sink left out for being too old, a
+card-only sweep leaving the state file alone, each save of the cache file, the
+migrations a start finds not needed or applied before, the ones noted or frozen
+that the first start said at `INFO`, and each copy a migration set aside that
+the state file forgets because the store purges it or keeps it for good. There
+is no per-request log at any level. See
 [debugging](https://jmrp.io/docs/ghchronicle/configuration/logging/#debugging).
 
 ```yaml
@@ -419,13 +422,13 @@ instant in UTC: PostgreSQL's renamed table, Elasticsearch's clone, lower case
 there, and the name InfluxDB 3 gives a table it deleted. None of the shipped
 panels reads one. ghchronicle purges PostgreSQL's and Elasticsearch's once they
 have been kept 24 hours, and InfluxDB 3 purges its own on its own schedule, 72
-hours after the delete by default, except a server before 3.2, which never does
-(see [before 3.2 the copy
+hours after the delete by default, except one a release before 3.2 deleted,
+which is never purged, not even after an upgrade (see [before 3.2 the copy
 stays](https://jmrp.io/docs/ghchronicle/sinks/influxdb/#before-32-the-copy-stays)); `-migrate` lists
 them under their store as `kept aside`. `-uninstall data` removes PostgreSQL's
 and Elasticsearch's with everything else, and leaves out InfluxDB 3's with a
-note, since the server refuses a delete of a table it has already deleted, or,
-before 3.2, renames it once more.
+note saying which of them stay, since the server refuses a delete of a table it
+has already deleted, or, before 3.2, renames it once more.
 
 ## After an upgrade
 

@@ -1255,7 +1255,7 @@ log:
   level: debug
 ```
 
-Debug adds seven lines, and no more:
+Debug adds these lines, and no more:
 
 - `loaded the written-points ledger`, with how many points it came back with,
   when the service starts;
@@ -1270,7 +1270,15 @@ Debug adds seven lines, and no more:
   rejected;
 - `card-only sweep, the state file is left as it was`;
 - `cache file saved`, with how many answers and runs it holds and how long it
-  took.
+  took;
+- `migration not needed` and `migration applied before`, at every start, for
+  each change a store never needed or has had applied already;
+- `migration noted: nothing is changed` and `migration frozen`, at every start
+  after the first, which says each at `INFO`;
+- `set-aside copy forgotten`, when a copy a migration set aside falls due and
+  the state file stops naming it: `the store purges it itself` for one
+  InfluxDB 3 purges on its own schedule, and `the store keeps it for good, and
+  -migrate asks the store for it` for one it keeps for good.
 
 There is no per-request log: the client in `internal/ghapi` carries no logger,
 so which endpoint was called and which answer came back 304 are not visible at

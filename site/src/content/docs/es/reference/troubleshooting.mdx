@@ -270,13 +270,16 @@ ghchronicle -config config.yaml -once        # una pasada en primer plano, y sal
 journalctl -u ghchronicle -f                 # bajo systemd
 ```
 
-`debug` añade siete líneas a eso y nada más: el tamaño del libro de escrituras
-al arrancar, un primer arranque sin fichero de caché, un arranque que vuelve a
+`debug` añade esto a eso y nada más: el tamaño del libro de escrituras al
+arrancar, un primer arranque sin fichero de caché, un arranque que vuelve a
 listar jobs porque un almacén no lleva registro, las familias de cuenta
 saltadas por falta de `targets.user`, las entradas que un destino dejó fuera
-por viejas, una pasada solo de tarjeta que deja en paz el fichero de estado, y
-cada guardado del fichero de caché. No hay registro por petición en ningún
-nivel. Ver [depuración](/ghchronicle/es/configuration/logging/#depuración).
+por viejas, una pasada solo de tarjeta que deja en paz el fichero de estado,
+cada guardado del fichero de caché, las migraciones que un arranque encuentra
+innecesarias o ya aplicadas, las anotadas o congeladas que el primer arranque
+dijo en `INFO`, y cada copia que apartó una migración y que el fichero de
+estado olvida porque el almacén la purga o la guarda para siempre. No hay
+registro por petición en ningún nivel. Ver [depuración](/ghchronicle/es/configuration/logging/#depuración).
 
 ```yaml
 log:
@@ -443,12 +446,14 @@ allí en minúsculas, y el nombre que InfluxDB 3 da a una tabla que borró.
 Ninguno de los paneles que se distribuyen lee ninguna. ghchronicle purga las de
 PostgreSQL y Elasticsearch cuando llevan 24 horas guardadas, e InfluxDB 3 purga
 las suyas con su propio calendario, 72 horas después del borrado por omisión,
-salvo un servidor anterior a la 3.2, que nunca lo hace (ver [antes de la 3.2 la
-copia se queda](/ghchronicle/es/sinks/influxdb/#antes-de-la-32-la-copia-se-queda));
+salvo una que borró una versión anterior a la 3.2, que no se purga nunca, ni
+siquiera después de actualizar (ver [antes de la 3.2 la copia se
+queda](/ghchronicle/es/sinks/influxdb/#antes-de-la-32-la-copia-se-queda));
 `-migrate` las lista bajo su almacén como `kept aside`. `-uninstall data` quita
 las de PostgreSQL y Elasticsearch con todo lo demás, y deja fuera las de
-InfluxDB 3 con una nota, porque el servidor rechaza el borrado de una tabla que
-ya ha borrado, o, antes de la 3.2, la renombra otra vez.
+InfluxDB 3 con una nota que dice cuáles se quedan, porque el servidor rechaza el
+borrado de una tabla que ya ha borrado, o, antes de la 3.2, la renombra otra
+vez.
 
 ## Tras una actualización
 

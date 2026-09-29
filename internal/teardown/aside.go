@@ -343,8 +343,7 @@ func InfluxStay(server string, s *config.InfluxSink, table string) Stay {
 // aside. 3.2.0's system table has no such column, so there the question
 // fails, and InfluxDB 2 keeps no copy at all.
 func (i *influx) Unpurged(ctx context.Context, measurements []string) ([]Aside, error) {
-	server, err := i.Describe(ctx)
-	if err != nil || i.v2 {
+	if _, err := i.Describe(ctx); err != nil || i.v2 {
 		return nil, err
 	}
 	names, err := i.tables(ctx)
@@ -352,24 +351,24 @@ func (i *influx) Unpurged(ctx context.Context, measurements []string) ([]Aside, 
 		return nil, err
 	}
 	var copies []Aside
+	var copyNames []string
 	for _, name := range names {
 		if a, ok := asideOf(name, measurements); ok {
 			copies = append(copies, a)
+			copyNames = append(copyNames, name)
 		}
 	}
-	if len(copies) == 0 {
-		return nil, nil
+	stays, err := i.Staying(ctx, copyNames)
+	if err != nil {
+		return nil, err
 	}
-	if !KeepsForGood(server) {
-		unscheduled, askErr := i.unscheduled(ctx)
-		if askErr != nil {
-			return nil, askErr
-		}
-		copies = slices.DeleteFunc(copies, func(a Aside) bool { return !unscheduled[a.Name] })
-	}
+	copies = slices.DeleteFunc(copies, func(a Aside) bool {
+		_, kept := stays[a.Name]
+		return !kept
+	})
 	for k := range copies {
 		copies[k].ByServer, copies[k].ForGood = true, true
-		copies[k].Stays = InfluxStay(server, i.sink, copies[k].Name).String()
+		copies[k].Stays = stays[copies[k].Name].String()
 	}
 	return copies, nil
 }

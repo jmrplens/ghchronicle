@@ -70,8 +70,8 @@ type Client struct {
 	// endpoint reports it: `GET /rate_limit` does not even see this budget.
 	spend GraphQLSpend
 
-	// retryPause is how long a REST GET waits before asking again after a
-	// gateway gave up on it; see send.
+	// retryPause is how long a request waits before its one retry; see send
+	// for which answers get one.
 	retryPause time.Duration
 }
 
