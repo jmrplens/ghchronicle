@@ -1217,6 +1217,42 @@ func esTbl(m string, buckets, metrics []any, names []named, where []string, extr
 	return []Target{esq(m, metrics, buckets, "A", where, "")}, tf
 }
 
+// esNewest is the newest document of one of the account's snapshots over the
+// dashboard range, the row the SQL stores read of it, as a series per field
+// of one point, or of none where the range holds no document of it, which a
+// stat draws as the words its panel gives a value that is not there. `fields`
+// maps each field to the value the panel draws it as, and `extra` is
+// transformations to run after that renaming.
+//
+// The newest document is a top_metrics, and its bucket is one date histogram
+// bucket a century wide, esWholeRange, that has to hold a document. A terms
+// bucket that has to hold one answers a range with no document in it with no
+// field at all, so a stat had no tile to draw and the group read "No data"
+// where the SQL stores read a null in each (the 2.6.3 review). Asked for
+// its empty buckets instead, a terms bucket or a histogram bucket takes the
+// whole panel with it: the datasource reads the first of the newest documents
+// without looking, and an empty bucket has none ("index out of range [0] with
+// length 0", measured against Grafana 13.2.1). A histogram bucket that has to
+// hold a document is the one shape between the two: over a range with nothing
+// in it the datasource still answers each field, with no value.
+//
+// A series is named after its field even where the metric reads one field,
+// unlike the column of a table, which esCols names.
+func (b *builder) esNewest(m string, fields []named, extra ...any) (targets []Target, tf []any) {
+	bucket := b.dh(esWholeRange)
+	settings, _ := agg(bucket)["settings"].(map[string]any)
+	settings["min_doc_count"] = "1"
+	rename := map[string]any{}
+	for _, f := range fields {
+		rename["Top Metrics "+f.From] = f.To
+	}
+	tf = append([]any{map[string]any{"id": "organize", "options": map[string]any{
+		"excludeByName": map[string]any{}, "indexByName": map[string]any{},
+		"renameByName": rename,
+	}}}, extra...)
+	return []Target{esq(m, []any{b.mNewest(fieldsOf(fields)...)}, []any{bucket}, "A", nil, "")}, tf
+}
+
 // esRaw is the newest documents as rows. `names` maps document keys, in the
 // order the columns should appear, to their headings.
 func (b *builder) esRaw(m string, size int, names []named, where []string) (targets []Target, tf []any) {

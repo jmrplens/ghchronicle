@@ -421,12 +421,18 @@ the run duration and the queue wait beside the two byte totals leave it as
 well, because that panel adds each value up and would read a value of nothing
 as 0.
 
-Over a range no sweep reached, a group of snapshots the SQL stores read the
-newest row of, Community, Account, Since the account began and Sponsorship,
-reads "No data" in every store, as the SQL stores have no row to read. Before
-2.6.2 Graphite, whose paths answer a range they hold nothing in with nulls,
-drew three of them as a panel with nothing in it, not even the names, and
-Elasticsearch drew the four names of Sponsorship with nothing beside them.
+Over a range no sweep reached, the groups of the account's own snapshots, which
+the SQL stores read as the newest row of the range, say what the range lacked
+as well: since 2.6.4 every tile of Community, Account, Since the account began
+and Sponsorship, and the repository count beside the stars and forks, reads
+"not read" in every store. Until then those groups read "No data" in all five,
+as the SQL stores had no row to read, and before 2.6.2 Graphite, whose paths
+answer a range they hold nothing in with nulls, drew three of them as a panel
+with nothing in it, not even the names, and Elasticsearch drew the four names of
+Sponsorship with nothing beside them. In Elasticsearch the repository count
+still leaves the Repositories group over such a range, with the stars and the
+forks, since that panel adds its values up and would read a count that is not
+there as 0.
 
 ### Overview
 

@@ -570,7 +570,8 @@ const dayWidth = 100
 // selection at all: the collector writes the stars and forks, the artifact
 // storage and the cache as one row per repository each time it reads them, 0
 // when there is nothing to count, so no row is no reading rather than none of
-// it.
+// it. The account's own snapshots, which every sweep rewrites whole, say it
+// over a range no sweep reached.
 const notRead = "not read"
 
 // noValueOf is what one value of a stat group reads when its query answers

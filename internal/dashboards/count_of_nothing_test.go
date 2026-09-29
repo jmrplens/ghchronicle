@@ -146,7 +146,10 @@ func TestNoReleaseAnybodyDownloadedIsZeroReleasesInGraphite(t *testing.T) {
 // Graphite and Elasticsearch drawing neither for most of them: over a
 // repository with nothing in it eighteen tiles were missing from Graphite and
 // twenty from Elasticsearch, and a group whose every value was a total, the
-// traffic or the open alerts, was an empty panel in all five stores.
+// traffic or the open alerts, was an empty panel in all five stores. The 2.6.3
+// review found the account's own snapshots, read as the newest row of the
+// range, drawing "No data" in all five over a range no sweep reached, where
+// the groups beside them said what the range lacked.
 func TestEveryStatValueIsDrawnOverNothing(t *testing.T) {
 	t.Parallel()
 	checked := sqlNullsHaveWords(t) + graphiteValuesFallBack(t) + prometheusAggregationsFallBack(t) +
@@ -157,10 +160,12 @@ func TestEveryStatValueIsDrawnOverNothing(t *testing.T) {
 }
 
 // sqlNullsHaveWords holds every value a SQL stat reads as null over no rows to
-// words of its own: everything but a count and the newest row of a snapshot,
-// which over no rows is no row, and no tile, in every store.
+// words of its own, everything but a count, and every statement that reads
+// the newest row of a snapshot to answering a row over no rows, since no row
+// is no tile.
 func sqlNullsHaveWords(t *testing.T) int {
 	t.Helper()
+	joined, after, _ := strings.Cut(alwaysARow("\x00"), "\x00")
 	checked := 0
 	for _, p := range renderedPanels(t, "influxdb") {
 		if p["type"] != "stat" {
@@ -168,8 +173,12 @@ func sqlNullsHaveWords(t *testing.T) int {
 		}
 		for _, target := range panelTargets(p) {
 			sql, _ := target["rawSql"].(string)
-			if strings.Contains(sql, "ORDER BY time DESC LIMIT 1") {
-				continue
+			inner, always := strings.CutPrefix(sql, joined)
+			if always {
+				sql = strings.TrimSuffix(inner, after)
+			} else if strings.Contains(sql, "ORDER BY time DESC LIMIT 1") {
+				t.Errorf("%q reads the newest row of a snapshot, which a range no sweep reached answers "+
+					"with no row and so with no tile: %s", p["title"], sql)
 			}
 			for name, expr := range selectedValues(t, sql) {
 				checked++
@@ -259,67 +268,31 @@ func saysNothingAs(p map[string]any, name string) bool {
 }
 
 // graphiteValuesFallBack holds every value of a Graphite stat to a fallback
-// for a path the store has never held, which answers no series at all, and a
-// value the SQL stores read as the newest row of a snapshot to no series at
-// all where the range holds no reading, grNewest, since the SQL stores have
-// no row there. A path Graphite holds answers a range it holds nothing in
-// with nulls, which a fallback keeps as a tile with nothing in it, and a
-// group of those was a panel with nothing in it, not even the names.
+// for a path the store has never held, which answers no series at all. A path
+// Graphite holds answers a range it holds nothing in with nulls, which the
+// fallback leaves as they are, a tile the panel's words are drawn in.
 func graphiteValuesFallBack(t *testing.T) int {
 	t.Helper()
-	newest := newestRowValues(t)
 	checked := 0
 	for _, p := range renderedPanels(t, "graphite") {
 		if p["type"] != "stat" {
 			continue
 		}
-		title, _ := p["title"].(string)
 		for _, target := range panelTargets(p) {
 			checked++
-			expr, _ := target["target"].(string)
-			named := graphiteAlias.FindStringSubmatch(expr)
-			snapshot := named != nil && newest[title][named[1]]
-			switch {
-			case snapshot && !strings.HasPrefix(expr, "alias(removeEmptySeries(keepLastValue("):
-				t.Errorf("graphite %q: %s is the newest row of a snapshot in the SQL stores, which have no "+
-					"row over a range no sweep reached, and this draws a tile with nothing in it there: %s",
-					title, named[1], expr)
-			case !snapshot && !strings.HasPrefix(expr, "alias(fallbackSeries("):
+			if expr, _ := target["target"].(string); !strings.HasPrefix(expr, "alias(fallbackSeries(") {
 				t.Errorf("graphite %q: a value with no fallback draws no tile for a path never held: %s",
-					title, expr)
+					p["title"], expr)
 			}
 		}
 	}
 	return checked
 }
 
-// newestRowValues is, per panel title, every value of a SQL stat that is the
-// newest row of a snapshot rather than an aggregate over the range.
-func newestRowValues(t *testing.T) map[string]map[string]bool {
-	t.Helper()
-	out := map[string]map[string]bool{}
-	for _, p := range renderedPanels(t, "influxdb") {
-		title, _ := p["title"].(string)
-		for _, target := range panelTargets(p) {
-			sql, _ := target["rawSql"].(string)
-			if p["type"] != "stat" || !strings.Contains(sql, "ORDER BY time DESC LIMIT 1") {
-				continue
-			}
-			if out[title] == nil {
-				out[title] = map[string]bool{}
-			}
-			for name := range selectedValues(t, sql) {
-				out[title][name] = true
-			}
-		}
-	}
-	return out
-}
-
-// prometheusAggregationsFallBack holds every aggregation a Prometheus stat
-// reads to a value for no series at all: 0 for a count, NaN for the rest. A
-// selector with no aggregation reads the one series a snapshot is, and is
-// left as the SQL stores leave the newest row.
+// prometheusAggregationsFallBack holds every value a Prometheus stat reads to
+// an aggregation with a value for no series at all: 0 for a count, NaN for
+// the rest. A selector alone answers a range Prometheus holds nothing in with
+// no series, and no tile.
 func prometheusAggregationsFallBack(t *testing.T) int {
 	t.Helper()
 	checked := 0
@@ -328,13 +301,10 @@ func prometheusAggregationsFallBack(t *testing.T) int {
 			continue
 		}
 		for _, target := range panelTargets(p) {
-			expr, _ := target["expr"].(string)
-			if !strings.Contains(expr, "sum(") && !strings.Contains(expr, "avg(") && !strings.Contains(expr, "count(") {
-				continue
-			}
 			checked++
-			if !strings.HasSuffix(expr, ") or vector(0)") && !strings.HasSuffix(expr, ") or vector(NaN)") {
-				t.Errorf("prometheus %q: an aggregation of no series draws no tile: %s", p["title"], expr)
+			if expr, _ := target["expr"].(string); !strings.HasSuffix(expr, ") or vector(0)") &&
+				!strings.HasSuffix(expr, ") or vector(NaN)") {
+				t.Errorf("prometheus %q: a value with no fallback draws no tile over no series: %s", p["title"], expr)
 			}
 		}
 	}
@@ -343,9 +313,10 @@ func prometheusAggregationsFallBack(t *testing.T) int {
 
 // elasticsearchValuesAnswerNothing holds every value of an Elasticsearch stat
 // that reads the last value of each field to a bucket that is there when no
-// document is, unless it counts, which the test above holds, or reads the
-// newest document of a snapshot; and every stat that adds its values up to
-// saying which of them leave the group over nothing.
+// document is, unless it counts, which the test above holds; the newest
+// document of a snapshot to the one bucket that answers its fields over no
+// document without failing, esNewest's; and every stat that adds its values
+// up to saying which of them leave the group over nothing.
 func elasticsearchValuesAnswerNothing(t *testing.T) int {
 	t.Helper()
 	checked := 0
@@ -364,26 +335,40 @@ func elasticsearchValuesAnswerNothing(t *testing.T) int {
 			continue
 		}
 		for _, target := range panelTargets(p) {
-			metrics, _ := target["metrics"].([]any)
-			buckets, _ := target["bucketAggs"].([]any)
-			if len(metrics) == 0 || len(buckets) == 0 {
-				continue
-			}
-			first, _ := metrics[0].(map[string]any)
-			switch first["type"] {
-			case "count", "cardinality", "top_metrics":
-				continue
-			}
-			checked++
-			last, _ := buckets[len(buckets)-1].(map[string]any)
-			settings, _ := last["settings"].(map[string]any)
-			if last["type"] != "date_histogram" || settings["min_doc_count"] != "0" {
-				t.Errorf("elasticsearch %q: a %v over the range has no bucket to answer nothing in: %v",
-					p["title"], first["type"], buckets)
-			}
+			checked += esValueAnswersNothing(t, p["title"], target)
 		}
 	}
 	return checked
+}
+
+// esValueAnswersNothing is elasticsearchValuesAnswerNothing for one target of
+// a stat that reads the last value of each field, and says whether it held
+// the target to anything.
+func esValueAnswersNothing(t *testing.T, title any, target map[string]any) int {
+	t.Helper()
+	metrics, _ := target["metrics"].([]any)
+	buckets, _ := target["bucketAggs"].([]any)
+	if len(metrics) == 0 || len(buckets) == 0 {
+		return 0
+	}
+	first, _ := metrics[0].(map[string]any)
+	last, _ := buckets[len(buckets)-1].(map[string]any)
+	settings, _ := last["settings"].(map[string]any)
+	switch first["type"] {
+	case "count", "cardinality":
+		return 0
+	case "top_metrics":
+		if len(buckets) != 1 || last["type"] != "date_histogram" || settings["min_doc_count"] != "1" {
+			t.Errorf("elasticsearch %q: the newest document over %v answers a range with no document "+
+				"in it with no field, and no tile, or fails over it", title, buckets)
+		}
+		return 1
+	}
+	if last["type"] != "date_histogram" || settings["min_doc_count"] != "0" {
+		t.Errorf("elasticsearch %q: a %v over the range has no bucket to answer nothing in: %v",
+			title, first["type"], buckets)
+	}
+	return 1
 }
 
 // TestABucketScriptReadsTheMetricsOfItsOwnQuery holds every Elasticsearch

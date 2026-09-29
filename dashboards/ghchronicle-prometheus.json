@@ -87,6 +87,30 @@
           {
             "matcher": {
               "id": "byName",
+              "options": "Repositories"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
               "options": "Stars"
             },
             "properties": [
@@ -159,7 +183,7 @@
         {
           "datasource": "${DS_PROMETHEUS}",
           "editorMode": "code",
-          "expr": "github_account_public_repos",
+          "expr": "(max(github_account_public_repos)) or vector(NaN)",
           "instant": true,
           "legendFormat": "Repositories",
           "range": false,
@@ -357,7 +381,104 @@
           },
           "unit": "short"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Followers"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Following"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sponsors"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sponsoring"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 4,
@@ -384,7 +505,7 @@
         {
           "datasource": "${DS_PROMETHEUS}",
           "editorMode": "code",
-          "expr": "github_account_followers",
+          "expr": "(max(github_account_followers)) or vector(NaN)",
           "instant": true,
           "legendFormat": "Followers",
           "range": false,
@@ -393,7 +514,7 @@
         {
           "datasource": "${DS_PROMETHEUS}",
           "editorMode": "code",
-          "expr": "github_account_following",
+          "expr": "(max(github_account_following)) or vector(NaN)",
           "instant": true,
           "legendFormat": "Following",
           "range": false,
@@ -402,7 +523,7 @@
         {
           "datasource": "${DS_PROMETHEUS}",
           "editorMode": "code",
-          "expr": "github_account_sponsors",
+          "expr": "(max(github_account_sponsors)) or vector(NaN)",
           "instant": true,
           "legendFormat": "Sponsors",
           "range": false,
@@ -411,7 +532,7 @@
         {
           "datasource": "${DS_PROMETHEUS}",
           "editorMode": "code",
-          "expr": "github_account_sponsoring",
+          "expr": "(max(github_account_sponsoring)) or vector(NaN)",
           "instant": true,
           "legendFormat": "Sponsoring",
           "range": false,
@@ -454,6 +575,150 @@
                 "value": "d"
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Contributions"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Account age"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Watching"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Stars given"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Gists"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Packages"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
           }
         ]
       },
@@ -482,7 +747,7 @@
         {
           "datasource": "${DS_PROMETHEUS}",
           "editorMode": "code",
-          "expr": "github_contributions_total_calendar_total",
+          "expr": "(max(github_contributions_total_calendar_total)) or vector(NaN)",
           "instant": true,
           "legendFormat": "Contributions",
           "range": false,
@@ -491,7 +756,7 @@
         {
           "datasource": "${DS_PROMETHEUS}",
           "editorMode": "code",
-          "expr": "github_account_account_age_days",
+          "expr": "(max(github_account_account_age_days)) or vector(NaN)",
           "instant": true,
           "legendFormat": "Account age",
           "range": false,
@@ -500,7 +765,7 @@
         {
           "datasource": "${DS_PROMETHEUS}",
           "editorMode": "code",
-          "expr": "github_account_watching",
+          "expr": "(max(github_account_watching)) or vector(NaN)",
           "instant": true,
           "legendFormat": "Watching",
           "range": false,
@@ -509,7 +774,7 @@
         {
           "datasource": "${DS_PROMETHEUS}",
           "editorMode": "code",
-          "expr": "github_account_starred",
+          "expr": "(max(github_account_starred)) or vector(NaN)",
           "instant": true,
           "legendFormat": "Stars given",
           "range": false,
@@ -518,7 +783,7 @@
         {
           "datasource": "${DS_PROMETHEUS}",
           "editorMode": "code",
-          "expr": "github_account_gists",
+          "expr": "(max(github_account_gists)) or vector(NaN)",
           "instant": true,
           "legendFormat": "Gists",
           "range": false,
@@ -527,7 +792,7 @@
         {
           "datasource": "${DS_PROMETHEUS}",
           "editorMode": "code",
-          "expr": "github_account_packages",
+          "expr": "(max(github_account_packages)) or vector(NaN)",
           "instant": true,
           "legendFormat": "Packages",
           "range": false,
@@ -568,7 +833,152 @@
               },
               "unit": "short"
             },
-            "overrides": []
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Pull requests merged"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Pull requests reviewed"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Commits"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Issues opened"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Merged elsewhere"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Threads commented elsewhere"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
           },
           "gridPos": {
             "h": 5,
@@ -595,7 +1005,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "github_account_total_pulls_merged",
+              "expr": "(max(github_account_total_pulls_merged)) or vector(NaN)",
               "instant": true,
               "legendFormat": "Pull requests merged",
               "range": false,
@@ -604,7 +1014,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "github_account_total_pulls_reviewed",
+              "expr": "(max(github_account_total_pulls_reviewed)) or vector(NaN)",
               "instant": true,
               "legendFormat": "Pull requests reviewed",
               "range": false,
@@ -613,7 +1023,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "github_account_total_commits",
+              "expr": "(max(github_account_total_commits)) or vector(NaN)",
               "instant": true,
               "legendFormat": "Commits",
               "range": false,
@@ -622,7 +1032,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "github_account_total_issues_opened",
+              "expr": "(max(github_account_total_issues_opened)) or vector(NaN)",
               "instant": true,
               "legendFormat": "Issues opened",
               "range": false,
@@ -631,7 +1041,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "github_account_total_pulls_merged_elsewhere",
+              "expr": "(max(github_account_total_pulls_merged_elsewhere)) or vector(NaN)",
               "instant": true,
               "legendFormat": "Merged elsewhere",
               "range": false,
@@ -640,7 +1050,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "github_account_total_commented_elsewhere",
+              "expr": "(max(github_account_total_commented_elsewhere)) or vector(NaN)",
               "instant": true,
               "legendFormat": "Threads commented elsewhere",
               "range": false,
@@ -17154,7 +17564,104 @@
               },
               "unit": "currencyUSD"
             },
-            "overrides": []
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Lifetime received"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Monthly income"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Next payout"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Spent sponsoring"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
           },
           "gridPos": {
             "h": 4,
@@ -17181,7 +17688,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "github_sponsors_listing_lifetime_received_cents / 100",
+              "expr": "(max(github_sponsors_listing_lifetime_received_cents) / 100) or vector(NaN)",
               "instant": true,
               "legendFormat": "Lifetime received",
               "range": false,
@@ -17190,7 +17697,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "github_sponsors_listing_monthly_income_cents / 100",
+              "expr": "(max(github_sponsors_listing_monthly_income_cents) / 100) or vector(NaN)",
               "instant": true,
               "legendFormat": "Monthly income",
               "range": false,
@@ -17199,7 +17706,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "github_sponsors_listing_next_payout_cents / 100",
+              "expr": "(max(github_sponsors_listing_next_payout_cents) / 100) or vector(NaN)",
               "instant": true,
               "legendFormat": "Next payout",
               "range": false,
@@ -17208,7 +17715,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "github_sponsors_listing_sponsor_spend_cents / 100",
+              "expr": "(max(github_sponsors_listing_sponsor_spend_cents) / 100) or vector(NaN)",
               "instant": true,
               "legendFormat": "Spent sponsoring",
               "range": false,

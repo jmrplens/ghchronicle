@@ -30,7 +30,7 @@ var tilesLeftOverNothing = []dashboardDiffer{
 	{
 		title: "Repositories", kind: "stat", stores: []string{"elasticsearch"},
 		reason: "leaves its group when the range holds no document of it",
-		only:   []string{"Stars", "Forks"},
+		only:   []string{"Stars", "Forks", "Repositories"},
 	},
 	{
 		title: "Runs in range", stores: []string{"elasticsearch"},

@@ -87,6 +87,30 @@
           {
             "matcher": {
               "id": "byName",
+              "options": "Repositories"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
               "options": "Stars"
             },
             "properties": [
@@ -161,7 +185,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT public_repos AS \"Repositories\" FROM gh_account WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 1",
+          "rawSql": "SELECT newest.* FROM (SELECT 1 AS one) AS always LEFT JOIN (SELECT public_repos AS \"Repositories\" FROM gh_account WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 1) AS newest ON true",
           "refId": "A"
         },
         {
@@ -327,7 +351,104 @@
           },
           "unit": "short"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Followers"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Following"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sponsors"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sponsoring"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 4,
@@ -356,7 +477,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT followers AS \"Followers\", following AS \"Following\", sponsors AS \"Sponsors\", sponsoring AS \"Sponsoring\" FROM gh_account WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 1",
+          "rawSql": "SELECT newest.* FROM (SELECT 1 AS one) AS always LEFT JOIN (SELECT followers AS \"Followers\", following AS \"Following\", sponsors AS \"Sponsors\", sponsoring AS \"Sponsoring\" FROM gh_account WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 1) AS newest ON true",
           "refId": "A"
         }
       ],
@@ -396,6 +517,150 @@
                 "value": "d"
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Contributions"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Account age"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Watching"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Stars given"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Gists"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Packages"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
           }
         ]
       },
@@ -426,7 +691,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT calendar_total AS \"Contributions\" FROM gh_contributions_total WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 1",
+          "rawSql": "SELECT newest.* FROM (SELECT 1 AS one) AS always LEFT JOIN (SELECT calendar_total AS \"Contributions\" FROM gh_contributions_total WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 1) AS newest ON true",
           "refId": "A"
         },
         {
@@ -434,7 +699,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT account_age_days AS \"Account age\", watching AS \"Watching\", starred AS \"Stars given\", gists AS \"Gists\", packages AS \"Packages\" FROM gh_account WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 1",
+          "rawSql": "SELECT newest.* FROM (SELECT 1 AS one) AS always LEFT JOIN (SELECT account_age_days AS \"Account age\", watching AS \"Watching\", starred AS \"Stars given\", gists AS \"Gists\", packages AS \"Packages\" FROM gh_account WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 1) AS newest ON true",
           "refId": "B"
         }
       ],
@@ -472,7 +737,152 @@
               },
               "unit": "short"
             },
-            "overrides": []
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Pull requests merged"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Pull requests reviewed"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Commits"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Issues opened"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Merged elsewhere"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Threads commented elsewhere"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
           },
           "gridPos": {
             "h": 5,
@@ -501,7 +911,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT pulls_merged AS \"Pull requests merged\", pulls_reviewed AS \"Pull requests reviewed\", commits AS \"Commits\", issues_opened AS \"Issues opened\", pulls_merged_elsewhere AS \"Merged elsewhere\", commented_elsewhere AS \"Threads commented elsewhere\" FROM gh_account_total WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 1",
+              "rawSql": "SELECT newest.* FROM (SELECT 1 AS one) AS always LEFT JOIN (SELECT pulls_merged AS \"Pull requests merged\", pulls_reviewed AS \"Pull requests reviewed\", commits AS \"Commits\", issues_opened AS \"Issues opened\", pulls_merged_elsewhere AS \"Merged elsewhere\", commented_elsewhere AS \"Threads commented elsewhere\" FROM gh_account_total WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 1) AS newest ON true",
               "refId": "A"
             }
           ],
@@ -16231,7 +16641,104 @@
               },
               "unit": "currencyUSD"
             },
-            "overrides": []
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Lifetime received"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Monthly income"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Next payout"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Spent sponsoring"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
           },
           "gridPos": {
             "h": 4,
@@ -16260,7 +16767,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT lifetime_received_cents / 100.0 AS \"Lifetime received\", monthly_income_cents / 100.0 AS \"Monthly income\", next_payout_cents / 100.0 AS \"Next payout\", sponsor_spend_cents / 100.0 AS \"Spent sponsoring\" FROM gh_sponsors_listing WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 1",
+              "rawSql": "SELECT newest.* FROM (SELECT 1 AS one) AS always LEFT JOIN (SELECT lifetime_received_cents / 100.0 AS \"Lifetime received\", monthly_income_cents / 100.0 AS \"Monthly income\", next_payout_cents / 100.0 AS \"Next payout\", sponsor_spend_cents / 100.0 AS \"Spent sponsoring\" FROM gh_sponsors_listing WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 1) AS newest ON true",
               "refId": "A"
             }
           ],
