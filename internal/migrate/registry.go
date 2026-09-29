@@ -67,7 +67,12 @@ type Migration struct {
 	// Account is the tag that says whose rows these are, for telling a store
 	// this configuration alone writes from one it shares with another.
 	Account string
-	Reach   Reach
+	// Item is the tags that name one item, whatever shape its rows are in:
+	// what the copy of the old rows and the table read back are compared by
+	// once a refill ends, to name the items GitHub no longer served. Empty
+	// for a change nothing reads back.
+	Item  []string
+	Reach Reach
 	// Why is one sentence for the plan and the log.
 	Why   string
 	Issue string
@@ -90,7 +95,7 @@ var Registry = []Migration{
 		ID: "1.0.0/gh_code_scanning_alert_item/state", Release: PreRelease,
 		Measurement: "gh_code_scanning_alert_item", Kind: Identity,
 		OldTags: []string{"state", "reason"}, Families: []string{"security"},
-		Account: "owner", Reach: Whole,
+		Account: "owner", Item: []string{"full_name", "number"}, Reach: Whole,
 		// alert_state is in the first public commit, under a new name so a
 		// store that already held the tag kept accepting writes: only builds
 		// before 1.0.0 wrote these tags.
@@ -101,7 +106,7 @@ var Registry = []Migration{
 		ID: "1.0.0/gh_dependabot_alert_item/state", Release: PreRelease,
 		Measurement: "gh_dependabot_alert_item", Kind: Identity,
 		OldTags: []string{"state"}, Families: []string{"security"},
-		Account: "owner", Reach: Whole,
+		Account: "owner", Item: []string{"full_name", "number"}, Reach: Whole,
 		Why: "a build before 1.0.0 tagged each Dependabot alert with its state, " +
 			"so an alert fixed after it was first read is two rows at one instant",
 	},
@@ -121,7 +126,7 @@ var Registry = []Migration{
 		Measurement: "gh_discussion_comment", Kind: Identity,
 		OldTags:  []string{"is_answer"},
 		Families: []string{"discussions", "outbound"},
-		Account:  "user", Reach: Whole,
+		Account:  "user", Item: []string{"comment"}, Reach: Whole,
 		Why: "is_answer was a tag, so a comment read before and after its " +
 			"acceptance is two rows at one instant",
 		Issue: "https://github.com/jmrplens/ghchronicle/issues/96",

@@ -75,6 +75,16 @@ func checkEntry(t *testing.T, m Migration) {
 	if !slices.Contains(tags, m.Account) {
 		t.Errorf("%s: account tag %q is not a tag of %s", m.ID, m.Account, m.Measurement)
 	}
+	if m.noteOnly() != (len(m.Item) == 0) {
+		t.Errorf("%s: item %v; a change that is read back names the tags of one item, and only such a change",
+			m.ID, m.Item)
+	}
+	for _, tag := range m.Item {
+		if !slices.Contains(tags, tag) {
+			t.Errorf("%s: item tag %q is not a tag of %s, so the table read back cannot be asked for it",
+				m.ID, tag, m.Measurement)
+		}
+	}
 }
 
 func TestReleasesCompareAsNumbers(t *testing.T) {
