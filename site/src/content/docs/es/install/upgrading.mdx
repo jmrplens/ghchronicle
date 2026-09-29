@@ -117,6 +117,12 @@ ghchronicle -config /etc/ghchronicle/config.yaml -migrate -yes
 systemctl start ghchronicle
 ```
 
+Ejecútalo con el usuario con que corre el servicio y con el entorno que tiene
+el servicio: guarda el fichero de estado y los que hay a su lado, y un fichero
+que guarda root es uno que el servicio ya no puede leer.
+[systemd](/ghchronicle/es/install/systemd/#tras-una-actualización) y
+[Docker](/ghchronicle/es/install/docker/#tras-una-actualización) muestran cómo.
+
 `-migrate -yes` imprime el mismo plan y después aplica cada cambio pendiente,
 también los que no son seguros, porque `-yes` es la palabra que pedía el plan.
 Cada uno se registra en el fichero de estado al aplicarse, así que parar a
@@ -421,6 +427,18 @@ medidas](/ghchronicle/es/collectors/measurements/#cómo-leer-las-tablas) dice
 qué guarda cada almacén y cómo borrarla. `-migrate` dice cuáles de los
 almacenes configurados guardan todavía la forma antigua, bajo
 `2.6.1/gh_discussion_comment/is_answer`: ver [Migraciones](#migraciones).
+
+Lo que la forma antigua todavía le cuesta a quien lee es una respuesta aceptada
+y retirada después: su fila antigua dice aceptada, así que los dos paneles de
+comentarios la leen aceptada hasta que el almacén se pone al día. Medido en la
+batería en contenedores con una respuesta retirada en el GitHub falso, en
+InfluxDB 3.11.2, PostgreSQL 18.6, Elasticsearch 9.5.3, Graphite 1.1.10-5 y el
+fichero SQL reproducido en PostgreSQL: Answers elsewhere y Discussion answers la
+leen aceptada, una fila para el comentario, antes de actualizar en todos los
+almacenes; no aceptada, todavía una fila, en los tres primeros tras un arranque
+con `migrate: auto`, que deja Graphite y el fichero SQL a quien los lleva; y no
+aceptada en los cinco tras `-migrate -yes`, una vez ejecutadas las órdenes de
+Graphite y reproducido el fichero desde donde estaba.
 
 ### Un ajuste de ruta se expande
 

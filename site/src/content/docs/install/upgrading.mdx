@@ -115,6 +115,11 @@ ghchronicle -config /etc/ghchronicle/config.yaml -migrate -yes
 systemctl start ghchronicle
 ```
 
+Run it as the user the service runs as, with the environment the service has:
+it saves the state file and the files beside it, and a file root saves is one
+the service can no longer read. [systemd](/ghchronicle/install/systemd/#after-an-upgrade)
+and [Docker](/ghchronicle/install/docker/#after-an-upgrade) show how.
+
 `-migrate -yes` prints the same plan and then applies every pending change, the
 unsafe ones too, since `-yes` is the word the plan asked for. Each one is
 recorded in the state file as it is applied, so a stop half way costs nothing
@@ -401,6 +406,18 @@ page](/ghchronicle/collectors/measurements/#how-to-read-the-tables) says what
 each store keeps and how to drop it. `-migrate` says which of the configured
 stores still hold the old shape, under
 `2.6.1/gh_discussion_comment/is_answer`: see [Migrations](#migrations).
+
+What the old shape still costs a reader is an answer accepted and taken back
+since: its old row says accepted, so both comment panels read it accepted
+until the store is brought along. Measured in the containerised suite with an
+answer taken back on the fake GitHub, in InfluxDB 3.11.2, PostgreSQL 18.6,
+Elasticsearch 9.5.3, Graphite 1.1.10-5 and the SQL file replayed into
+PostgreSQL: Answers elsewhere and Discussion answers read it accepted, one row
+for the comment, before the upgrade in every store; not accepted, still one
+row, in the first three after a start under `migrate: auto`, which leaves
+Graphite and the SQL file to their operator; and not accepted in all five after
+`-migrate -yes`, once the Graphite commands had run and the file had been
+replayed from where it was.
 
 ### A path setting is expanded
 

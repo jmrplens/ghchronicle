@@ -1291,11 +1291,15 @@ almost nothing: an outbound TCP socket and one writable directory.
 the right ownership on start, so the state file has somewhere to live without a
 manual `mkdir` and a `chown` that someone will forget after a reinstall.
 
-Three files live there, not one. Beside `state.json` the sweep keeps its write
+Four files live there, not one. Beside `state.json` the sweep keeps its write
 ledger, `state-written.bin` by default, which is what stops an unchanged point
 being written again, and its cache, `state-cache.bin`, which is what lets a
-restart ask GitHub only for what changed; `ReadWritePaths` covers the
-directory, so all three are already allowed. Put the state file or the ledger
+restart ask GitHub only for what changed; and the service holds `state-lock`
+for as long as it runs, which is how `-migrate -yes` knows not to change the
+stores under it. A backfill, or the reading back of a
+[migration](https://jmrp.io/docs/ghchronicle/install/upgrading/#migrations), that stops half way
+leaves its checkpoint there too. `ReadWritePaths` covers the directory, so all
+of them are already allowed. Put the state file or the ledger
 somewhere else and that path needs adding here, and the cache follows the state
 file wherever it goes. Losing the ledger costs one sweep of rewriting:
 [only what changed is written](https://jmrp.io/docs/ghchronicle/sinks/#only-what-changed-is-written);
@@ -1320,6 +1324,7 @@ losing the cache, one sweep at full price:
       - state.json created by the service
       - state-written.bin the write ledger, beside it
       - state-cache.bin the cache, beside it too
+      - state-lock held by the service while it runs
 
 3. Write the environment file, and nothing else in it.
 
@@ -1364,13 +1369,16 @@ level=INFO msg="rate budget" bucket=core remaining=4477 limit=5000
 day](https://jmrp.io/docs/ghchronicle/configuration/logging/#what-the-log-says-on-a-good-day) has
 every routine line.
 
-Two warnings are worth an alert:
+Three warnings are worth an alert:
 
 - **`rate limit reserve reached`** means a family was skipped to protect the
   budget. Once is fine; every sweep means the cadences are too fast for the
   number of repositories.
 - **`family failed everywhere, not marking it as run`** means every repository
   failed for one family, so it will be retried rather than treated as done.
+- **`migration pending`**, at every start after an upgrade, means a store still
+  holds rows in a shape this release no longer writes, and the start left
+  them: see [after an upgrade](https://jmrp.io/docs/ghchronicle/install/systemd/#after-an-upgrade).
 
 ```sh
 journalctl -u ghchronicle -f
@@ -1382,6 +1390,39 @@ journalctl -u ghchronicle -p warning --since today
 > `systemd-analyze security ghchronicle` scores the unit and names anything the
 > sandbox is not covering. It is the fastest way to see that an edit quietly
 > removed a restriction.
+
+### After an upgrade
+
+Replace the binary and restart the service. Under the default
+[`migrate: auto`](https://jmrp.io/docs/ghchronicle/configuration/#migrate), the start checks every
+store against the changes the new release carries and, before its first sweep,
+applies on its own each one that loses nothing, saying so at `WARN`. A change
+it leaves is a `WARN` at every start, naming the store, the reason and the two
+commands: [what a start does about
+it](https://jmrp.io/docs/ghchronicle/install/upgrading/#what-a-start-does-about-it).
+
+Run those as the service's own user and with its environment file, with the
+service stopped, since `-migrate -yes` refuses to run beside it:
+
+```sh
+sudo systemctl stop ghchronicle
+sudo systemd-run --uid=ghchronicle --gid=ghchronicle --pipe --wait --collect \
+  --property=EnvironmentFile=/etc/ghchronicle/ghchronicle.env \
+  /usr/local/bin/ghchronicle -config /etc/ghchronicle/config.yaml -migrate
+sudo systemd-run --uid=ghchronicle --gid=ghchronicle --pipe --wait --collect \
+  --property=EnvironmentFile=/etc/ghchronicle/ghchronicle.env \
+  /usr/local/bin/ghchronicle -config /etc/ghchronicle/config.yaml -migrate -yes
+sudo systemctl start ghchronicle
+```
+
+The first prints the plan and changes nothing; the second applies it and reads
+back what it cleared. `systemd-run` reads the environment file as root, as the
+unit does, so it stays mode 600, and runs the binary as `ghchronicle`: measured
+on systemd 257, a command started that way saw the token of a file only root
+could read and ran as the user named. Run by root instead, `-migrate -yes`
+saves the files it rewrites beside the state file as root's, mode 600,
+`state.json` among them, and the service, which runs as `ghchronicle`, can no
+longer read what it remembers.
 
 ### cron instead of a service
 
@@ -1891,18 +1932,19 @@ signature at all, so for them that answer is the true one.
 
 ### What has to be writable
 
-The config file is mounted read-only. Five things are not:
+The config file is mounted read-only. Six things are not:
 
 | Path                | Needed for                                                                        |
 | ------------------- | --------------------------------------------------------------------------------- |
 | `state_file`        | Always. Without a persistent path the stargazer walk repeats on every restart     |
 | `<name>-cache.bin`  | Always. The cache, which sits beside the state file and has no setting of its own |
 | `sinks.dedupe_file` | The long-running service, with a sink that keeps it. A `-once` run opens none     |
+| `<name>-lock`       | The long-running service, which holds it while it runs, and `-migrate -yes`       |
 | `sinks.file.path`   | Only with the file sink                                                           |
 | `log.file`          | Only with a log file configured                                                   |
 
-The first three live in the same directory by default, so one mounted
-directory covers them, and it has to be a directory. Each of the three is
+The first three live in the same directory by default, and so does the lock,
+so one mounted directory covers them, and it has to be a directory. Each of the three is
 written beside itself and renamed into place, so a reader never sees half a
 file, and a file mounted on its own cannot be renamed over: measured with the
 2.6.1 image built from its Dockerfile, a state file bind-mounted alone was
@@ -2010,6 +2052,35 @@ other sink is outbound.
 
   The collector reaches the database by service name, so
   `sinks.influxdb.url` is `http://influxdb:8181`.
+
+### After an upgrade
+
+Pull the new image and recreate the container. Under the default
+[`migrate: auto`](https://jmrp.io/docs/ghchronicle/configuration/#migrate), its start applies on its
+own, before its first sweep, every change the new release carries that loses
+nothing, and warns about the rest at every start with the two commands that
+apply them: see [Migrations](https://jmrp.io/docs/ghchronicle/install/upgrading/#migrations). The
+container takes the same flags as the binary, so those run in a one-off
+container of the same service, with its volume, its environment and its user,
+while the service is stopped:
+
+```sh
+docker compose pull ghchronicle
+docker compose up -d ghchronicle
+docker compose logs ghchronicle | grep 'migration pending'
+docker compose stop ghchronicle
+docker compose run --rm ghchronicle -config /config.yaml -migrate
+docker compose run --rm ghchronicle -config /config.yaml -migrate -yes
+docker compose start ghchronicle
+```
+
+The first `run` prints the plan and changes nothing; the second applies it and
+reads back what it cleared. Both mount the volume the service mounts, so they
+find the lock it holds beside the state file: with the service still running,
+`-migrate -yes` refuses, naming the process by the number the service's own
+container gives it, and changes nothing. Measured with two containers on one
+named volume: a `flock` one of them held was refused to the other, and granted
+once the first had gone.
 
 ### One sweep, then exit
 
@@ -2479,6 +2550,11 @@ ghchronicle -config /etc/ghchronicle/config.yaml -migrate -yes
 systemctl start ghchronicle
 ```
 
+Run it as the user the service runs as, with the environment the service has:
+it saves the state file and the files beside it, and a file root saves is one
+the service can no longer read. [systemd](https://jmrp.io/docs/ghchronicle/install/systemd/#after-an-upgrade)
+and [Docker](https://jmrp.io/docs/ghchronicle/install/docker/#after-an-upgrade) show how.
+
 `-migrate -yes` prints the same plan and then applies every pending change, the
 unsafe ones too, since `-yes` is the word the plan asked for. Each one is
 recorded in the state file as it is applied, so a stop half way costs nothing
@@ -2765,6 +2841,18 @@ page](https://jmrp.io/docs/ghchronicle/collectors/measurements/#how-to-read-the-
 each store keeps and how to drop it. `-migrate` says which of the configured
 stores still hold the old shape, under
 `2.6.1/gh_discussion_comment/is_answer`: see [Migrations](https://jmrp.io/docs/ghchronicle/install/upgrading/#migrations).
+
+What the old shape still costs a reader is an answer accepted and taken back
+since: its old row says accepted, so both comment panels read it accepted
+until the store is brought along. Measured in the containerised suite with an
+answer taken back on the fake GitHub, in InfluxDB 3.11.2, PostgreSQL 18.6,
+Elasticsearch 9.5.3, Graphite 1.1.10-5 and the SQL file replayed into
+PostgreSQL: Answers elsewhere and Discussion answers read it accepted, one row
+for the comment, before the upgrade in every store; not accepted, still one
+row, in the first three after a start under `migrate: auto`, which leaves
+Graphite and the SQL file to their operator; and not accepted in all five after
+`-migrate -yes`, once the Graphite commands had run and the file had been
+replayed from where it was.
 
 #### A path setting is expanded
 

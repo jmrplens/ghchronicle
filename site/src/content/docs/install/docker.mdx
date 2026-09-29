@@ -109,18 +109,19 @@ signature at all, so for them that answer is the true one.
 
 ## What has to be writable
 
-The config file is mounted read-only. Five things are not:
+The config file is mounted read-only. Six things are not:
 
 | Path                | Needed for                                                                        |
 | ------------------- | --------------------------------------------------------------------------------- |
 | `state_file`        | Always. Without a persistent path the stargazer walk repeats on every restart     |
 | `<name>-cache.bin`  | Always. The cache, which sits beside the state file and has no setting of its own |
 | `sinks.dedupe_file` | The long-running service, with a sink that keeps it. A `-once` run opens none     |
+| `<name>-lock`       | The long-running service, which holds it while it runs, and `-migrate -yes`       |
 | `sinks.file.path`   | Only with the file sink                                                           |
 | `log.file`          | Only with a log file configured                                                   |
 
-The first three live in the same directory by default, so one mounted
-directory covers them, and it has to be a directory. Each of the three is
+The first three live in the same directory by default, and so does the lock,
+so one mounted directory covers them, and it has to be a directory. Each of the three is
 written beside itself and renamed into place, so a reader never sees half a
 file, and a file mounted on its own cannot be renamed over: measured with the
 2.6.1 image built from its Dockerfile, a state file bind-mounted alone was
@@ -230,6 +231,35 @@ other sink is outbound.
 
   </TabItem>
 </Tabs>
+
+## After an upgrade
+
+Pull the new image and recreate the container. Under the default
+[`migrate: auto`](/ghchronicle/configuration/#migrate), its start applies on its
+own, before its first sweep, every change the new release carries that loses
+nothing, and warns about the rest at every start with the two commands that
+apply them: see [Migrations](/ghchronicle/install/upgrading/#migrations). The
+container takes the same flags as the binary, so those run in a one-off
+container of the same service, with its volume, its environment and its user,
+while the service is stopped:
+
+```sh
+docker compose pull ghchronicle
+docker compose up -d ghchronicle
+docker compose logs ghchronicle | grep 'migration pending'
+docker compose stop ghchronicle
+docker compose run --rm ghchronicle -config /config.yaml -migrate
+docker compose run --rm ghchronicle -config /config.yaml -migrate -yes
+docker compose start ghchronicle
+```
+
+The first `run` prints the plan and changes nothing; the second applies it and
+reads back what it cleared. Both mount the volume the service mounts, so they
+find the lock it holds beside the state file: with the service still running,
+`-migrate -yes` refuses, naming the process by the number the service's own
+container gives it, and changes nothing. Measured with two containers on one
+named volume: a `flock` one of them held was refused to the other, and granted
+once the first had gone.
 
 ## One sweep, then exit
 

@@ -429,6 +429,100 @@ las suyas; `-migrate` las lista bajo su almacén como `kept aside`.
 deja fuera las de InfluxDB 3 con una nota, porque el servidor rechaza el
 borrado de una tabla que ya ha borrado.
 
+## Tras una actualización
+
+**`migration pending`, en cada arranque.** Un almacén guarda filas de una medida
+con una forma que esta versión ya no escribe, y este arranque no lo puso al
+día. `not_applied` dice por qué: `migrate: warn`, o un motivo por el que el
+cambio necesita la palabra de alguien, como un InfluxDB 2, cuya única vía es un
+borrado definitivo, un fichero SQL, un Graphite o un Telegraf, donde ghchronicle
+no aparta nada, filas de cuentas que esta configuración no recoge, o filas que
+volver a leer no traería de vuelta. `plan` y `apply` son las dos órdenes, y
+`first`, en el servicio, dice que lo pares antes de la segunda. Se dice en cada
+arranque hasta que el almacén se pone al día: mira
+[Migraciones](/ghchronicle/es/install/upgrading/#migraciones).
+
+**`applying a migration before the first sweep`.** No es un error. Con
+`migrate: auto` el arranque encontró un cambio que puede aplicar sin perder
+nada, y lo está aplicando: `found` es lo que guarda el almacén, `action` adónde
+van las filas antiguas, y `refill` lo que se vuelve a leer de GitHub. Sale una
+vez por almacén y cambio, seguido de `refill starting`, `refill complete` y
+`reconciled`, y luego la primera pasada.
+
+**`migration noted: nothing is changed` o `migration frozen`.** Tampoco son
+errores. Una nota es un cambio que nada puede arreglar, como las filas de
+`gh_actions_cache_entry` fechadas antes de la 2.6.0, y una medida congelada es
+una que ya no escribe nada de lo que corre esta configuración. Cada una se dice
+una vez en `INFO` y después en `DEBUG`.
+
+**`migration check failed: the store did not answer`.** Al arrancar se preguntó
+al almacén si guarda una forma antigua, y lo rechazó o no respondió en 30
+segundos. No se anotó nada ni cambió nada; la pasada sigue, y el siguiente
+arranque vuelve a preguntar.
+
+**`migration failed`.** El almacén rechazó lo que aplicar le pidió, y el cambio
+sigue pendiente; los demás almacenes siguieron adelante. `err` dice por qué, y
+el motivo habitual es una credencial que puede escribir y no borrar: el token de
+InfluxDB 3 tiene que poder borrar una tabla, y el error lleva el mismo borrado
+como un `curl` para ejecutarlo a mano; el usuario de PostgreSQL tiene que ser
+dueño de la tabla, como lo es cuando la creó su propio destino; una clave de
+Elasticsearch necesita `manage` y `delete_index` sobre los índices de su
+prefijo. PostgreSQL además se rinde tras tres esperas de 5 segundos cada una
+detrás de una consulta que tiene la tabla, y una consulta larga de Grafana
+puede serlo. Ejecuta la misma orden otra vez cuando esté arreglada la causa: lo
+aplicado queda anotado y no se hace dos veces.
+
+**`refill did not finish, and is still owed`.** Volver a leer lo despejado se
+detuvo: se paró la ejecución, un almacén rechazó una escritura o GitHub no
+respondió. `resume` dice cómo seguir. El recorrido guarda su punto de control
+junto al fichero de estado, `<nombre>-refill.json`, y `refill owed`, en [cosas
+que sí son errores](#cosas-que-sí-son-errores), es lo que dice de él un arranque
+posterior.
+
+**`not reconciled: the copy and the table could not be compared`.** El
+historial se volvió a leer, y la copia de las filas antiguas no se pudo leer, o
+ya tocaba purgarla. Lo que volvió está en la tabla; solo falta la lista de lo
+que GitHub ya no sirve, y mientras la copia siga ahí se puede leer a mano.
+
+**`set-aside copy not purged` o `set-aside copies not listed`.** Un día después
+de que una migración la apartara, ghchronicle no pudo quitar la copia de
+PostgreSQL ni borrar el clon de Elasticsearch, o no pudo preguntar al almacén
+qué copias guarda. Lo vuelve a intentar tras cada pasada y en cada arranque;
+`aside` nombra la copia, que también se puede quitar a mano. InfluxDB 3 purga
+las suyas.
+
+**`the cache file still claims what the cleared store held`.** Una migración no
+pudo reescribir el fichero de caché para olvidar los rechazos, y las ejecuciones
+de workflow ya escritas, de las familias que vuelve a leer, así que esas
+familias pueden seguir saltándose lo que el almacén despejado ya no guarda. Con
+el servicio parado, borrar `<nombre>-cache.bin` cuesta una pasada a precio
+completo: [la caché que hay a su
+lado](/ghchronicle/es/configuration/#la-caché-que-hay-a-su-lado).
+
+**`-migrate -yes` responde `process N (ghchronicle ..., service, since ...)
+holds ...-lock`.** El servicio, u otro `-migrate -yes`, tiene el fichero de
+estado, y no se cambió nada. Páralo, o deja que termine, y ejecuta la orden otra
+vez. En Docker, N es el proceso con el número que le da el contenedor del
+propio servicio.
+
+**`waiting for the process holding the state file to finish`.** El servicio se
+arrancó mientras `-migrate -yes` corría sobre el mismo fichero de estado.
+Espera a que termine y luego arranca sobre lo que dejó.
+
+**`another ghchronicle service keeps the same state file`.** Se arrancó un
+segundo servicio sobre un fichero de estado que ya tiene uno en marcha, y se
+rechazó, porque dos servicios que guardan un mismo fichero de estado deshacen
+las marcas del otro. Para uno, o da a cada uno su propio `state_file`.
+
+**`the state file cannot be locked, so -migrate -yes cannot tell this service
+is running`.** El servicio no pudo crear ni abrir `<nombre>-lock` junto al
+fichero de estado: el directorio no es escribible, o una ejecución como otro
+usuario, casi siempre root, creó el fichero. El servicio corre sin el candado, y
+entonces `-migrate -yes` se niega a correr, porque nada impediría que el
+servicio arrancara por debajo de él a medias. Ejecútalo con el usuario del
+servicio: [tras una
+actualización](/ghchronicle/es/install/systemd/#tras-una-actualización).
+
 ## El PostgreSQL que conecta
 
 **`could not reach its database`.** El sink conecta en la primera escritura y

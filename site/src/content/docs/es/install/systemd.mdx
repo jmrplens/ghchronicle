@@ -82,11 +82,15 @@ casi nada: un socket TCP saliente y un directorio escribible.
 dueño correcto al arrancar, así que el fichero de estado tiene dónde vivir sin
 un `mkdir` manual y un `chown` que alguien olvidará tras una reinstalación.
 
-Ahí viven tres ficheros, no uno. Junto a `state.json` la pasada guarda su
+Ahí viven cuatro ficheros, no uno. Junto a `state.json` la pasada guarda su
 registro de escrituras, `state-written.bin` por omisión, que es lo que evita
 volver a escribir un punto que no ha cambiado, y su caché, `state-cache.bin`,
 que es lo que permite a un reinicio preguntar a GitHub solo por lo que cambió;
-`ReadWritePaths` cubre el directorio, así que los tres están ya permitidos. Si
+y el servicio mantiene `state-lock` mientras corre, que es como `-migrate -yes`
+sabe que no debe cambiar los almacenes por debajo de él. Un relleno, o la
+relectura de una [migración](/ghchronicle/es/install/upgrading/#migraciones),
+que se detiene a medias deja también ahí su punto de control. `ReadWritePaths`
+cubre el directorio, así que todos están ya permitidos. Si
 pones el fichero de estado o el registro en otro sitio, esa ruta hay que
 añadirla aquí, y la caché sigue al fichero de estado vaya donde vaya. Perder el
 registro cuesta una pasada de reescritura:
@@ -116,6 +120,7 @@ perder la caché, una pasada a precio completo:
       - state.json lo crea el servicio
       - state-written.bin el registro de escrituras, al lado
       - state-cache.bin la caché, también al lado
+      - state-lock lo mantiene el servicio mientras corre
 
     </FileTree>
 
@@ -164,7 +169,7 @@ level=INFO msg="rate budget" bucket=core remaining=4477 limit=5000
 bueno](/ghchronicle/es/configuration/logging/#qué-dice-el-log-un-día-bueno)
 tiene todas las líneas de rutina.
 
-Dos avisos merecen una alerta:
+Tres avisos merecen una alerta:
 
 - **`rate limit reserve reached`** significa que se saltó una familia para
   proteger el presupuesto. Una vez está bien; en cada pasada significa que las
@@ -172,6 +177,10 @@ Dos avisos merecen una alerta:
 - **`family failed everywhere, not marking it as run`** significa que todos los
   repositorios fallaron en una familia, así que se reintentará en vez de darla
   por hecha.
+- **`migration pending`**, en cada arranque tras una actualización, significa
+  que un almacén aún guarda filas con una forma que esta versión ya no escribe,
+  y que el arranque las dejó: mira [tras una
+  actualización](#tras-una-actualización).
 
 ```sh
 journalctl -u ghchronicle -f
@@ -183,6 +192,39 @@ journalctl -u ghchronicle -p warning --since today
   el sandbox no está cubriendo. Es la forma más rápida de ver que una edición
   quitó en silencio una restricción.
 </Aside>
+
+## Tras una actualización
+
+Sustituye el binario y reinicia el servicio. Con el valor por omisión,
+[`migrate: auto`](/ghchronicle/es/configuration/#migrate), el arranque comprueba
+cada almacén frente a los cambios que trae la nueva versión y, antes de su
+primera pasada, aplica por su cuenta cada uno que no pierde nada, y lo dice en
+`WARN`. Un cambio que deja es un `WARN` en cada arranque, con el almacén, el
+motivo y las dos órdenes: [lo que hace un
+arranque](/ghchronicle/es/install/upgrading/#lo-que-hace-un-arranque).
+
+Ejecútalas con el propio usuario del servicio y con su fichero de entorno, con
+el servicio parado, porque `-migrate -yes` se niega a correr a su lado:
+
+```sh
+sudo systemctl stop ghchronicle
+sudo systemd-run --uid=ghchronicle --gid=ghchronicle --pipe --wait --collect \
+  --property=EnvironmentFile=/etc/ghchronicle/ghchronicle.env \
+  /usr/local/bin/ghchronicle -config /etc/ghchronicle/config.yaml -migrate
+sudo systemd-run --uid=ghchronicle --gid=ghchronicle --pipe --wait --collect \
+  --property=EnvironmentFile=/etc/ghchronicle/ghchronicle.env \
+  /usr/local/bin/ghchronicle -config /etc/ghchronicle/config.yaml -migrate -yes
+sudo systemctl start ghchronicle
+```
+
+La primera imprime el plan y no cambia nada; la segunda lo aplica y vuelve a
+leer lo que despejó. `systemd-run` lee el fichero de entorno como root, igual que
+la unidad, así que puede seguir en modo 600, y ejecuta el binario como
+`ghchronicle`: medido en systemd 257, una orden lanzada así vio el token de un
+fichero que solo root podía leer y corrió como el usuario indicado. Si la lanza
+root, `-migrate -yes` guarda como de root, en modo 600, los ficheros que
+reescribe junto al de estado, `state.json` entre ellos, y el servicio, que corre
+como `ghchronicle`, ya no puede leer lo que recuerda.
 
 ## cron en vez de un servicio
 
