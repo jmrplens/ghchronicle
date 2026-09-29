@@ -121,8 +121,11 @@ The client asks once more two seconds later and says nothing about it, so a
 line like this is a request that failed twice, and the next sweep asks again.
 A GraphQL query is asked again the same way, but for one answer: a `502` or a
 `504` that took GitHub's ten seconds to come back is a query too large, which
-the collectors ask again with a smaller page or take as the end of their walk,
-and a line naming one says the query is too large for one request.
+the collectors that have a smaller page ask again with it. A line that says the
+query is too large for one request is one that timed out even at the smallest
+page, or in a walk with no smaller page to ask. What was read before it is
+written, a backfill does not record that repository as walked, and the next
+sweep reads it again.
 
 **`state not saved` or `cache file not saved`.** The user the collector runs as
 could not put the file in place. Each of the two is written under a temporary

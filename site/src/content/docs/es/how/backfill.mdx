@@ -368,10 +368,16 @@ doce páginas de los recorridos de commits del propio autor se toparon con él,
 en seis repositorios. Ambos recorridos parten su página por la mitad y
 reintentan sobre el mismo cursor, en silencio: ninguno de los dos colectores
 lleva registrador, así que un relleno de un repositorio activo lo muestra solo
-como una familia más lenta, nunca como una línea. Solo esa respuesta parte la
-página: un `503`, o un `502` que vuelve antes de diez segundos, no es una
-consulta con la que a la pasarela se le acabó el tiempo, y [el cliente la
-vuelve a preguntar una vez
+como una familia más lenta, nunca como una línea. Una página con la que la
+pasarela aún se rinde en diez, y un tiempo límite en cualquier recorrido sin
+página más pequeña que pedir, es un fallo: se escriben las filas leídas antes,
+la línea `collector failed` dice que la consulta es demasiado grande para una
+sola petición, y el repositorio no se anota en el punto de control, así que al
+reanudar se vuelve a recorrer. Hasta 2.6.3 el recorrido de commits tomaba el
+tiempo límite por el final del historial y anotaba el repositorio como
+recorrido. Solo esa respuesta parte la página: un `503`, o un `502` que vuelve
+antes de diez segundos, no es una consulta con la que a la pasarela se le acabó
+el tiempo, y [el cliente la vuelve a preguntar una vez
 más](/ghchronicle/es/api/#una-respuesta-que-github-no-pudo-terminar-se-pregunta-una-vez-más)
 con el mismo tamaño.
 

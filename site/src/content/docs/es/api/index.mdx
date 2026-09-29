@@ -200,9 +200,9 @@ las mismas pasadas, de 66.821 consultas GitHub respondió 42 con un `502` tras
 10,45 a 11,20 segundos, 9 con un `504` tras 11,03 a 11,23, y 3 con un `503`
 tras 0,70 a 1,08 segundos. Cada una de esas tres costó un punto y era una
 página de un historial de commits, y por eso un fallo rápido no se lee como
-una consulta demasiado grande: el recorrido de commits toma una como el final
-de lo que puede leer, y cada una de las tres detuvo ahí su recorrido y lo dio
-por bueno. Una consulta que falla dos veces es un fallo que el colector
+una consulta demasiado grande: el recorrido de commits tomaba entonces una
+como el final de lo que podía leer, y cada una de las tres detuvo ahí su
+recorrido y lo dio por bueno. Una consulta que falla dos veces es un fallo que el colector
 informa, y la pasada siguiente vuelve a preguntar; también lo es una respuesta
 que no es JSON y no es ese tiempo límite, que no es respuesta GraphQL alguna.
 
@@ -222,8 +222,18 @@ Lo que no se vuelve a preguntar:
 - **El tiempo límite de GraphQL de GitHub.** Un `502` o un `504` a una
   consulta que estuvo diez segundos en marcha significa una consulta demasiado
   grande para responderla en ellos, con la que la misma consulta volvería a
-  toparse; los colectores vuelven a preguntar sobre el mismo cursor con una
-  página más pequeña, o detienen el recorrido donde está.
+  toparse. Los recorridos de pull requests, de commits y de pull requests en
+  coautoría vuelven a preguntar sobre el mismo cursor con media página, hasta
+  diez, y una consulta sobre varios repositorios a la vez se vuelve a preguntar
+  con la mitad de ellos, hasta uno. Lo que aún agota el tiempo ahí, y cualquier
+  otro recorrido o consulta suelta, es un fallo que el colector informa junto
+  con las filas que leyó antes, nunca el final de lo que hay que leer: un
+  relleno no anota ese repositorio como recorrido, y la pasada siguiente lo
+  vuelve a leer. Hasta 2.6.3 un recorrido sin página más pequeña que pedir
+  tomaba el tiempo límite por el final de sus datos y lo daba por bueno, lo que
+  en la cuenta del autor detuvo doce recorridos de commits, todos con páginas
+  de cincuenta; preguntados a mano, veinticinco de los mismos commits
+  respondieron en menos de cinco segundos.
 
 ## El presupuesto en el log
 

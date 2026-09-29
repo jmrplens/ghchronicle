@@ -126,9 +126,11 @@ nada de ello, así que una línea como esta es una petición que falló dos vece
 la siguiente pasada vuelve a preguntar. Una consulta GraphQL se vuelve a
 preguntar del mismo modo, salvo por una respuesta: un `502` o un `504` que tardó
 los diez segundos de GitHub en volver es una consulta demasiado grande, que los
-colectores vuelven a preguntar con una página más pequeña o toman como el final
-de su recorrido, y una línea que nombra una dice que la consulta es demasiado
-grande para una sola petición.
+colectores que tienen una página más pequeña vuelven a preguntar con ella. Una
+línea que dice que la consulta es demasiado grande para una sola petición es
+una que agotó el tiempo incluso con la página más pequeña, o en un recorrido
+sin página más pequeña que pedir. Lo leído antes se escribe, un relleno no
+anota ese repositorio como recorrido, y la pasada siguiente lo vuelve a leer.
 
 **`state not saved` o `cache file not saved`.** El usuario con el que corre el
 colector no pudo poner el fichero en su sitio. Cada uno de los dos se escribe

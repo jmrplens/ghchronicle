@@ -198,12 +198,14 @@ by cursor, and the GraphQL gateway answers a hundred pull requests with their
 reviews, and fifty commits of a busy repository with their checks, with an
 HTML 502 after ten seconds (`ghapi.TooLargeError`), so `Pulls` and `Commits`
 halve their page and retry on the same cursor; `Commits` counts what it may
-read in commits, so a sweep's one page of fifty is two of twenty-five. The
-star history is handed `collect.Unbounded` instead until the state file records
-`history_read` for the repository, which only a walk that reached the end of
-the history sets (`StarHistory.Read` says whether it did), so the first sweep
-after upgrading and any walk cut short, by an error or by a 403 or 404 past
-page one, read the whole history once. A 404 on page one, which is every repository on GitHub
+read in commits, so a sweep's one page of fifty is two of twenty-five. A walk
+the timeout stops is a failure, never the end of the data: it returns the rows
+it read with the error, and a backfill leaves that repository out of its
+checkpoint. The star history is handed `collect.Unbounded` instead until the
+state file records `history_read` for the repository, which only a walk that
+reached the end of the history sets (`StarHistory.Read` says whether it did),
+so the first sweep after upgrading and any walk cut short, by an error or by a
+403 or 404 past page one, read the whole history once. A 404 on page one, which is every repository on GitHub
 Enterprise Server, leaves it unset too.
 
 **A gateway error means one thing in REST and another in GraphQL.** A REST 502
@@ -220,9 +222,15 @@ took GitHub's documented ten seconds (`ghapi.GraphQLTimeoutWindow`; all 51 in
 the production proxy's log came after 10.45 to 11.23 s) is the query being too
 large (`TooLargeError`), which the same query would only time out on again, so
 `Pulls`, `Commits` and the co-authored walk halve their page on the same
-cursor, an aliased batch (`aliasBatch`) halves the batch, and the other walks
-keep what they read and stop. Any other 500, 502, 503 or 504 to a query is
-asked once more like a GET, on the same page: the log's three 503s came after
+cursor down to ten, and an aliased batch (`aliasBatch`, and `Branches`' own)
+halves the batch down to one. What still times out there, and every other walk
+or single query, hands `TooLargeError` up with what it read: a failure the
+runner writes, reports as `query too large` and keeps out of a backfill's
+checkpoint. Up to 2.6.3 `collect.isSkippableGraphQL` read it as "nothing
+here", and twelve commit walks in production ended at it as though the history
+had run out and reported success; that function is for NOT_FOUND, FORBIDDEN,
+403, 404 and 202 alone. Any other 500, 502, 503 or 504 to a query is asked
+once more like a GET, on the same page: the log's three 503s came after
 0.70 to 1.08 s, and each, read as too large, ended a commit walk as though the
 history had run out and reported success. A query that fails twice, or an
 answer that is not JSON and not that timeout, is a `StatusError`, a failure.

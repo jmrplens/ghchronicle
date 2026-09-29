@@ -560,7 +560,9 @@ func (e *UnavailableError) Error() string {
 
 // TooLargeError means the GraphQL gateway gave up on a query before finishing it.
 // Measured: an HTML 502 at about ten seconds, independent of the point cost.
-// The remedy is a smaller page, not a retry of the same one.
+// The remedy is a smaller page, not a retry of the same one, and a collector
+// with no smaller page to ask hands it up as the failure it is: it is not the
+// end of what there is to read.
 //
 // Only a 502 or a 504 that took GitHub's timeout window to arrive is one (see
 // GraphQLTimeoutWindow). A quicker failure is not the query running out of
@@ -827,10 +829,10 @@ func replayable(raw []byte, out any) []byte {
 //
 // A GraphQL query is asked again by the same retry, with one answer left out:
 // GitHub's timeout, a query too large for ten seconds (TooLargeError), which
-// the same query asked again would only time out on again, so the collectors
-// ask again on the same cursor with a smaller page instead; see graphql. Both
-// keep what the walk already read and ask again from where it stopped; each
-// asks the way its own failure can be fixed.
+// the same query asked again would only time out on again, so a collector
+// with a smaller page or batch to ask asks it on the same cursor instead, and
+// one with none reports the timeout; see graphql. Both keep what the walk
+// already read, and each asks the way its own failure can be fixed.
 func (c *Client) send(ctx context.Context, path string, req *http.Request, do func(*http.Request) (*http.Response, error)) (*http.Response, error) {
 	resp, _, err := c.sendTwice(ctx, path, req, do, true, restAgain)
 	return resp, err
@@ -1160,7 +1162,7 @@ func (c *Client) graphql(ctx context.Context, query string, vars map[string]any,
 	// takes more than ten, each a page of a commit history 28 to 2,488 pages
 	// into a walk, and each moved the budget's used count by one. Read as too
 	// large, each ended its repository's walk there, since the commit walk
-	// takes that as the end of what can be read, and the walk reported
+	// then took that as the end of what could be read, and the walk reported
 	// success; the next query, the next repository's first page, was
 	// answered. A walk that halves its page would have halved it for nothing.
 	resp, took, err := c.sendTwice(ctx, graphqlPath, req, c.http.Do, charged, c.queryAgain)
@@ -1179,7 +1181,8 @@ func (c *Client) graphql(ctx context.Context, query string, vars map[string]any,
 	if resp.StatusCode >= 500 || !strings.Contains(resp.Header.Get("Content-Type"), "json") {
 		// The gateway answers a query it cannot finish in ten seconds with
 		// an HTML 502 or a 504, whatever the point cost. That is a request
-		// too large, not a server down, and the caller should shrink it.
+		// too large, not a server down, and the caller should shrink it, or
+		// report it where it has nothing smaller to ask.
 		if c.timedOut(resp.StatusCode, took) {
 			return &TooLargeError{Status: resp.StatusCode}
 		}

@@ -191,9 +191,10 @@ func (cm Commits) Collect(ctx context.Context, c *ghapi.Client, repo Repo, _ tim
 				continue
 			}
 			// An empty repository has no default branch, which is not a
-			// failure. Neither is a page that still times out at ten. A
-			// spent budget or a canceled sweep is, and returning the pages
-			// walked so far with no error would hide it.
+			// failure. A page the gateway still gives up on at ten is, and so
+			// are a spent budget and a canceled sweep: each is handed up with
+			// the pages walked so far, which the runner writes, reports and
+			// keeps out of a backfill's checkpoint.
 			if isSkippableGraphQL(err) {
 				return points, nil
 			}
