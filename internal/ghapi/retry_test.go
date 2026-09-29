@@ -3,11 +3,17 @@ package ghapi
 import (
 	"context"
 	"errors"
+	"io"
+	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
+
+	"github.com/jmrplens/ghchronicle/v2/internal/httpx"
 )
 
 // failingFirst answers the first n requests with status and every later one
@@ -36,13 +42,21 @@ func answerJSON(body string) http.HandlerFunc {
 	}
 }
 
-// TestAGatewayErrorIsAskedOnceMore is issue #89: the artifact listing of two
-// repositories answered 502 after ten seconds on 15 of 54 passes, and a pass
-// that met one lost the repository's storage total. A second attempt is what
-// the next pass got, so it is what this one gets.
-func TestAGatewayErrorIsAskedOnceMore(t *testing.T) {
+// askedAgainStatuses are the answers send asks once more for: GitHub failing
+// to finish the answer, at its gateway or in the application.
+var askedAgainStatuses = []int{
+	http.StatusInternalServerError, http.StatusBadGateway,
+	http.StatusServiceUnavailable, http.StatusGatewayTimeout,
+}
+
+// TestAFailureToFinishIsAskedOnceMore is issue #89 and its sequel: the
+// artifact listing of two repositories answered 502 after ten seconds on 15
+// of 54 passes, one of them later 500 after eight, and a pass that met either
+// lost the repository's storage total. A second attempt is what the next pass
+// got, so it is what this one gets.
+func TestAFailureToFinishIsAskedOnceMore(t *testing.T) {
 	t.Parallel()
-	for _, status := range []int{http.StatusBadGateway, http.StatusGatewayTimeout} {
+	for _, status := range askedAgainStatuses {
 		t.Run(strconv.Itoa(status), func(t *testing.T) {
 			t.Parallel()
 			c, calls := failingFirst(t, 1, status, answerJSON(`{"total_count": 29405}`))
@@ -66,31 +80,39 @@ func TestAGatewayErrorIsAskedOnceMore(t *testing.T) {
 	}
 }
 
-// TestTwoGatewayErrorsInARowReturnTheStatus: once, not until it works. The
-// second answer is the one returned, with its status and its body.
-func TestTwoGatewayErrorsInARowReturnTheStatus(t *testing.T) {
+// TestTwoFailuresInARowReturnTheStatus: once, not until it works. The second
+// answer is the one returned, with its status and its body.
+func TestTwoFailuresInARowReturnTheStatus(t *testing.T) {
 	t.Parallel()
-	c, calls := failingFirst(t, 2, http.StatusBadGateway, answerJSON(`{}`))
-	_, _, err := c.GetJSON(context.Background(), "/repos/o/n/actions/artifacts?per_page=100&page=2", &struct{}{}, "")
-	se, ok := errors.AsType[*StatusError](err)
-	if !ok || se.Code != http.StatusBadGateway || se.Body != `{"message":"Server Error"}` {
-		t.Fatalf("err = %v, want the second 502 as a StatusError with its body", err)
-	}
-	if se.Path != "/repos/o/n/actions/artifacts?per_page=100&page=2" {
-		t.Errorf("Path = %q, want the request", se.Path)
-	}
-	if n := calls.Load(); n != 2 {
-		t.Errorf("the server saw %d requests, want exactly two", n)
+	for _, status := range askedAgainStatuses {
+		t.Run(strconv.Itoa(status), func(t *testing.T) {
+			t.Parallel()
+			c, calls := failingFirst(t, 2, status, answerJSON(`{}`))
+			_, _, err := c.GetJSON(context.Background(), "/repos/o/n/actions/artifacts?per_page=100&page=2", &struct{}{}, "")
+			se, ok := errors.AsType[*StatusError](err)
+			if !ok || se.Code != status || se.Body != `{"message":"Server Error"}` {
+				t.Fatalf("err = %v, want the second %d as a StatusError with its body", err, status)
+			}
+			if se.Path != "/repos/o/n/actions/artifacts?per_page=100&page=2" {
+				t.Errorf("Path = %q, want the request", se.Path)
+			}
+			if n := calls.Load(); n != 2 {
+				t.Errorf("the server saw %d requests, want exactly two", n)
+			}
+		})
 	}
 }
 
-// TestOnlyTheGatewayStatusesAreAskedAgain: a 500 or a 503 is not a gateway
-// that ran out of time, and neither is a refusal or a spent budget.
-func TestOnlyTheGatewayStatusesAreAskedAgain(t *testing.T) {
+// TestARefusalIsNotAskedAgain: a 4xx is the same answer asked again, and so
+// is a 5xx that says the request itself will never be served. Only the four
+// failures to finish an answer are asked again, not every status from 500.
+func TestARefusalIsNotAskedAgain(t *testing.T) {
 	t.Parallel()
 	for _, status := range []int{
-		http.StatusInternalServerError, http.StatusServiceUnavailable,
-		http.StatusNotFound, http.StatusForbidden, http.StatusUnprocessableEntity,
+		http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden,
+		http.StatusNotFound, http.StatusConflict, http.StatusGone,
+		http.StatusUnprocessableEntity, http.StatusTooManyRequests,
+		http.StatusNotImplemented, http.StatusHTTPVersionNotSupported,
 	} {
 		t.Run(strconv.Itoa(status), func(t *testing.T) {
 			t.Parallel()
@@ -151,24 +173,29 @@ func TestTheRetryAsksWithTheSameValidator(t *testing.T) {
 	}
 }
 
-// TestTheRetryIsBraked: a 502 is charged, and the brake reads its headers
-// like any other answer's. A budget the 502 left at the reserve is not spent
-// on asking again.
+// TestTheRetryIsBraked: a 500 and a 502 are charged, and the brake reads
+// their headers like any other answer's. A budget the failure left at the
+// reserve is not spent on asking again.
 func TestTheRetryIsBraked(t *testing.T) {
 	t.Parallel()
-	var calls atomic.Int32
-	c, _ := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
-		calls.Add(1)
-		rateHeaders(w, "core", 5000, 10, time.Now().Add(time.Hour))
-		w.WriteHeader(http.StatusBadGateway)
-	})
-	c.SetReserve(500, false)
-	_, _, err := c.GetJSON(context.Background(), "/p", &struct{}{}, "")
-	if _, ok := errors.AsType[*RateLimitedError](err); !ok {
-		t.Errorf("err = %v, want the brake's refusal", err)
-	}
-	if n := calls.Load(); n != 1 {
-		t.Errorf("the server saw %d requests, want only the one that spent the budget", n)
+	for _, status := range askedAgainStatuses {
+		t.Run(strconv.Itoa(status), func(t *testing.T) {
+			t.Parallel()
+			var calls atomic.Int32
+			c, _ := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+				calls.Add(1)
+				rateHeaders(w, "core", 5000, 10, time.Now().Add(time.Hour))
+				w.WriteHeader(status)
+			})
+			c.SetReserve(500, false)
+			_, _, err := c.GetJSON(context.Background(), "/p", &struct{}{}, "")
+			if _, ok := errors.AsType[*RateLimitedError](err); !ok {
+				t.Errorf("err = %v, want the brake's refusal", err)
+			}
+			if n := calls.Load(); n != 1 {
+				t.Errorf("the server saw %d requests, want only the one that spent the budget", n)
+			}
+		})
 	}
 }
 
@@ -262,21 +289,200 @@ func TestGetTextAsksAGatewayErrorOnceMore(t *testing.T) {
 	}
 }
 
-// TestGraphQLIsNotAskedAgainByTheClient: the gateway's 502 on a query is a
-// query too large, and the collectors ask again with a smaller page. Asking
-// the same one again here would be ten more seconds for the same answer.
+// TestGraphQLIsNotAskedAgainByTheClient: a query is a POST, and the
+// gateway's 502 on one is a query too large, which the collectors ask again
+// with a smaller page. Asking the same one again here would be ten more
+// seconds for the same answer.
 func TestGraphQLIsNotAskedAgainByTheClient(t *testing.T) {
 	t.Parallel()
-	var calls atomic.Int32
-	c, _ := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
-		calls.Add(1)
-		w.Header().Set("Content-Type", "text/html")
-		w.WriteHeader(http.StatusBadGateway)
-	})
-	if _, ok := errors.AsType[*TooLargeError](c.GraphQL(context.Background(), "{}", nil, nil)); !ok {
-		t.Error("a 502 on a query is no longer a TooLargeError")
+	for _, status := range askedAgainStatuses {
+		t.Run(strconv.Itoa(status), func(t *testing.T) {
+			t.Parallel()
+			var calls atomic.Int32
+			c, _ := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+				calls.Add(1)
+				w.Header().Set("Content-Type", "text/html")
+				w.WriteHeader(status)
+			})
+			if _, ok := errors.AsType[*TooLargeError](c.GraphQL(context.Background(), "{}", nil, nil)); !ok {
+				t.Errorf("a %d on a query is no longer a TooLargeError", status)
+			}
+			if n := calls.Load(); n != 1 {
+				t.Errorf("the server saw %d queries, want one", n)
+			}
+		})
 	}
-	if n := calls.Load(); n != 1 {
-		t.Errorf("the server saw %d queries, want one", n)
+}
+
+// roundTrip is a transport made of a function, for a failure no server can
+// be made to give on demand, and for counting what the client sent.
+type roundTrip func(*http.Request) (*http.Response, error)
+
+func (f roundTrip) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+// counted wraps a transport so a test can see how many requests the client
+// made through it, including the ones that never reached a server.
+func counted(inner http.RoundTripper) (http.RoundTripper, *atomic.Int32) {
+	var n atomic.Int32
+	return roundTrip(func(r *http.Request) (*http.Response, error) {
+		n.Add(1)
+		return inner.RoundTrip(r)
+	}), &n
+}
+
+// lookupFailed is the error a DNS lookup that could not be made comes back
+// as, shaped as the job log's download met it on 2026-09-28: net/http wraps
+// it in a *url.Error on the way out, as it would a real one.
+func lookupFailed(host string) error {
+	return &net.OpError{Op: "dial", Net: "tcp", Err: &net.DNSError{
+		Err:  "dial udp [fe80::1%enp1s0]:53: connect: invalid argument",
+		Name: host, Server: "[fe80::1%enp1s0]:53",
+	}}
+}
+
+// networkFailure is one way a request can get no answer at all: the base URL
+// a client is pointed at, the transport it goes through, how many
+// connections the far end accepted, and what the error must carry.
+type networkFailure struct {
+	name     string
+	setup    func(t *testing.T) (base string, rt http.RoundTripper, accepted *atomic.Int32)
+	carrying func(error) bool
+}
+
+// networkFailures are made for real where a local socket can make them, and
+// injected where only a resolver could: a lookup is the one kind production
+// met, and a test cannot make the host's resolver fail.
+func networkFailures() []networkFailure {
+	return []networkFailure{
+		{
+			name: "a DNS lookup that failed",
+			setup: func(*testing.T) (string, http.RoundTripper, *atomic.Int32) {
+				return "http://api.example.test", roundTrip(func(r *http.Request) (*http.Response, error) {
+					return nil, lookupFailed(r.URL.Hostname())
+				}), &atomic.Int32{}
+			},
+			carrying: func(err error) bool { _, ok := errors.AsType[*net.DNSError](err); return ok },
+		},
+		{
+			name: "a connection refused",
+			setup: func(t *testing.T) (string, http.RoundTripper, *atomic.Int32) {
+				t.Helper()
+				ln, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
+				if err != nil {
+					t.Fatal(err)
+				}
+				addr := ln.Addr().String()
+				_ = ln.Close()
+				return "http://" + addr, httpx.OwnTransport(), &atomic.Int32{}
+			},
+			carrying: func(err error) bool {
+				op, ok := errors.AsType[*net.OpError](err)
+				return ok && op.Op == "dial"
+			},
+		},
+		{
+			name: "a connection reset",
+			setup: func(t *testing.T) (string, http.RoundTripper, *atomic.Int32) {
+				t.Helper()
+				accepted := serve(t, func(conn net.Conn) {
+					// Read the request, then close with no linger, which
+					// sends a reset rather than an orderly end.
+					_, _ = conn.Read(make([]byte, 4096))
+					if tcp, ok := conn.(*net.TCPConn); ok {
+						_ = tcp.SetLinger(0)
+					}
+					_ = conn.Close()
+				})
+				return "http://" + accepted.addr, httpx.OwnTransport(), &accepted.n
+			},
+			carrying: func(err error) bool {
+				return errors.Is(err, syscall.ECONNRESET) || errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)
+			},
+		},
+		{
+			name: "a TLS handshake that timed out",
+			setup: func(t *testing.T) (string, http.RoundTripper, *atomic.Int32) {
+				t.Helper()
+				accepted := serve(t, func(conn net.Conn) {
+					// Say nothing until the test is over.
+					<-t.Context().Done()
+					_ = conn.Close()
+				})
+				rt := httpx.OwnTransport()
+				rt.TLSHandshakeTimeout = 100 * time.Millisecond
+				return "https://" + accepted.addr, rt, &accepted.n
+			},
+			carrying: func(err error) bool { return err != nil && strings.Contains(err.Error(), "TLS handshake timeout") },
+		},
+	}
+}
+
+// listening is a raw TCP server whose answers a test decides, and how
+// many connections it has accepted.
+type listening struct {
+	addr string
+	n    atomic.Int32
+}
+
+func serve(t *testing.T, handle func(net.Conn)) *listening {
+	t.Helper()
+	ln, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+	l := &listening{addr: ln.Addr().String()}
+	go func() {
+		for {
+			conn, acceptErr := ln.Accept()
+			if acceptErr != nil {
+				return
+			}
+			l.n.Add(1)
+			go handle(conn)
+		}
+	}()
+	return l
+}
+
+// TestANetworkFailureIsNotAskedAgain: a request that got no answer at all
+// is left to the next pass. The lookups measured had already been asked
+// twice by the resolver when they failed, and the other three kinds never
+// appeared in 457,098 requests; see send.
+func TestANetworkFailureIsNotAskedAgain(t *testing.T) {
+	t.Parallel()
+	asks := map[string]func(*Client) error{
+		"GetJSON": func(c *Client) error {
+			_, _, err := c.GetJSON(context.Background(), "/repos/o/n/actions/artifacts", &struct{}{}, "")
+			return err
+		},
+		"GetText": func(c *Client) error {
+			_, err := c.GetText(context.Background(), "/repos/o/n/actions/jobs/1/logs")
+			return err
+		},
+	}
+	for _, failure := range networkFailures() {
+		for how, ask := range asks {
+			t.Run(failure.name+"/"+how, func(t *testing.T) {
+				t.Parallel()
+				base, rt, accepted := failure.setup(t)
+				c := New("test-token", 5*time.Second)
+				c.SetBaseURL(base)
+				c.SetRetryPause(0)
+				var sent *atomic.Int32
+				c.http.Transport, sent = counted(rt)
+				err := ask(c)
+				t.Log(err)
+				if !failure.carrying(err) {
+					t.Fatalf("err = %v, want %s", err, failure.name)
+				}
+				if n := sent.Load(); n != 1 {
+					t.Errorf("the client sent %d requests, want one", n)
+				}
+				if n := accepted.Load(); n > 1 {
+					t.Errorf("the far end accepted %d connections, want at most one", n)
+				}
+			})
+		}
 	}
 }

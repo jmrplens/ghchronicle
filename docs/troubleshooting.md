@@ -114,12 +114,13 @@ for one family, so it will be retried rather than treated as done. One
 repository failing is normal; all of them is the token, the network or an
 outage.
 
-**`collector failed` naming a `502 Bad Gateway` or a `504 Gateway Timeout`.**
-GitHub's gateway gave up on a REST request. The client asks once more two
-seconds later and says nothing about it, so a line like this is a request that
-failed twice, and the next sweep asks again. GitHub's GraphQL gateway gives up
-the same way on a query too large for its ten seconds, and there the collectors
-ask again with a smaller page instead.
+**`collector failed` naming a `500`, a `502 Bad Gateway`, a `503` or a `504
+Gateway Timeout`.** GitHub did not finish the answer to a REST request, at its
+gateway or in the application. The client asks once more two seconds later and
+says nothing about it, so a line like this is a request that failed twice, and
+the next sweep asks again.
+GitHub's GraphQL gateway gives up the same way on a query too large for its ten
+seconds, and there the collectors ask again with a smaller page instead.
 
 **`state not saved` or `cache file not saved`.** The user the collector runs as
 could not put the file in place. Each of the two is written under a temporary

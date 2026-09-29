@@ -1830,8 +1830,9 @@ func TestPackageCountPagesEveryRegistry(t *testing.T) {
 		{"ten full pages", map[string]map[string]int{"container": tenFull}, 0, 1000, 10 + 5},
 		{"a registry it cannot list", map[string]map[string]int{"container": {"1": -404}, "npm": {"1": 3}}, 0, 3, 6},
 		{"a page past the limit", map[string]map[string]int{"container": {"1": 100, "2": -422}, "npm": {"1": 2}}, 0, 102, 7},
-		{"a broken listing under GraphQL's count", map[string]map[string]int{"container": {"1": 3}, "npm": {"1": -500}}, 5, 5, 2},
-		{"a broken listing over GraphQL's count", map[string]map[string]int{"container": {"1": 3}, "npm": {"1": -500}}, 1, 3, 2},
+		// Three requests: the broken page is asked once more by the client.
+		{"a broken listing under GraphQL's count", map[string]map[string]int{"container": {"1": 3}, "npm": {"1": -500}}, 5, 5, 3},
+		{"a broken listing over GraphQL's count", map[string]map[string]int{"container": {"1": 3}, "npm": {"1": -500}}, 1, 3, 3},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()

@@ -118,11 +118,11 @@ repositorios en una familia, así que se reintentará en vez de darse por hecha.
 Que falle un repositorio es normal; que fallen todos es el token, la red o una
 caída.
 
-**`collector failed` que nombra un `502 Bad Gateway` o un `504 Gateway
-Timeout`.** La pasarela de GitHub se rindió con una petición REST. El cliente
-pregunta una vez más dos segundos después y no dice nada de ello, así que una
-línea como esta es una petición que falló dos veces, y la siguiente pasada
-vuelve a preguntar. La pasarela GraphQL de GitHub se rinde igual con una
+**`collector failed` que nombra un `500`, un `502 Bad Gateway`, un `503` o un
+`504 Gateway Timeout`.** GitHub no terminó la respuesta a una petición REST, en
+su pasarela o en la aplicación. El cliente pregunta una vez más dos segundos
+después y no dice nada de ello, así que una línea como esta es una petición que
+falló dos veces, y la siguiente pasada vuelve a preguntar. La pasarela GraphQL de GitHub se rinde igual con una
 consulta demasiado grande para sus diez segundos, y ahí los colectores vuelven
 a preguntar con una página más pequeña.
 
