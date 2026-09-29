@@ -264,7 +264,7 @@ func TestContributionMixIsFourSharesOfTheTotal(t *testing.T) {
 		t.Errorf("Elasticsearch divides the counts itself and shows the fraction as %v", unit)
 	}
 	raw := asJSON(t, es["transformations"])
-	if !strings.Contains(raw, `"reducer":"sum"`) || strings.Count(raw, `"operator":"/"`) != len(mixParts) {
+	if !strings.Contains(raw, `"reducer":"sum"`) || strings.Count(raw, `"operator":"/","right":"Total"`) != len(mixParts) {
 		t.Errorf("the Elasticsearch shares are not each count over the row's sum: %s", raw)
 	}
 }

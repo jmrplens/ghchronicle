@@ -3904,7 +3904,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "The four kinds of contribution as shares of their sum over the last year, the mix the profile draws as a radar: commits, pull requests, issues and code review. The percentages are computed from the totals beside this, and the four add up to a hundred.",
+          "description": "The four kinds of contribution as shares of their sum over the last year, the mix the profile draws as a radar: commits, pull requests, issues and code review. The percentages are computed from the totals beside this, and the four add up to a hundred. Each bar reads \"not read\" over a range no sweep reached, as the totals do, and so does a year with none of the four, which has no mix to draw.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3915,7 +3915,104 @@
               "min": 0,
               "unit": "percentunit"
             },
-            "overrides": []
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Commits"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Pull requests"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Issues"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Code review"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
           },
           "gridPos": {
             "h": 5,
@@ -3946,15 +4043,14 @@
             {
               "bucketAggs": [
                 {
-                  "field": "measurement.keyword",
+                  "field": "@timestamp",
                   "id": "88",
                   "settings": {
+                    "interval": "36500d",
                     "min_doc_count": "1",
-                    "order": "desc",
-                    "orderBy": "_count",
-                    "size": "1"
+                    "trimEdges": "0"
                   },
-                  "type": "terms"
+                  "type": "date_histogram"
                 }
               ],
               "datasource": "${DS_ELASTICSEARCH}",
@@ -3993,6 +4089,61 @@
                   "Top Metrics reviews": "Code review"
                 }
               }
+            },
+            {
+              "id": "reduce",
+              "options": {
+                "mode": "seriesToRows",
+                "reducers": [
+                  "sum",
+                  "count"
+                ]
+              }
+            },
+            {
+              "id": "calculateField",
+              "options": {
+                "alias": "Read",
+                "binary": {
+                  "left": "Count",
+                  "operator": "/",
+                  "right": "Count"
+                },
+                "mode": "binary"
+              }
+            },
+            {
+              "id": "calculateField",
+              "options": {
+                "alias": "Value",
+                "binary": {
+                  "left": "Total",
+                  "operator": "*",
+                  "right": "Read"
+                },
+                "mode": "binary"
+              }
+            },
+            {
+              "id": "groupBy",
+              "options": {
+                "fields": {
+                  "Field": {
+                    "aggregations": [],
+                    "operation": "groupby"
+                  },
+                  "Value": {
+                    "aggregations": [
+                      "lastNotNull"
+                    ],
+                    "operation": "aggregate"
+                  }
+                }
+              }
+            },
+            {
+              "id": "rowsToFields",
+              "options": {}
             },
             {
               "id": "calculateField",

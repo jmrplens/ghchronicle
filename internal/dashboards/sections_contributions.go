@@ -587,6 +587,19 @@ const calendarDesc = "The profile's green squares, as GitHub draws them: a colum
 	"a week."
 
 // contributionMix is the radar the profile draws, as four shares of one sum.
+//
+// It reads the newest snapshot of the range, as the Account group beside it
+// reads the same one, and over a range no sweep reached each bar says so as
+// that group's tiles do, in every store: the SQL stores join the newest row
+// to a row that is always there (alwaysARow), Prometheus reads the largest
+// series of each gauge or NaN (promNewest), Graphite keeps its series of
+// nulls with a fallback for a path never written (grNamed), and Elasticsearch
+// reads esNewest's bucket and makes a field of each part (esSumPerName) for
+// the arithmetic of the row. Each store read the newest reading alone before,
+// which such a range answers with nothing, and the last review of 2.6.4 found
+// the panel drawing "No data" there in four stores and four names with nothing
+// beside them in Graphite (Grafana 13.2.1, over 26 July to 25 August 2025 on
+// the containerised suite).
 func contributionMix(b *builder) Panel {
 	// The four kinds of contribution as shares of their sum, the mix
 	// GitHub draws as a radar on the profile. Computed here, so every store
@@ -606,29 +619,40 @@ func contributionMix(b *builder) Panel {
 		mixGR[i] = grNamed(ref(i), part.To, fmt.Sprintf("asPercent(keepLastValue(%s), sumSeries(keepLastValue(%s)))",
 			gp("gh_contributions_total", part.From), mixPath))
 	}
-	mixProm := make([]Target, len(mixParts))
+	// Each gauge is read as promNewest reads one, the largest of its series,
+	// which is what lets the division stand beside `or`: a quotient of plain
+	// selectors keeps their labels.
+	newest := func(field string) string { return "max(github_contributions_total_" + field + ")" }
+	whole := make([]string, len(mixParts))
 	for i, part := range mixParts {
-		mixProm[i] = promNamed(ref(i), part.To, fmt.Sprintf(
-			"100 * github_contributions_total_%s / (github_contributions_total_commits"+
-				" + github_contributions_total_pull_requests + github_contributions_total_issues"+
-				" + github_contributions_total_reviews)", part.From,
-		))
+		whole[i] = newest(part.From)
+	}
+	mixProm := make([]Target, len(mixParts))
+	overrides := make([]any, len(mixParts))
+	for i, part := range mixParts {
+		mixProm[i] = promAggregated(ref(i), part.To, fmt.Sprintf("100 * %s / (%s)",
+			newest(part.From), strings.Join(whole, " + ")))
+		overrides[i] = noValueOf(part.To, notRead)
 	}
 	// Elasticsearch hands back the four counts of the newest document, and
 	// the percentages are the panel's own arithmetic: the sum of the row,
-	// then each count over it, then the counts and the sum dropped.
-	mixES, mixEStf := esTbl("gh_contributions_total", []any{b.one()},
-		[]any{b.mNewest(fieldsOf(mixParts)...)}, mixParts, nil)
-	mixEStf = append(mixEStf, mixShares()...)
-	return panel("bargauge", "Contribution mix (last year)", box{W: 14, H: 5, X: 10, Y: 7}, []Target{sqlT(mix)}, &P{
-		Desc: "The four kinds of contribution as shares of their sum over the last " +
-			"year, the mix the profile draws as a radar: commits, pull requests, " +
-			"issues and code review. The percentages are computed from the totals " +
-			"beside this, and the four add up to a hundred.",
-		Prom: mixProm,
-		GR:   mixGR,
-		ES:   mixES, ESTF: mixEStf, ESOpts: Opts{"unit": "percentunit", "maxv": 1.0},
-	})
+	// then each count over it, then the counts and the sum dropped. The row
+	// is esSumPerName's, since esNewest answers a series per count.
+	mixES, mixEStf := b.esNewest("gh_contributions_total", mixParts,
+		append(esSumPerName(), mixShares()...)...)
+	return panel("bargauge", "Contribution mix (last year)", box{W: 14, H: 5, X: 10, Y: 7},
+		[]Target{sqlT(alwaysARow(mix))}, &P{
+			Desc: "The four kinds of contribution as shares of their sum over the last " +
+				"year, the mix the profile draws as a radar: commits, pull requests, " +
+				"issues and code review. The percentages are computed from the totals " +
+				"beside this, and the four add up to a hundred. Each bar reads \"not read\" " +
+				"over a range no sweep reached, as the totals do, and so does a year with " +
+				"none of the four, which has no mix to draw.",
+			Prom: mixProm,
+			GR:   mixGR,
+			ES:   mixES, ESTF: mixEStf, ESOpts: Opts{"unit": "percentunit", "maxv": 1.0},
+			Overrides: overrides,
+		})
 }
 
 // sundayWeek bins a time to the Sunday that starts its week. date_bin aligns

@@ -45,10 +45,10 @@ var tilesLeftOverNothing = []dashboardDiffer{
 	},
 }
 
-// TestEveryTileIsDrawnOverNothing asks every stat and gauge of the five
-// dashboards about nothing, twice: about a repository that holds nothing, and
-// over a range no sweep reached, and holds every store to drawing the tiles
-// the others draw, with the same words.
+// TestEveryTileIsDrawnOverNothing asks every stat, gauge and bar gauge of the
+// five dashboards about nothing, twice: about a repository that holds
+// nothing, and over a range no sweep reached, and holds every store to
+// drawing the tiles the others draw, with the same words.
 //
 // Over no rows a SQL count is 0 and anything else is null, which a tile draws
 // as the words its panel gives a value that is not there: "no issue closed",
@@ -77,7 +77,10 @@ var tilesLeftOverNothing = []dashboardDiffer{
 //
 // The Elasticsearch Repositories group was let leave out all three of its
 // tiles here until the last review of 2.6.4, which found a way to draw them:
-// its stat no longer adds all its values up.
+// its stat no longer adds all its values up. That review found as well that
+// this asked no bar gauge, and "Contribution mix (last year)", a bar per share
+// of the snapshot the Account group reads, drew "No data" over such a range
+// in four stores and four names with nothing beside them in Graphite.
 func TestEveryTileIsDrawnOverNothing(t *testing.T) {
 	s := Start(t)
 	run := dashboardsRun(t, s)
@@ -116,8 +119,9 @@ func TestEveryTileIsDrawnOverNothing(t *testing.T) {
 		// A floor rather than a count, measured on the 2.6.2 branch at 52
 		// tiles over the repository and 19 over the range, and on the 2.6.4
 		// one at 52 over each, where 2.6.3 drew 31 over the range because the
-		// tiles of the account's snapshots had no row to draw there, so that a
-		// change that stops asking fails instead of passing with nothing asked.
+		// tiles of the account's snapshots had no row to draw there, and at 56
+		// over each once the bar gauge was asked as well, so that a change
+		// that stops asking fails instead of passing with nothing asked.
 		if tiles < 15 {
 			t.Errorf("InfluxDB drew only %d tiles over %s, too few for this to have asked anything", tiles, q.name)
 		}
@@ -132,17 +136,12 @@ func TestEveryTileIsDrawnOverNothing(t *testing.T) {
 	t.Logf("%d pairs of stores compared, %d alike", c.pairs, c.agreed)
 }
 
-// askTilesOverNothing asks one store's stats and gauges about
+// askTilesOverNothing asks one store's stats, gauges and bar gauges about
 // nothingRepository. dashboardsRunInto calls it, with the other questions.
 func askTilesOverNothing(ctx context.Context, client grafana.Client, doc map[string]any,
 	store dashboardStore,
 ) []grafana.Result {
-	var tiles []grafana.PanelQuery
-	for _, p := range grafana.Panels(doc["panels"]) {
-		if (p.Type == "stat" || p.Type == "gauge") && (store.name != "prometheus" || !promNeedsHistory(&p)) {
-			tiles = append(tiles, p)
-		}
-	}
+	tiles := tilePanels(doc, store)
 	// Every form of the repository variable names the one repository, All's
 	// own value included, which is what Graphite and Prometheus would
 	// otherwise substitute.
@@ -154,18 +153,13 @@ func askTilesOverNothing(ctx context.Context, client grafana.Client, doc map[str
 	})
 }
 
-// askTilesOverQuiet asks one store's stats and gauges over quiet, a range
-// quietRange found, with the repositories the sweep wrote, as the first
-// question asks them over the dashboard's own range.
+// askTilesOverQuiet asks one store's stats, gauges and bar gauges over quiet,
+// a range quietRange found, with the repositories the sweep wrote, as the
+// first question asks them over the dashboard's own range.
 func askTilesOverQuiet(ctx context.Context, client grafana.Client, doc map[string]any,
 	store dashboardStore, repos []string, quiet [2]time.Time,
 ) []grafana.Result {
-	var tiles []grafana.PanelQuery
-	for _, p := range grafana.Panels(doc["panels"]) {
-		if (p.Type == "stat" || p.Type == "gauge") && (store.name != "prometheus" || !promNeedsHistory(&p)) {
-			tiles = append(tiles, p)
-		}
-	}
+	tiles := tilePanels(doc, store)
 	from, to := strconv.FormatInt(quiet[0].UnixMilli(), 10), strconv.FormatInt(quiet[1].UnixMilli(), 10)
 	vars := dashboardVars(doc, store, repos)
 	if vars.TimeFilter != "" {
@@ -178,6 +172,22 @@ func askTilesOverQuiet(ctx context.Context, client grafana.Client, doc map[strin
 		Timeout: 120 * time.Second, Workers: dashboardWorkers(store.name),
 		IntervalMs: dashboardInterval, MaxDataPoints: dashboardMaxDataPoints,
 	})
+}
+
+// tilePanels is every panel of a dashboard that draws a tile per value, the
+// ones the two questions ask: a stat's tiles, a gauge's and a bar gauge's
+// bars. A Prometheus panel that needs more history than the run's half
+// minute of scrapes is left out, as promNeedsHistory leaves it out of every
+// other question.
+func tilePanels(doc map[string]any, store dashboardStore) []grafana.PanelQuery {
+	var tiles []grafana.PanelQuery
+	for _, p := range grafana.Panels(doc["panels"]) {
+		if (p.Type == "stat" || p.Type == "gauge" || p.Type == "bargauge") &&
+			(store.name != "prometheus" || !promNeedsHistory(&p)) {
+			tiles = append(tiles, p)
+		}
+	}
+	return tiles
 }
 
 // quietRange is thirty days no point of any sweep falls in, the newest such

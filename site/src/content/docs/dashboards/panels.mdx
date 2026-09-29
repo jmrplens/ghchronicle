@@ -85,13 +85,17 @@ where it answers nothing, so the group draws what the other stores draw.
 Over a range no sweep reached, the groups of the account's own snapshots, which
 the SQL stores read as the newest row of the range, say what the range lacked
 as well: since 2.6.4 every tile of Community, Account, Since the account began,
-Sponsorship and Repositories reads "not read" in every store. Until then the
-first four groups read "No data" in all five, as the SQL stores had no row to
-read, and the repository count left its group in all five, taking the stars and
-the forks with it in Elasticsearch. Before 2.6.2 Graphite, whose paths answer a
-range they hold nothing in with nulls, drew three of the groups as a panel with
+Sponsorship and Repositories reads "not read" in every store, and so does each
+bar of Contribution mix (last year), which reads the snapshot the contributions
+in Account read. Until then the first four groups read "No data" in all five,
+as the SQL stores had no row to read, the repository count left its group in
+all five, taking the stars and the forks with it in Elasticsearch, and the bar
+gauge read "No data" in every store but Graphite, which drew its four names
+with nothing beside them. Before 2.6.2 Graphite, whose paths answer a range
+they hold nothing in with nulls, drew three of the groups as a panel with
 nothing in it, not even the names, and Elasticsearch drew the four names of
-Sponsorship with nothing beside them.
+Sponsorship with nothing beside them. A year with none of the four kinds of
+contribution has no mix to draw either, and its bars read "not read" too.
 
 ## Overview
 

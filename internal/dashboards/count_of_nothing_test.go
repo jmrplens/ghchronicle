@@ -150,7 +150,9 @@ func TestNoReleaseAnybodyDownloadedIsZeroReleasesInGraphite(t *testing.T) {
 // traffic or the open alerts, was an empty panel in all five stores. The 2.6.3
 // review found the account's own snapshots, read as the newest row of the
 // range, drawing "No data" in all five over a range no sweep reached, where
-// the groups beside them said what the range lacked.
+// the groups beside them said what the range lacked. The last review of 2.6.4
+// found the bar gauge beside them, "Contribution mix (last year)", doing the
+// same, so a bar gauge is held to it as a stat is.
 func TestEveryStatValueIsDrawnOverNothing(t *testing.T) {
 	t.Parallel()
 	checked := sqlNullsHaveWords(t) + graphiteValuesFallBack(t) + prometheusAggregationsFallBack(t) +
@@ -158,6 +160,13 @@ func TestEveryStatValueIsDrawnOverNothing(t *testing.T) {
 	if checked < 60 {
 		t.Fatalf("only %d stat values checked, too few for this to have held the stat groups to anything", checked)
 	}
+}
+
+// drawsTiles reports whether a panel draws a tile per value, which is what
+// the checks of a value over nothing hold: a stat's tiles and a bar gauge's
+// bars.
+func drawsTiles(p map[string]any) bool {
+	return p["type"] == "stat" || p["type"] == "bargauge"
 }
 
 // sqlNullsHaveWords holds every value a SQL stat reads as null over no rows to
@@ -169,7 +178,7 @@ func sqlNullsHaveWords(t *testing.T) int {
 	joined, after, _ := strings.Cut(alwaysARow("\x00"), "\x00")
 	checked := 0
 	for _, p := range renderedPanels(t, "influxdb") {
-		if p["type"] != "stat" {
+		if !drawsTiles(p) {
 			continue
 		}
 		for _, target := range panelTargets(p) {
@@ -276,7 +285,7 @@ func graphiteValuesFallBack(t *testing.T) int {
 	t.Helper()
 	checked := 0
 	for _, p := range renderedPanels(t, "graphite") {
-		if p["type"] != "stat" {
+		if !drawsTiles(p) {
 			continue
 		}
 		for _, target := range panelTargets(p) {
@@ -298,7 +307,7 @@ func prometheusAggregationsFallBack(t *testing.T) int {
 	t.Helper()
 	checked := 0
 	for _, p := range renderedPanels(t, "prometheus") {
-		if p["type"] != "stat" {
+		if !drawsTiles(p) {
 			continue
 		}
 		for _, target := range panelTargets(p) {
@@ -323,7 +332,7 @@ func elasticsearchValuesAnswerNothing(t *testing.T) int {
 	t.Helper()
 	checked := 0
 	for _, p := range renderedPanels(t, "elasticsearch") {
-		if p["type"] != "stat" {
+		if !drawsTiles(p) {
 			continue
 		}
 		if sumsPerName(p) {

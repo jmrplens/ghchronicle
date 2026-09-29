@@ -8,13 +8,14 @@ import (
 	"github.com/jmrplens/ghchronicle/v2/internal/grafana"
 )
 
-// TestTheElasticsearchSnapshotsSayNotReadOverNothing replays Elasticsearch
+// TestTheElasticsearchSnapshotsSayNotReadOverNothing replays two Elasticsearch
 // panels over the answer the datasource gives a range no sweep reached, and
-// over one with documents in it. The last review of 2.6.4 found the whole
-// Repositories group drawing "No data" there, where the groups beside it read
-// "not read" in every store: its stars and forks add up the newest document of
-// each repository, which answers no field over nothing, and its stat added all
-// three values up, which reads a count that is not there as 0.
+// over one with documents in it. The last review of 2.6.4 found both drawing
+// "No data" there, where the groups beside them read "not read" in every
+// store: the whole Repositories group, whose stars and forks add up the newest
+// document of each repository and whose stat added all three values up, and
+// the bar gauge of the contribution mix, which read the newest document in a
+// bucket that has to hold one.
 func TestTheElasticsearchSnapshotsSayNotReadOverNothing(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -44,6 +45,14 @@ func TestTheElasticsearchSnapshotsSayNotReadOverNothing(t *testing.T) {
 				"D": {esSeriesFrame("D", "Forks")},
 			},
 			want: map[string]float64{"Repositories": 2, "Stars": 0, "Forks": 0},
+		},
+		{
+			title: "Contribution mix (last year)",
+			data: map[string][]map[string]any{"A": {
+				esSeriesFrame("A", "Top Metrics commits", 80), esSeriesFrame("A", "Top Metrics pull_requests", 10),
+				esSeriesFrame("A", "Top Metrics issues", 5), esSeriesFrame("A", "Top Metrics reviews", 5),
+			}},
+			want: map[string]float64{"Commits": 0.8, "Pull requests": 0.1, "Issues": 0.05, "Code review": 0.05},
 		},
 	} {
 		p := tilesPanel(t, "elasticsearch", tc.title)
@@ -84,16 +93,16 @@ func drawnTiles(t *testing.T, p, answer map[string]any) map[string]any {
 	return out
 }
 
-// tilesPanel is the stat of that title, which "Repositories" needs: the
-// Inventory has a table of the name as well.
+// tilesPanel is the stat or the bar gauge of that title, which "Repositories"
+// needs: the Inventory has a table of the name as well.
 func tilesPanel(t *testing.T, store, title string) map[string]any {
 	t.Helper()
 	for _, p := range renderedPanels(t, store) {
-		if p["title"] == title && p["type"] == "stat" {
+		if p["title"] == title && drawsTiles(p) {
 			return p
 		}
 	}
-	t.Fatalf("no stat called %q in %s", title, store)
+	t.Fatalf("no stat or bar gauge called %q in %s", title, store)
 	return nil
 }
 

@@ -97,13 +97,18 @@ Sobre un rango al que no llegó ningún barrido, los grupos de las instantáneas
 la propia cuenta, de las que los almacenes SQL leen la fila más reciente del
 rango, también dicen qué le faltó al rango: desde la 2.6.4 cada tarjeta de
 Community, Account, Since the account began, Sponsorship y Repositories dice
-"not read" en todos los almacenes. Hasta entonces los cuatro primeros grupos
-decían "No data" en los cinco, ya que los almacenes SQL no tenían fila que
-leer, y el recuento de repositorios salía de su grupo en los cinco, llevándose
-consigo las estrellas y los forks en Elasticsearch. Antes de la 2.6.2 Graphite,
-cuyas rutas responden con nulos a un rango en el que no tienen nada, dibujaba
-tres de los grupos como un panel sin nada, ni siquiera los nombres, y
-Elasticsearch dibujaba los cuatro nombres de Sponsorship sin nada al lado.
+"not read" en todos los almacenes, y también cada barra de Contribution mix
+(last year), que lee la instantánea que leen las contribuciones de Account.
+Hasta entonces los cuatro primeros grupos decían "No data" en los cinco, ya que
+los almacenes SQL no tenían fila que leer, el recuento de repositorios salía de
+su grupo en los cinco, llevándose consigo las estrellas y los forks en
+Elasticsearch, y el medidor de barras decía "No data" en todos los almacenes
+menos Graphite, que dibujaba sus cuatro nombres sin nada al lado. Antes de la
+2.6.2 Graphite, cuyas rutas responden con nulos a un rango en el que no tienen
+nada, dibujaba tres de los grupos como un panel sin nada, ni siquiera los
+nombres, y Elasticsearch dibujaba los cuatro nombres de Sponsorship sin nada al
+lado. Un año sin ninguno de los cuatro tipos de contribución tampoco tiene
+mezcla que dibujar, y sus barras también dicen "not read".
 
 ## Overview
 
