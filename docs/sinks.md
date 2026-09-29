@@ -323,16 +323,17 @@ name creates the table afresh, in the new shape, even where a column changes
 from a tag to a field. The binary reads the name back from the catalog, prints
 it, and keeps it in the state file, with when the server has scheduled its
 hard deletion, read from the system table of its `_internal` database. That is
-72 hours after the delete (measured on 3.11.2 and 3.11.5), and the server keeps
+72 hours after the delete (measured on 3.2.1 to 3.11.5), and the server keeps
 the name in its catalog for its `--delete-grace-period` after that, 24 hours by
-default; where the time cannot be read, 72 hours is assumed. 3.0.0 has no purge
-at all, and the plan says so for a server older than 3.4.0. Nothing else can
-purge it: a delete of the renamed table is answered with a 409, with or without
-`hard_delete_at`, so ghchronicle forgets the copy once the server's time for it
-has come and leaves it to the server. `hard_delete_at` is never sent: measured
-on 3.11.5, `now` had not removed the rows eleven minutes later, and it takes
-the days to undo the change away. Until then the copy's rows can be read with
-SQL and written back through the sink.
+default; where the time cannot be read, 3.2.0 among them, 72 hours is assumed,
+which is what 3.2.0 schedules too. A server before 3.2 never purges it: see
+[below](https://jmrp.io/docs/ghchronicle/sinks/influxdb/#before-32-the-copy-stays). ghchronicle leaves the copy to the server,
+and forgets it once the server's time for it has come. It never asks for it to
+go sooner: `hard_delete_at` is never sent, since measured on 3.11.5 `now` had
+not removed the rows eleven minutes later, and it takes the days to undo the
+change away; and from 3.10.0 on, a delete of the renamed table is answered with
+a 409, with or without it (measured on 3.10.0 to 3.11.5). Until then the copy's
+rows can be read with SQL and written back through the sink.
 
 InfluxDB 3 Core refuses a query that would open more Parquet files than its
 `--query-file-limit`, 432 by default, which a table written every ten minutes
@@ -354,7 +355,44 @@ the same measurement in another bucket as they were. So a start never applies
 it on its own; `-migrate -yes` does.
 
 `-uninstall data` leaves out the tables InfluxDB 3 has already deleted, and
-says they are the server's to purge.
+says they are the server's to purge, or, before 3.2, that they stay.
+
+#### Before 3.2 the copy stays
+
+**Measured against InfluxDB 3 Core 3.0.0, 3.0.3 and 3.1.0**, none of which has
+a hard deletion: no deleter runs, `hard_delete_at` is taken and ignored,
+`_internal` has no `system.tables`, and a delete of the renamed table answers
+200 and renames it once more, `<measurement>-<instant>-<instant>`. The copy
+stays, and answers queries, for as long as the server runs one of those
+releases. 3.2.0 is the first release with a deleter: 3.2.0 and 3.3.0 were
+measured scheduling a hard deletion and carrying it out as 3.4.0 and later do.
+
+The binary reads the release from `/ping`, and on a server before 3.2 says so
+where it matters: the plan says `set aside for good` before anything is
+applied, applying says it with the copy's name, and `-migrate` lists each copy
+such a server keeps as `kept aside ... for good`, asked of the server itself,
+so the list holds a copy the state file has forgotten, or a new state file
+never knew. `-uninstall data` says the same of every table it deletes there.
+Each ends in the request that removes the copy once the server runs a release
+that takes it:
+
+```sh
+curl -X DELETE '<url>/api/v3/configure/table?db=<bucket>&table=<copy>&hard_delete_at=now' \
+  -H 'Authorization: Bearer <token>'
+```
+
+A copy made before 3.2 keeps no hard deletion time through an upgrade:
+measured with copies 3.0.3 and 3.1.0 made, opened by 3.2.0, 3.4.0, 3.9.13 and
+3.11.5. So it stays after the upgrade too, until it is told to go. 3.2.0, 3.4.0
+and 3.9.13 took the request for such a copy and dropped it from their catalog
+once their delete grace period had passed, 3.2.0 after renaming it once more;
+3.10.0 to 3.11.5 answer it with a 409. So the request is sent while the server
+runs a release from 3.2 to 3.9, on the way up. From 3.2.1 on, `-migrate` lists
+the copies the system table shows with no hard deletion time, which is how
+such a copy looks there; 3.2.0's system table has no such column, so on 3.2.0
+it lists none. Measured as well: 3.11.5, started on the data directory of a
+3.0.3, began with an empty catalog, while 3.4.0 and 3.9.13 read the catalogs
+3.0.3 and 3.1.0 had left.
 
 ### Where to go next
 

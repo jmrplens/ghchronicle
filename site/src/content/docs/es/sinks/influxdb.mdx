@@ -149,16 +149,18 @@ nuevo, con la forma nueva, aunque una columna pase de etiqueta a campo. El
 binario lee el nombre del catálogo, lo imprime y lo guarda en el fichero de
 estado, con cuándo ha programado el servidor su borrado definitivo, leído de la
 tabla de sistema de su base de datos `_internal`. Eso es 72 horas después del
-borrado (medido en 3.11.2 y 3.11.5), y el servidor guarda el nombre en su
+borrado (medido de la 3.2.1 a la 3.11.5), y el servidor guarda el nombre en su
 catálogo durante su `--delete-grace-period` después de eso, 24 horas por
-omisión; donde no se puede leer la hora, se suponen 72 horas. La 3.0.0 no purga
-nada, y el plan lo dice para un servidor anterior a la 3.4.0. Nada más puede
-purgarla: un borrado de la tabla renombrada recibe un 409, con `hard_delete_at`
-o sin él, así que ghchronicle olvida la copia cuando llega la hora del servidor
-y la deja al servidor. `hard_delete_at` no se envía nunca: medido en la 3.11.5,
-`now` no había quitado las filas once minutos después, y se lleva los días para
-deshacer el cambio. Hasta entonces las filas de la copia se pueden leer con SQL
-y escribir de vuelta a través del destino.
+omisión; donde no se puede leer la hora, entre ellos la 3.2.0, se suponen 72
+horas, que es lo que programa también la 3.2.0. Un servidor anterior a la 3.2
+no la purga nunca: ver [más abajo](#antes-de-la-32-la-copia-se-queda).
+ghchronicle deja la copia al servidor, y la olvida cuando llega la hora del
+servidor. Nunca pide que se vaya antes: `hard_delete_at` no se envía nunca,
+porque medido en la 3.11.5 `now` no había quitado las filas once minutos
+después, y se lleva los días para deshacer el cambio; y desde la 3.10.0 un
+borrado de la tabla renombrada recibe un 409, con `hard_delete_at` o sin él
+(medido de la 3.10.0 a la 3.11.5). Hasta entonces las filas de la copia se
+pueden leer con SQL y escribir de vuelta a través del destino.
 
 InfluxDB 3 Core rechaza una consulta que abriría más ficheros Parquet que su
 `--query-file-limit`, 432 por omisión, que una tabla escrita cada diez minutos
@@ -181,7 +183,47 @@ medida en otro bucket. Por eso un arranque nunca lo aplica por su cuenta;
 `-migrate -yes` sí.
 
 `-uninstall data` deja fuera las tablas que InfluxDB 3 ya ha borrado, y dice
-que purgarlas le toca al servidor.
+que purgarlas le toca al servidor, o, antes de la 3.2, que se quedan.
+
+### Antes de la 3.2 la copia se queda
+
+**Medido contra InfluxDB 3 Core 3.0.0, 3.0.3 y 3.1.0**, ninguna de las cuales
+tiene borrado definitivo: no corre ningún borrador, `hard_delete_at` se acepta
+y se ignora, `_internal` no tiene `system.tables`, y un borrado de la tabla
+renombrada responde 200 y la renombra otra vez,
+`<medida>-<instante>-<instante>`. La copia se queda, y responde a consultas,
+mientras el servidor ejecute una de esas versiones. La 3.2.0 es la primera
+versión con borrador: en la 3.2.0 y la 3.3.0 se midió que programan un borrado
+definitivo y lo llevan a cabo como la 3.4.0 y las siguientes.
+
+El binario lee la versión de `/ping`, y en un servidor anterior a la 3.2 lo dice
+donde importa: el plan dice `set aside for good` antes de aplicar nada, aplicar
+lo dice con el nombre de la copia, y `-migrate` lista cada copia que guarda un
+servidor así como `kept aside ... for good`, preguntándoselo al propio
+servidor, de modo que la lista incluye una copia que el fichero de estado ha
+olvidado, o que un fichero de estado nuevo nunca conoció. `-uninstall data`
+dice lo mismo de cada tabla que borra allí. Cada una termina en la petición que
+quita la copia en cuanto el servidor ejecute una versión que la acepte:
+
+```sh
+curl -X DELETE '<url>/api/v3/configure/table?db=<bucket>&table=<copia>&hard_delete_at=now' \
+  -H 'Authorization: Bearer <token>'
+```
+
+Una copia hecha antes de la 3.2 no gana hora de borrado definitivo al
+actualizar: medido con copias hechas por la 3.0.3 y la 3.1.0, abiertas por la
+3.2.0, la 3.4.0, la 3.9.13 y la 3.11.5. Así que también se queda después de
+actualizar, hasta que se le diga que se vaya. La 3.2.0, la 3.4.0 y la 3.9.13
+aceptaron la petición para una copia así y la quitaron de su catálogo al pasar
+su periodo de gracia de borrado, la 3.2.0 después de renombrarla otra vez; de
+la 3.10.0 a la 3.11.5 responden con un 409. Así que la petición se envía
+mientras el servidor ejecuta una versión de la 3.2 a la 3.9, de camino hacia
+arriba. Desde la 3.2.1, `-migrate` lista las copias que la tabla de sistema
+muestra sin hora de borrado definitivo, que es como se ve allí una copia así;
+la tabla de sistema de la 3.2.0 no tiene esa columna, así que en la 3.2.0 no
+lista ninguna. Medido también: la 3.11.5, arrancada sobre el directorio de datos
+de una 3.0.3, empezó con un catálogo vacío, mientras que la 3.4.0 y la 3.9.13
+leyeron los catálogos que habían dejado la 3.0.3 y la 3.1.0.
 
 ## Por dónde seguir
 

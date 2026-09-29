@@ -2486,14 +2486,14 @@ stores are asked questions, GitHub is asked for the repository list alone, and
 the state file is read and never written. A store that can be asked decides for
 itself; one that cannot is decided by what the state file remembers of it.
 
-| Store                                | What decides                                                                                                       |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| Store                                | What decides                                                                                                                                              |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | InfluxDB 3                           | Whether the old tag is a tag column of the live table, asked of the catalog. A table InfluxDB has set aside is listed under another name and is not asked |
-| InfluxDB 2                           | Whether any row carries the old tag. The tag keys stay listed after a delete, so they are not asked                 |
-| PostgreSQL                           | Whether any row holds a value in the old tag's column, in the schema the sink writes to                             |
-| Elasticsearch                        | A count of the documents that carry the old tag. The mapping keeps a field after its documents are gone             |
-| SQL file, Graphite, Telegraf         | The release the state file records as the first to write the store                                                  |
-| Loki, Prometheus, OTLP, file, stdout | Nothing: none of them keeps a row whose identity a release could change                                             |
+| InfluxDB 2                           | Whether any row carries the old tag. The tag keys stay listed after a delete, so they are not asked                                                       |
+| PostgreSQL                           | Whether any row holds a value in the old tag's column, in the schema the sink writes to                                                                   |
+| Elasticsearch                        | A count of the documents that carry the old tag. The mapping keeps a field after its documents are gone                                                   |
+| SQL file, Graphite, Telegraf         | The release the state file records as the first to write the store                                                                                        |
+| Loki, Prometheus, OTLP, file, stdout | Nothing: none of them keeps a row whose identity a release could change                                                                                   |
 
 Each line starts with what the check found:
 
@@ -2629,15 +2629,15 @@ inputs](https://jmrp.io/docs/ghchronicle/install/actions/#inputs).
 
 #### What applying does in each store
 
-| Store                                                                         | What applying does                                                                                                        |
-| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| [InfluxDB 3](https://jmrp.io/docs/ghchronicle/sinks/influxdb/#what-a-migration-does-here)         | Deletes the one table, which InfluxDB keeps as `<measurement>-<instant>`, queryable, and purges itself 72 hours later     |
-| InfluxDB 2                                                                    | Deletes every row of the measurement in the bucket. Nothing is kept, so a start never does it on its own                  |
-| [PostgreSQL](https://jmrp.io/docs/ghchronicle/sinks/postgres/#what-a-migration-does-here)         | Renames the table `<measurement>-<instant>` in the sink's schema; ghchronicle drops it 24 hours later                     |
-| [Elasticsearch](https://jmrp.io/docs/ghchronicle/sinks/elasticsearch/#what-a-migration-does-here) | Blocks writes to the index, clones it to `<index>-<instant>` and deletes it; ghchronicle deletes the clone 24 hours later |
-| SQL file                                                                      | Writes `DROP TABLE IF EXISTS` for the measurement into the file, ahead of the rows written after it                       |
-| Graphite                                                                      | Prints the commands that remove the old paths on the Graphite host                                                        |
-| Telegraf                                                                      | Says what to do in the store behind it                                                                                    |
+| Store                                                                         | What applying does                                                                                                                         |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| [InfluxDB 3](https://jmrp.io/docs/ghchronicle/sinks/influxdb/#what-a-migration-does-here)         | Deletes the one table, which InfluxDB keeps as `<measurement>-<instant>`, queryable, and purges itself 72 hours later, or never before 3.2 |
+| InfluxDB 2                                                                    | Deletes every row of the measurement in the bucket. Nothing is kept, so a start never does it on its own                                   |
+| [PostgreSQL](https://jmrp.io/docs/ghchronicle/sinks/postgres/#what-a-migration-does-here)         | Renames the table `<measurement>-<instant>` in the sink's schema; ghchronicle drops it 24 hours later                                      |
+| [Elasticsearch](https://jmrp.io/docs/ghchronicle/sinks/elasticsearch/#what-a-migration-does-here) | Blocks writes to the index, clones it to `<index>-<instant>` and deletes it; ghchronicle deletes the clone 24 hours later                  |
+| SQL file                                                                      | Writes `DROP TABLE IF EXISTS` for the measurement into the file, ahead of the rows written after it                                        |
+| Graphite                                                                      | Prints the commands that remove the old paths on the Graphite host                                                                         |
+| Telegraf                                                                      | Says what to do in the store behind it                                                                                                     |
 
 Each store touches that one measurement and nothing else: the table, index or
 paths named exactly, in the database, bucket, schema or prefix the sink writes
@@ -2655,9 +2655,13 @@ run of the Action that does not restore one among them, asks PostgreSQL and
 Elasticsearch for copies named the way a migration names them, since its state
 file cannot name them. InfluxDB 3 purges its own on a schedule of its own, which
 is read back from the system table of its `_internal` database: 72 hours after
-the delete by default (measured on 3.11.2 and 3.11.5), and it keeps the name in
-its catalog for its delete grace period after that, 24 hours by default. Until
-a copy goes, undoing the change is on each store's page.
+the delete by default (measured on 3.2.1 to 3.11.5), and it keeps the name in
+its catalog for its delete grace period after that, 24 hours by default. A
+server before 3.2 never purges one: the plan says so before applying, and
+`-migrate` asks the server for every copy it keeps that way, with the request
+that removes it once the server runs a release from 3.2 to 3.9 (see [before 3.2
+the copy stays](https://jmrp.io/docs/ghchronicle/sinks/influxdb/#before-32-the-copy-stays)). Until a
+copy goes, undoing the change is on each store's page.
 
 A store that was cleared is written again whole. The [write
 ledger](https://jmrp.io/docs/ghchronicle/sinks/#only-what-changed-is-written) forgets the

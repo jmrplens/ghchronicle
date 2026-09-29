@@ -169,7 +169,8 @@ and found items GitHub no longer serves: a repository deleted or no longer
 covered, a comment deleted, an alert whose feature was switched off. `first`
 names a few, and `only_in` is the copy that still holds them, until it is
 purged: a day after the migration for PostgreSQL's and Elasticsearch's, and
-when the server's schedule says for InfluxDB 3's, 72 hours by default. Carrying
+when the server's schedule says for InfluxDB 3's, 72 hours by default, or
+never on a server before 3.2. Carrying
 them over is by hand, from that copy, while it is there.
 
 **A number is a multiple of the sweep count.** Something that is a snapshot is
@@ -268,7 +269,10 @@ log:
 
 A family that is not due yet simply does not appear.
 
-<Aside type="tip" title="Deleting the state file costs quota, and two things more">
+<Aside
+  type="tip"
+  title="Deleting the state file costs quota, and two things more"
+>
   It remembers nine things, and seven of them cost only quota when they go: what
   is collected again is keyed by measurement, tags and timestamp and overwrites.
   `last_head` is the commit each dependency diff started from, and without it
@@ -418,10 +422,13 @@ instant in UTC: PostgreSQL's renamed table, Elasticsearch's clone, lower case
 there, and the name InfluxDB 3 gives a table it deleted. None of the shipped
 panels reads one. ghchronicle purges PostgreSQL's and Elasticsearch's once they
 have been kept 24 hours, and InfluxDB 3 purges its own on its own schedule, 72
-hours after the delete by default; `-migrate` lists them
-under their store as `kept aside`. `-uninstall data` removes PostgreSQL's and
-Elasticsearch's with everything else, and leaves out InfluxDB 3's with a note,
-since the server refuses a delete of a table it has already deleted.
+hours after the delete by default, except a server before 3.2, which never does
+(see [before 3.2 the copy
+stays](/ghchronicle/sinks/influxdb/#before-32-the-copy-stays)); `-migrate` lists
+them under their store as `kept aside`. `-uninstall data` removes PostgreSQL's
+and Elasticsearch's with everything else, and leaves out InfluxDB 3's with a
+note, since the server refuses a delete of a table it has already deleted, or,
+before 3.2, renames it once more.
 
 ## After an upgrade
 
@@ -498,7 +505,8 @@ read by hand.
 migration set it aside, ghchronicle could not drop PostgreSQL's copy or delete
 Elasticsearch's clone, or could not ask the store which copies it holds. It
 tries again after every sweep and at every start; `aside` names the copy, which
-can also be removed by hand. InfluxDB 3 purges its own on its own schedule.
+can also be removed by hand. InfluxDB 3 purges its own on its own schedule,
+or, before 3.2, never.
 
 **`the cache file still claims what the cleared store held`.** A migration
 could not rewrite the cache file to forget the refusals, and the workflow runs

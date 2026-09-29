@@ -178,8 +178,8 @@ encontró elementos que GitHub ya no sirve: un repositorio borrado o que ya no
 se cubre, un comentario borrado, una alerta cuya función se apagó. `first`
 nombra unos pocos, y `only_in` es la copia que aún los guarda, hasta que se
 purga: un día después de la migración las de PostgreSQL y Elasticsearch, y
-cuando diga el calendario del servidor la de InfluxDB 3, 72 horas por omisión.
-Traspasarlos se hace a mano, desde esa copia, mientras está.
+cuando diga el calendario del servidor la de InfluxDB 3, 72 horas por omisión,
+o nunca en un servidor anterior a la 3.2. Traspasarlos se hace a mano, desde esa copia, mientras está.
 
 **Un número es múltiplo del número de pasadas.** Algo que es una instantánea se
 está sumando en el tiempo. Los referrers, las rutas, las etiquetas y los hitos
@@ -285,16 +285,19 @@ log:
 
 Una familia a la que aún no le toca sencillamente no aparece.
 
-<Aside type="tip" title="Borrar el fichero de estado cuesta cuota, y dos cosas más">
+<Aside
+  type="tip"
+  title="Borrar el fichero de estado cuesta cuota, y dos cosas más"
+>
   Recuerda nueve cosas, y siete de ellas solo cuestan cuota cuando se van: lo
   que se vuelve a recoger se indexa por medida, etiquetas y marca de tiempo y
   sobrescribe. `last_head` es el commit desde el que arrancaba cada diff de
   dependencias, y sin él la pasada siguiente tiene la fotografía y no el diff.
   `stores` es lo que el fichero registra de cada almacén, entre ello una
   relectura que una migración aún debe, y sin él nada vuelve a leer ese
-  historial hasta que lo haga un `-backfill -families`. Ver
-  [el fichero de estado](/ghchronicle/es/configuration/#state_file). El fichero
-  de caché que hay a su lado cuesta cuota y nada más: ver [la caché que hay a su
+  historial hasta que lo haga un `-backfill -families`. Ver [el fichero de
+  estado](/ghchronicle/es/configuration/#state_file). El fichero de caché que
+  hay a su lado cuesta cuota y nada más: ver [la caché que hay a su
   lado](/ghchronicle/es/configuration/#la-caché-que-hay-a-su-lado).
 </Aside>
 
@@ -439,11 +442,13 @@ instante en UTC: la tabla renombrada de PostgreSQL, el clon de Elasticsearch,
 allí en minúsculas, y el nombre que InfluxDB 3 da a una tabla que borró.
 Ninguno de los paneles que se distribuyen lee ninguna. ghchronicle purga las de
 PostgreSQL y Elasticsearch cuando llevan 24 horas guardadas, e InfluxDB 3 purga
-las suyas con su propio calendario, 72 horas después del borrado por omisión;
-`-migrate` las lista bajo su almacén como `kept aside`.
-`-uninstall data` quita las de PostgreSQL y Elasticsearch con todo lo demás, y
-deja fuera las de InfluxDB 3 con una nota, porque el servidor rechaza el
-borrado de una tabla que ya ha borrado.
+las suyas con su propio calendario, 72 horas después del borrado por omisión,
+salvo un servidor anterior a la 3.2, que nunca lo hace (ver [antes de la 3.2 la
+copia se queda](/ghchronicle/es/sinks/influxdb/#antes-de-la-32-la-copia-se-queda));
+`-migrate` las lista bajo su almacén como `kept aside`. `-uninstall data` quita
+las de PostgreSQL y Elasticsearch con todo lo demás, y deja fuera las de
+InfluxDB 3 con una nota, porque el servidor rechaza el borrado de una tabla que
+ya ha borrado, o, antes de la 3.2, la renombra otra vez.
 
 ## Tras una actualización
 
@@ -523,7 +528,7 @@ de que una migración la apartara, ghchronicle no pudo quitar la copia de
 PostgreSQL ni borrar el clon de Elasticsearch, o no pudo preguntar al almacén
 qué copias guarda. Lo vuelve a intentar tras cada pasada y en cada arranque;
 `aside` nombra la copia, que también se puede quitar a mano. InfluxDB 3 purga
-las suyas con su propio calendario.
+las suyas con su propio calendario, o, antes de la 3.2, nunca.
 
 **`the cache file still claims what the cleared store held`.** Una migración no
 pudo reescribir el fichero de caché para olvidar los rechazos, y las ejecuciones
