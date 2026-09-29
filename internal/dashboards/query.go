@@ -1253,6 +1253,67 @@ func (b *builder) esNewest(m string, fields []named, extra ...any) (targets []Ta
 	return []Target{esq(m, []any{b.mNewest(fieldsOf(fields)...)}, []any{bucket}, "A", nil, "")}, tf
 }
 
+// esNameOnly is a query that answers a series named `name` with no value in
+// it over any range: the tile's name for a value whose own query answers a
+// range with no document in it with no field at all, which esSumPerName then
+// draws as the words its panel gives a value that is not there.
+//
+// It asks `like`'s documents for esNewest's one bucket a century wide, and in
+// it for a bucket script that answers null, since a count is never below 0.
+// Over a range with a document in it the datasource returns no row for a
+// bucket whose script answers null, and over one with none there is no bucket
+// to return, and either way it answers the series, named by the alias
+// (measured against Grafana 13.2.1). The script reads the count because one
+// that reads nothing does not compile: Painless cannot make a number of a
+// bare null.
+func (b *builder) esNameOnly(like Target, ref, name string) Target {
+	bucket := b.dh(esWholeRange)
+	settings, _ := agg(bucket)["settings"].(map[string]any)
+	settings["min_doc_count"] = "1"
+	count := agg(b.mCount())
+	count["hide"] = true
+	never := b.metric("bucket_script", "", map[string]any{"script": "params.n < 0 ? params.n : null"})
+	agg(never)["pipelineVariables"] = []any{map[string]any{"name": "n", "pipelineAgg": count["id"]}}
+	return Target{Kind: "es", Query: like.Query, Metrics: []any{count, never}, Buckets: []any{bucket}, Ref: ref, Alias: name}
+}
+
+// esSumPerName is the transformations that draw one field per name out of
+// every frame an Elasticsearch stat's queries answer: the sum of the values
+// read under that name, and no value where none was, which the tile draws as
+// the words its panel gives a value that is not there.
+//
+// It is the calculation per value that a stat does not have. A stat reduces
+// every value with one calculation, and the sum that adds up the newest
+// document of each repository reads a field with no value as 0 (a reducer's
+// answer to an empty field is its emptyInputResult, which is 0 for a sum in
+// Grafana 13.2.1), so a group that summed some values and read the rest as
+// they stood had to add all of them up, and over a range no sweep reached its
+// repository count read 0 or, with no field to draw, left the group. Here each
+// field becomes a row of its sum and of how many values it holds, the sum
+// becomes NaN where it holds none, as 0/0 is, and the rows of one name, a
+// value's own and its esNameOnly's, are grouped into the one that was read,
+// since the last value that is not null skips NaN too. The rows then turn back
+// into one field each, in the order their names were first met, and the stat
+// reads each as its last value.
+//
+// A string field would be a row of its own, so a table's bucket columns are
+// excluded before this runs.
+func esSumPerName() []any {
+	const read, value = "Read", "Value"
+	return []any{
+		map[string]any{"id": "reduce", "options": map[string]any{
+			"mode": "seriesToRows", "reducers": []any{"sum", "count"},
+		}},
+		binaryField(read, "Count", "/", "Count"),
+		binaryField(value, "Total", "*", read),
+		map[string]any{"id": "groupBy", "options": map[string]any{"fields": map[string]any{
+			"Field": map[string]any{"operation": "groupby", "aggregations": []any{}},
+			value:   map[string]any{"operation": "aggregate", "aggregations": []any{"lastNotNull"}},
+		}}},
+		map[string]any{"id": "rowsToFields", "options": map[string]any{}},
+	}
+}
+
 // esRaw is the newest documents as rows. `names` maps document keys, in the
 // order the columns should appear, to their headings.
 func (b *builder) esRaw(m string, size int, names []named, where []string) (targets []Target, tf []any) {

@@ -1,6 +1,7 @@
 package dashboards
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -315,13 +316,18 @@ func prometheusAggregationsFallBack(t *testing.T) int {
 // that reads the last value of each field to a bucket that is there when no
 // document is, unless it counts, which the test above holds; the newest
 // document of a snapshot to the one bucket that answers its fields over no
-// document without failing, esNewest's; and every stat that adds its values
-// up to saying which of them leave the group over nothing.
+// document without failing, esNewest's; a value the panel adds up per name to
+// a query that names its tile over nothing; and every stat that adds its
+// values up to saying which of them leave the group over nothing.
 func elasticsearchValuesAnswerNothing(t *testing.T) int {
 	t.Helper()
 	checked := 0
 	for _, p := range renderedPanels(t, "elasticsearch") {
 		if p["type"] != "stat" {
+			continue
+		}
+		if sumsPerName(p) {
+			checked += esNamedOverNothing(t, p)
 			continue
 		}
 		options, _ := p["options"].(map[string]any)
@@ -369,6 +375,86 @@ func esValueAnswersNothing(t *testing.T, title any, target map[string]any) int {
 			title, first["type"], buckets)
 	}
 	return 1
+}
+
+// sumsPerName reports whether an Elasticsearch panel draws a field per name
+// out of rows it makes of every field its queries answer, esSumPerName's
+// transformations, which is what lets a query that answers a name and nothing
+// else stand in for a value whose own query answers no field over nothing.
+func sumsPerName(p map[string]any) bool {
+	var ids []any
+	for _, raw := range asList(p["transformations"]) {
+		tf, _ := raw.(map[string]any)
+		ids = append(ids, tf["id"])
+	}
+	return slices.Contains(ids, "reduce") && slices.Contains(ids, "groupBy") && slices.Contains(ids, "rowsToFields")
+}
+
+// esNamedOverNothing holds each query of a panel that sums per name either to
+// answering its fields over no document, as esValueAnswersNothing holds a
+// query, or to a table of the newest document of each item whose every
+// column has a query of the panel that answers its name over any range, and
+// says how many values it held to either.
+func esNamedOverNothing(t *testing.T, p map[string]any) int {
+	t.Helper()
+	named := map[string]bool{}
+	for _, target := range panelTargets(p) {
+		if alias, _ := target["alias"].(string); alias != "" && answersNoValue(target) {
+			named[alias] = true
+		}
+	}
+	renamed := map[string]string{}
+	for _, raw := range asList(p["transformations"]) {
+		tf, _ := raw.(map[string]any)
+		options, _ := tf["options"].(map[string]any)
+		rename, _ := options["renameByName"].(map[string]any)
+		for from, to := range rename {
+			renamed[from], _ = to.(string)
+		}
+	}
+	checked := 0
+	for _, target := range panelTargets(p) {
+		if _, alias := target["alias"]; alias && answersNoValue(target) {
+			continue
+		}
+		metrics, _ := target["metrics"].([]any)
+		buckets, _ := target["bucketAggs"].([]any)
+		first, _ := metrics[0].(map[string]any)
+		last, _ := buckets[len(buckets)-1].(map[string]any)
+		if first["type"] != "top_metrics" || last["type"] == "date_histogram" {
+			checked += esValueAnswersNothing(t, p["title"], target)
+			continue
+		}
+		settings, _ := first["settings"].(map[string]any)
+		for _, raw := range asList(settings["metrics"]) {
+			field, _ := raw.(string)
+			checked++
+			if name := renamed["Top Metrics "+field]; !named[name] {
+				t.Errorf("elasticsearch %q: %s, the newest document of each item over %v, answers a range "+
+					"with no document in it with no field, and no query of the panel names its tile %q there",
+					p["title"], field, bucketFieldsOf(buckets), name)
+			}
+		}
+	}
+	return checked
+}
+
+// answersNoValue reports whether a query is esNameOnly's: one century-wide
+// bucket, and a script that answers null over it, beside the count it reads.
+func answersNoValue(target map[string]any) bool {
+	metrics, _ := target["metrics"].([]any)
+	buckets, _ := target["bucketAggs"].([]any)
+	if len(metrics) != 2 || len(buckets) != 1 {
+		return false
+	}
+	count, _ := metrics[0].(map[string]any)
+	script, _ := metrics[1].(map[string]any)
+	bucket, _ := buckets[0].(map[string]any)
+	settings, _ := script["settings"].(map[string]any)
+	text, _ := settings["script"].(string)
+	return count["type"] == "count" && count["hide"] == true && script["type"] == "bucket_script" &&
+		bucket["type"] == "date_histogram" && strings.HasSuffix(text, ": null") &&
+		strings.HasPrefix(text, "params.n < 0 ?")
 }
 
 // TestABucketScriptReadsTheMetricsOfItsOwnQuery holds every Elasticsearch

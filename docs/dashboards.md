@@ -412,27 +412,29 @@ it has never held, Elasticsearch for a range it holds no document in, and
 Prometheus for a query that finds no series. Before 2.6.2 such a tile left its
 group in those three, and over a repository with nothing in it eighteen tiles
 were missing from Graphite and twenty from Elasticsearch. One case is left, in
-Elasticsearch, and the four panels it touches say so: a value added up from the
-newest document of each repository, release or alert, the star and fork
-counts, the artifact storage and the cache, the download total and the open
-alerts, still leaves its group when there is no such document, since the
-datasource fails outright on that aggregation over nothing. The success rate,
-the run duration and the queue wait beside the two byte totals leave it as
-well, because that panel adds each value up and would read a value of nothing
-as 0.
+Elasticsearch, and the three panels it touches say so: a value added up from
+the newest document of each repository, release or alert, the artifact storage
+and the cache, the download total and the open alerts, still leaves its group
+when there is no such document, since the datasource fails outright on that
+aggregation over nothing. The success rate, the run duration and the queue wait
+beside the two byte totals leave it as well, because that panel adds each value
+up and would read a value of nothing as 0. The star and fork counts of the
+Overview left it too until 2.6.4. Their group now adds its values up in the
+panel's own transformations, a field per name holding the sum of what was read
+under it and no value where nothing was, and two queries that answer only the
+names Stars and Forks, over any range, stand in for the table of repositories
+where it answers nothing, so the group draws what the other stores draw.
 
 Over a range no sweep reached, the groups of the account's own snapshots, which
 the SQL stores read as the newest row of the range, say what the range lacked
-as well: since 2.6.4 every tile of Community, Account, Since the account began
-and Sponsorship reads "not read" in every store, and so does the repository
-count beside the stars and forks in every store but Elasticsearch. Until then
-those groups read "No data" in all five, as the SQL stores had no row to read,
-and before 2.6.2 Graphite, whose paths answer a range they hold nothing in with
-nulls, drew three of them as a panel with nothing in it, not even the names,
-and Elasticsearch drew the four names of Sponsorship with nothing beside them.
-In Elasticsearch the repository count leaves the Repositories group over such a
-range, with the stars and the forks, since that panel adds its values up and
-would read a count that is not there as 0.
+as well: since 2.6.4 every tile of Community, Account, Since the account began,
+Sponsorship and Repositories reads "not read" in every store. Until then the
+first four groups read "No data" in all five, as the SQL stores had no row to
+read, and the repository count left its group in all five, taking the stars and
+the forks with it in Elasticsearch. Before 2.6.2 Graphite, whose paths answer a
+range they hold nothing in with nulls, drew three of the groups as a panel with
+nothing in it, not even the names, and Elasticsearch drew the four names of
+Sponsorship with nothing beside them.
 
 ### Overview
 

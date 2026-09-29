@@ -78,29 +78,32 @@ Graphite para una ruta que nunca ha tenido, Elasticsearch para un rango en el
 que no tiene ningún documento, y Prometheus para una consulta que no encuentra
 ninguna serie. Antes de la 2.6.2 una tarjeta así salía de su grupo en esos tres,
 y sobre un repositorio sin nada faltaban dieciocho tarjetas en Graphite y veinte
-en Elasticsearch. Queda un caso, en Elasticsearch, y los cuatro paneles a los
+en Elasticsearch. Queda un caso, en Elasticsearch, y los tres paneles a los
 que afecta lo dicen: un valor sumado del documento más reciente de cada
-repositorio, release o alerta, los recuentos de estrellas y forks, el
-almacenamiento de artefactos y la caché, el total de descargas y las alertas
-abiertas, sigue saliendo de su grupo cuando no hay tal documento, ya que el
-datasource falla sin más con esa agregación sobre nada. La tasa de éxito, la
-duración de la ejecución y la espera en cola junto a los dos totales de bytes
-salen también, porque ese panel suma cada valor y leería como 0 un valor de
-nada.
+repositorio, release o alerta, el almacenamiento de artefactos y la caché, el
+total de descargas y las alertas abiertas, sigue saliendo de su grupo cuando no
+hay tal documento, ya que el datasource falla sin más con esa agregación sobre
+nada. La tasa de éxito, la duración de la ejecución y la espera en cola junto a
+los dos totales de bytes salen también, porque ese panel suma cada valor y
+leería como 0 un valor de nada. Los recuentos de estrellas y forks del Overview
+también salían hasta la 2.6.4. Su grupo suma ahora sus valores en las propias
+transformaciones del panel, un campo por nombre con la suma de lo leído bajo él
+y sin valor donde no se leyó nada, y dos consultas que responden solo los
+nombres Stars y Forks, sobre cualquier rango, ocupan el lugar de la tabla de
+repositorios donde esta no responde nada, así que el grupo dibuja lo que
+dibujan los demás almacenes.
 
 Sobre un rango al que no llegó ningún barrido, los grupos de las instantáneas de
 la propia cuenta, de las que los almacenes SQL leen la fila más reciente del
 rango, también dicen qué le faltó al rango: desde la 2.6.4 cada tarjeta de
-Community, Account, Since the account began y Sponsorship dice "not read" en
-todos los almacenes, y también el recuento de repositorios junto a las
-estrellas y los forks en todos menos Elasticsearch. Hasta entonces esos grupos
+Community, Account, Since the account began, Sponsorship y Repositories dice
+"not read" en todos los almacenes. Hasta entonces los cuatro primeros grupos
 decían "No data" en los cinco, ya que los almacenes SQL no tenían fila que
-leer, y antes de la 2.6.2 Graphite, cuyas rutas responden con nulos a un rango
-en el que no tienen nada, dibujaba tres de ellos como un panel sin nada, ni
-siquiera los nombres, y Elasticsearch dibujaba los cuatro nombres de
-Sponsorship sin nada al lado. En Elasticsearch el recuento de repositorios sale
-del grupo Repositories sobre un rango así, con las estrellas y los forks, ya
-que ese panel suma sus valores y leería como 0 un recuento que no está.
+leer, y el recuento de repositorios salía de su grupo en los cinco, llevándose
+consigo las estrellas y los forks en Elasticsearch. Antes de la 2.6.2 Graphite,
+cuyas rutas responden con nulos a un rango en el que no tienen nada, dibujaba
+tres de los grupos como un panel sin nada, ni siquiera los nombres, y
+Elasticsearch dibujaba los cuatro nombres de Sponsorship sin nada al lado.
 
 ## Overview
 

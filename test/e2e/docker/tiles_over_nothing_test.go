@@ -28,11 +28,6 @@ const nothingRepository = "nothing-was-written-here"
 // description of the panel, as in dashboardsDiffer.
 var tilesLeftOverNothing = []dashboardDiffer{
 	{
-		title: "Repositories", kind: "stat", stores: []string{"elasticsearch"},
-		reason: "leaves its group when the range holds no document of it",
-		only:   []string{"Stars", "Forks", "Repositories"},
-	},
-	{
 		title: "Runs in range", stores: []string{"elasticsearch"},
 		reason: "leaves its group when the range holds no document of it",
 		only: []string{
@@ -79,6 +74,10 @@ var tilesLeftOverNothing = []dashboardDiffer{
 // the range lacked (the 2.6.3 review). So InfluxDB, which every other store is
 // held to, is held to drawing over nothing every tile it draws over the
 // dashboard's own range.
+//
+// The Elasticsearch Repositories group was let leave out all three of its
+// tiles here until the last review of 2.6.4, which found a way to draw them:
+// its stat no longer adds all its values up.
 func TestEveryTileIsDrawnOverNothing(t *testing.T) {
 	s := Start(t)
 	run := dashboardsRun(t, s)

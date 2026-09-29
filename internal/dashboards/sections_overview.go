@@ -280,14 +280,19 @@ func overview(b *builder) []Panel {
 			named(rp("gh_repo", field, "archived", "false"), "gh_repo"),
 			named(grCollected(rp(rt, field, "archived", "true")), rt))
 	}
-	// The repository count is read in a bucket that has to hold a document,
-	// not the way esNewest reads the other snapshots: this panel adds its
-	// values up, for the stars and the forks, and Grafana adds up a value
-	// that is not there as 0, so over a range no sweep reached the count
-	// would read 0 repositories rather than leave its group with them.
-	countES, countEStf := esTbl("gh_account", []any{b.one()}, []any{b.mNewest("public_repos")},
-		[]named{{"public_repos", "Repositories"}}, nil)
+	// Elasticsearch adds up the newest document of each repository in the
+	// panel, since no query can, and reads the repository count as esNewest
+	// reads the account's other snapshots. esSumPerName makes a field of each
+	// name, for the stat that has one calculation for all three, and the two
+	// queries that only name a tile stand in for the stars and the forks over
+	// a range no document of them falls in, where the table of repositories
+	// answers no field at all. The table's column of full names is left out,
+	// since esSumPerName would make a field of it too.
+	countES, countEStf := b.esNewest("gh_account", []named{{"public_repos", "Repositories"}})
 	reposES[0].Ref = "B"
+	table, _ := reposEStf[0].(map[string]any)["options"].(map[string]any)
+	table["excludeByName"] = map[string]any{panelFullNameField: true}
+	reposES = append(reposES, b.esNameOnly(reposES[0], "C", "Stars"), b.esNameOnly(reposES[0], "D", "Forks"))
 	// The Account group reads two measurements, so two queries; each organize
 	// renames the series of the query that has them and leaves the other's
 	// alone.
@@ -341,12 +346,9 @@ func overview(b *builder) []Panel {
 				"the values the running collector pushed last, so the archived repositories " +
 				"count however short the range is, from the collector's first totals sweep on.",
 			GRDesc: grArchivedWindow,
-			ES:     append(countES, reposES...), ESTF: append(countEStf, reposEStf...),
-			ESOpts: Opts{"calc": "sum"},
-			ESDesc: esArchivedWindow + " " + esLeftOut("a star or a fork count",
-				esNewestAddedUp("repository")) + " Over a range no sweep reached, the " +
-				"repository count leaves the group with them: the panel adds its values up, for " +
-				"the stars and the forks, and would read a count that is not there as 0.",
+			ES:     append(countES, reposES...),
+			ESTF:   slices.Concat(countEStf, reposEStf, esSumPerName()),
+			ESDesc: esArchivedWindow,
 			Overrides: []any{
 				noValueOf("Repositories", notRead), noValueOf("Stars", notRead), noValueOf("Forks", notRead),
 			},
