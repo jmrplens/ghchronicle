@@ -13,6 +13,98 @@ day the tag was pushed, with two exceptions: 2.5.2 has a section and no tag,
 and its changes shipped in 2.6.0; 2.6.2 has a tag and no release, since its
 release stopped at the containerised suite, and its changes shipped in 2.6.3.
 
+## 2.6.5 - 2026-09-30
+
+A check of 2.6.4 in production found that the read which writes each open pull
+request and issue its row of the day asked GitHub for the fifty items of any
+state updated last, so an open item that fifty others had moved past went
+without its row, and that on the busiest repository the same read met GitHub's
+GraphQL timeout every day and read half of what it asked for. The day's read
+now asks for the open items themselves, reads what moved by date, and is
+recorded for each repository.
+
+- **Every open pull request and issue gets its row every day.** An open item
+  is stamped at 00:00 UTC of each day it is open, and one nobody touches keeps
+  its `updatedAt`, so the hourly read, which walks by `updatedAt`, never
+  reaches it again; the day's read is what writes it. That read was one page of
+  the fifty items updated last, of any state: in production, 3 of the 26 open
+  issues of `jmrplens/gitlab-mcp-server` had no row for one to five days
+  between 23 and 29 September, and on the 30th the oldest of them was 59th by
+  `updatedAt`. No open pull request had lost a day. The first sweep of each UTC
+  day now asks for the open items only, `states: OPEN` on both connections,
+  and walks every page, sized from the open counts of the last totals and never
+  more than twenty-five. The rows those days missed are not written after the
+  fact: GitHub serves no past day's state of an item.
+- **The day's read of what moved reaches back to the day before, whatever
+  moved.** The fifty items of any state were also a net for what closed: the
+  family is marked run when one repository failed and the others answered, so
+  two failed sweeps in a row on one repository leave what moved between them
+  outside the next window, and only the day's page read it again, while fewer
+  than fifty had moved. The first sweep of each day now also reads everything
+  that moved since a cadence before the repository's day's read before it, by
+  `updatedAt` and every page. A close moves `updatedAt`: of the 1,136 closed
+  pull requests and issues updated last in the account's 40 repositories, a
+  hundred of each at most, none was updated before it closed,
+  so a closed item is read by the hourly read after it, or by this a day later
+  at most, and needs no reading after that, its row being dated when it
+  closed. A repository with no day's read on record, which is every repository
+  of a new state file and so of every run of the Action, reaches back a month,
+  as the first sweep of actions does, and asks for a first page of fifty, the
+  newest fifty of each kind that 2.6.4 wrote there whatever their age.
+- **The day's read is recorded for each repository.** 2.6.4 recorded it for the
+  family once every repository had answered. One repository that kept failing
+  made every sweep take the day's read of every repository again, each
+  reaching back to the last day they had all answered, which the read by date
+  would have made a longer walk every hour; a backfill, which reads no open
+  item it has no reason to, recorded it, so an open item last touched before
+  the backfill's bound went without its row that day; and so did a pass
+  stopped for want of budget, for the repositories it never reached. Each
+  repository's read is now recorded when both of its reads answered, under
+  `issues/<full_name>` in `last_full`; a state file 2.6.4 wrote is read by the
+  family's record, and no further back than a month.
+- **The busiest repository's day's read fits the gateway again.** Fifty pull
+  requests of `jmrplens/phonometry` with their reviews and review threads met
+  GitHub's ten seconds on every day from 19 to 29 September, 10.45 to 10.98
+  seconds, and the read went on at twenty-five, half the page it was meant to
+  cover. Its open read asks for its 10 open pull requests on a page of ten, and
+  the read of what moved asks for pages of twenty-five, which answered there in
+  3.2 to 9.5 seconds on eleven of those days and met the timeout once, on the
+  19th, answering when halved to twelve. A page of 5, 10, 20, 25 or 50 costs 1,
+  2, 3, 4 or 9 points, with the state filter or without it (asked with
+  `dryRun` on 2026-09-30).
+- **An item both of the day's reads find is written once.** An open item that
+  moved in the day is in both. A store keeps one row either way, and the
+  Reducer has reduced a batch to one row per identity since 2.6.2, but a sink
+  that prints or streams what it is handed, stdout, the SQL file or Loki,
+  would carry both. `sink.Distinct` keeps the later of the two.
+
+`TestTheDaysReadWritesAnOpenItemFiftyOthersMovedPast` puts an open issue last
+touched two months ago 160th, behind fifty-eight closed in the last minutes
+and a hundred closed forty days ago, and fails on 2.6.4, whose day's read
+writes it no row, where this one writes it one and writes the open issue both
+reads find once. `TestTheDaysReadIsRecordedPerRepository` and
+`TestABackfillTakesNoDaysRead` fail on the family's record, the first with the
+repository that answered taking the read again, the second with the backfill
+recording it. The tests of the query filtered to the open items on both
+connections and walked to its last page, of the day's window reaching back to
+the repository's day's read before it, to the family's record of 2.6.4 and to
+a month, of the open items read in a repository the movement query says has
+not moved while what moved is gated as before, and of `sink.Distinct` are new.
+The fake GitHub of the end-to-end suites now answers a query filtered to the
+open items with the open items of its fixture only.
+
+Not verified:
+
+- Production had not run this release when it was written. Its first day's read
+  is what writes `jmrplens/gitlab-mcp-server`'s open issue 961 its first row
+  since 28 September.
+- The net for two failed sweeps in a row is tested as the window it reads, not
+  by failing a repository twice against GitHub.
+- A closed item can change without moving `updatedAt` only in fields this
+  account could not show: it has no reactions, and a resolved review thread
+  carries no time. 2.6.4's daily page rewrote such a field on the fifty items
+  updated last; nothing rewrites it now once the item has closed.
+
 ## 2.6.4 - 2026-09-30
 
 A review of 2.6.3 in production on the day it was released: the service's

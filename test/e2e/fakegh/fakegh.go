@@ -41,6 +41,7 @@
 package fakegh
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -187,7 +188,7 @@ var graphQL = []struct{ marker, fixture string }{
 	{"contributionsCollection(from:", "graphql_history.json"},
 	{"user(login: $login) { createdAt } }", "graphql_created_at.json"},
 	{"contributionCalendar", "graphql_account.json"},
-	{"pullRequests(", "graphql_pulls.json"},
+	{"pullRequests(", pullsFixture},
 	{"discussions(", "graphql_discussions.json"},
 	{"history(", "graphql_commits_page1.json"},
 	{"milestones(", "graphql_planning.json"},
@@ -463,6 +464,9 @@ func (s *Server) answer(r *http.Request, body []byte) answer {
 		if name == outboundSearchFixture {
 			a.body = s.narrowSearch(a.body, graphQLVariable(body, "query"))
 		}
+		if strings.HasSuffix(name, pullsFixture) && strings.Contains(query, "states: OPEN") {
+			a.body = s.openOnly(a.body)
+		}
 		switch {
 		case OffAPI(r.URL.Path):
 			// Off the API: nothing to charge and nothing to validate.
@@ -509,6 +513,47 @@ func graphQLVariable(body []byte, name string) string {
 // people's repositories. It holds every such item, and each search is served
 // the ones its qualifiers select; see narrowSearch.
 const outboundSearchFixture = "graphql_search_issues.json"
+
+// pullsFixture answers both reads of pull requests and issues: what moved, and
+// the day's read of every open item.
+const pullsFixture = "graphql_pulls.json"
+
+// openOnly keeps the open pull requests and issues of a pulls answer, which
+// is what GitHub answers connections asked with states: OPEN. Served whole,
+// the day's read of every open item would write the closed ones as well, and
+// the suite could not tell a read that asks for the open items from one that
+// asks for everything.
+func (s *Server) openOnly(body []byte) []byte {
+	dec := json.NewDecoder(bytes.NewReader(body))
+	dec.UseNumber()
+	var env map[string]any
+	if err := dec.Decode(&env); err != nil {
+		s.tb.Errorf("%s is not a pulls answer: %v", pullsFixture, err)
+		return body
+	}
+	data, _ := env["data"].(map[string]any)
+	repo, _ := data["repository"].(map[string]any)
+	for _, conn := range []string{"pullRequests", "issues"} {
+		c, ok := repo[conn].(map[string]any)
+		if !ok {
+			continue
+		}
+		nodes, _ := c["nodes"].([]any)
+		kept := make([]any, 0, len(nodes))
+		for _, n := range nodes {
+			if node, _ := n.(map[string]any); node["state"] == "OPEN" {
+				kept = append(kept, n)
+			}
+		}
+		c["nodes"] = kept
+	}
+	out, err := json.Marshal(env)
+	if err != nil {
+		s.tb.Errorf("keeping the open items of %s: %v", pullsFixture, err)
+		return body
+	}
+	return out
+}
 
 // narrowSearch is an issue search's answer cut to the items its query
 // selects, by kind and by state, the way GitHub's search does.

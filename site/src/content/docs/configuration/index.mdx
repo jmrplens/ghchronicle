@@ -141,9 +141,11 @@ Nine things, and deleting the file costs a different one for each:
 - `last_head`, the commit each repository was on when the dependency diff last
   ran. Without it the dependency changes in the gap are gone: the next sweep
   has the photograph and no diff.
-- `last_full`, when each family that normally reads what changed last read a
-  whole page. Without it a family reads as due, so the next sweep reads them
-  all whole.
+- `last_full`, when each family that normally reads what changed last took
+  the day's read: for `issues`, every open item and what moved since the day's
+  read before it, recorded for each repository, so one that failed takes it
+  again and no other does. Without it a repository reads as due, so the next
+  sweep takes it, reaching back a month.
 - `last_notified`, where the inbox window was cut. Without it zero asks for the
   whole inbox.
 - `last_event`, the newest event the feed had. Without it empty reads the whole

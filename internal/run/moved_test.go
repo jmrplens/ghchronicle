@@ -26,9 +26,9 @@ type movedFake struct {
 	// gates counts the movement queries.
 	asked map[string][]string
 	gates int
-	// firsts is the page size of each pull request query, which is how the
-	// daily whole page tells itself apart from the incremental pass.
-	firsts []int
+	// open is the repositories the day's read of every open item was sent
+	// for, which asks with states: OPEN and is never gated.
+	open []string
 }
 
 var movedAlias = regexp.MustCompile(`(r\d+): repository\(owner: "[^"]*", name: "([^"]*)"\)`)
@@ -73,10 +73,11 @@ func (f *movedFake) serve(w http.ResponseWriter, req *http.Request) {
 	case strings.Contains(env.Query, "timelineItems(since"):
 		f.asked["issueevents"] = append(f.asked["issueevents"], name)
 		_, _ = w.Write([]byte(`{"data":{"repository":{"issues":{"nodes":[]},"pullRequests":{"nodes":[]}}}}`))
+	case strings.Contains(env.Query, "reviewThreads(") && strings.Contains(env.Query, "states: OPEN"):
+		f.open = append(f.open, name)
+		_, _ = w.Write([]byte(`{"data":{"repository":{"issues":{"nodes":[]},"pullRequests":{"nodes":[]}}}}`))
 	case strings.Contains(env.Query, "reviewThreads("):
 		f.asked["issues"] = append(f.asked["issues"], name)
-		first, _ := env.Variables["first"].(float64)
-		f.firsts = append(f.firsts, int(first))
 		_, _ = w.Write([]byte(`{"data":{"repository":{"issues":{"nodes":[]},"pullRequests":{"nodes":[]}}}}`))
 	default:
 		_, _ = w.Write([]byte(`{"errors":[{"type":"UNKNOWN","message":"no answer for this query"}]}`))
@@ -91,8 +92,8 @@ func movement(head, items time.Time) string {
 }
 
 // movedRunner is a runner of the three families over the repositories named,
-// each family last run one cadence before now and so due, and the whole page
-// of issues already read today unless daily says it is due.
+// each family last run one cadence before now and so due, and the day's read
+// of every open item of issues already taken unless daily says it is due.
 func movedRunner(t *testing.T, fake *movedFake, now time.Time, daily bool, names ...string) *Runner {
 	t.Helper()
 	r := sweepRunner(t, fake.serve)
@@ -110,7 +111,9 @@ func movedRunner(t *testing.T, fake *movedFake, now time.Time, daily bool, names
 		r.State.Mark(family, now.Add(-time.Minute))
 	}
 	if !daily {
-		r.State.MarkFull("issues", now)
+		for _, repo := range r.repos {
+			r.State.MarkFull(dayReadKey("issues", repo), now)
+		}
 	}
 	return r
 }
@@ -190,30 +193,45 @@ func TestEachFamilyAsksOfTheMoveItReads(t *testing.T) {
 	}
 }
 
-// TestTheDailyPageIsReadWhateverMoved: the whole page of the day exists for
-// the open items nobody touches, so a repository nothing moved in is exactly
-// the one it is for.
-func TestTheDailyPageIsReadWhateverMoved(t *testing.T) {
+// TestEveryOpenItemIsReadWhateverMoved: the day's read of every open item
+// exists for the items nobody touches, so a repository nothing moved in is
+// exactly the one it is for. The read of what moved is gated as on any other
+// sweep, beside it, against the day's own window, which reaches back a month
+// on a state file with no day's read on record.
+func TestEveryOpenItemIsReadWhateverMoved(t *testing.T) {
 	t.Parallel()
 	now := time.Now().UTC().Truncate(time.Second)
+	idle := now.AddDate(0, -2, 0)
 	fake := &movedFake{moved: map[string]string{
 		"busy": movement(now, now),
-		"idle": movement(now.Add(-time.Hour), now.Add(-time.Hour)),
+		"idle": movement(idle, idle),
 	}}
 	r := movedRunner(t, fake, now, true, "busy", "idle")
 	if err := r.Once(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	if got := fake.asked["issues"]; len(got) != 2 {
-		t.Errorf("the daily page was read for %v, want both repositories", got)
+	if got := fake.open; len(got) != 2 {
+		t.Errorf("every open item was read for %v, want both repositories", got)
 	}
-	for _, first := range fake.firsts {
-		if first != 50 {
-			t.Errorf("a pull request page of %d on the daily pass, want the whole page", first)
-		}
+	if got := fake.asked["issues"]; len(got) != 1 || got[0] != "busy" {
+		t.Errorf("what moved was read for %v on the day's first sweep, want only the repository that moved", got)
 	}
 	if got := fake.asked["commits"]; len(got) != 1 || got[0] != "busy" {
 		t.Errorf("commits asked about %v on the day's first sweep, want only the repository that moved", got)
+	}
+	// Once on record, the next sweep of the same UTC day reads what moved
+	// only.
+	fake.open, fake.asked = nil, nil
+	r.State.Mark("issues", now.Add(-time.Hour))
+	r.Now = func() time.Time { return now.Add(time.Second) }
+	if err := r.Once(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if len(fake.asked["issues"]) == 0 {
+		t.Fatal("the next sweep did not run issues, so it says nothing about the open read")
+	}
+	if len(fake.open) != 0 && sameUTCDay(now, now.Add(time.Second)) {
+		t.Errorf("every open item was read again the same UTC day, for %v", fake.open)
 	}
 }
 

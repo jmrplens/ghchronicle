@@ -125,9 +125,10 @@ count of open pull requests says nothing about how the work actually goes; the
 interesting numbers are durations. How long until someone reviewed it, how long
 until it merged, how big the diff was, how many review rounds it took. One
 GraphQL query per repository covers both: a sweep walks what was updated in
-the last two cadences, ten at a time, and once a day reads a whole page sized
-to the repository, which is the only read that rewrites an open pull request
-nobody touched.
+the last two cadences, ten at a time, and the first sweep of each UTC day
+reaches back to the day's read before it and also reads every open item,
+whatever it was last updated, which is the only read that rewrites an open
+pull request nobody touched.
 
 **`commits`** collects the commit history with its size and its signature. This
 is what replaces `stats/code_frequency`, which answers 202 with an empty body
@@ -156,8 +157,8 @@ twenty-five repositories first asks each when the head of its default branch
 was committed and when its newest issue and its newest pull request were
 updated, and a family asks nothing of a repository where nothing moved since
 its own window: on the account this was measured on, about half of the `issues`
-and `issueevents` queries and 96 per cent of the `commits` ones. The daily whole
-page of `issues` and a backfill are read everywhere.
+and `issueevents` queries and 96 per cent of the `commits` ones. The day's read
+of every open item of `issues` and a backfill are read everywhere.
 [Cost of a sweep](https://jmrp.io/docs/ghchronicle/api/cost/#asking-first-what-moved) has the count.
 
 **`deps`** collects the dependency graph, off by default. Two shapes of the
@@ -794,7 +795,8 @@ A merged one keeps answering `CONFLICTING` long after it was merged, which is
 stale rather than false but reads as a repository full of conflicts. A sweep
 reads only what was updated in the last two cadences, so an open pull request
 nobody touches has its `seconds_open`, `mergeable` and `merge_state` rewritten
-once a day by the whole-page read rather than every hour; anything that moves
+once a day by the day's read of every open item rather than every hour, however
+long ago it last moved; anything that moves
 `updatedAt`, a review, a comment, a push, a close, is rewritten by the sweep
 that follows it.
 

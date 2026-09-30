@@ -781,7 +781,7 @@ func TestReadItemCountsFollowsTheTotalsWireFormat(t *testing.T) {
 	got := map[string]ItemCounts{"octocat/stale": {Pulls: 1}}
 	ReadItemCounts(points, got)
 	want := map[string]ItemCounts{
-		"octocat/hello-world": {Pulls: 33, Issues: 44},
+		"octocat/hello-world": {Pulls: 33, Issues: 44, OpenPulls: 2, OpenIssues: 4},
 		"octocat/quiet":       {},
 		"octocat/stale":       {Pulls: 1},
 	}
@@ -791,12 +791,61 @@ func TestReadItemCountsFollowsTheTotalsWireFormat(t *testing.T) {
 	if got["octocat/hello-world"].Most() != 44 || PageFor(got["octocat/quiet"].Most()) != 5 {
 		t.Errorf("the page follows the larger of the two connections: %v", got)
 	}
+	if got["octocat/hello-world"].MostOpen() != 4 {
+		t.Errorf("the open page follows the larger of the two open counts: %v", got)
+	}
 }
 
-// TestPullsReadsExactlyThePagesTheWalkAllows is what the daily pass leans on:
-// sized from lifetime totals up to an hour old by default, and older where a
-// configuration slows them down, it is allowed one page more than the one it
-// asked for, and no more, however many pages the API offers.
+// TestOpenPullsAskForTheOpenItemsOnlyAndWalkThemAll is the day's read of every
+// open item: both connections filtered to OPEN by GitHub, whatever each item
+// was last updated, and every page walked, so an open item fifty others moved
+// past is read, which the newest fifty of every state did not. The read of
+// what moved asks with no filter.
+func TestOpenPullsAskForTheOpenItemsOnlyAndWalkThemAll(t *testing.T) {
+	t.Parallel()
+	f := newFixtureServer(t)
+	var queries []string
+	f.graphQL(func(w http.ResponseWriter, _ *http.Request, query string, vars map[string]any) {
+		queries = append(queries, query)
+		var page map[string]any
+		mustUnmarshal(t, fixture(t, "graphql_pulls.json"), &page)
+		repo := page["data"].(map[string]any)["repository"].(map[string]any)
+		more := vars["prAfter"] == nil
+		for _, conn := range []string{"pullRequests", "issues"} {
+			c, ok := repo[conn].(map[string]any)
+			if !ok {
+				continue
+			}
+			c["pageInfo"] = map[string]any{"hasNextPage": more, "endCursor": "next"}
+			for _, n := range c["nodes"].([]any) {
+				// Last touched years ago: a walk by updatedAt with any bound
+				// would have stopped before it.
+				n.(map[string]any)["updatedAt"] = "2020-01-01T00:00:00Z"
+			}
+		}
+		_, _ = w.Write(mustMarshal(t, page))
+	})
+	if _, err := (Pulls{First: 5, Open: true, Walk: Walk{Pages: -1}}).Collect(ctx(t), f.Client, testRepo, testNow); err != nil {
+		t.Fatal(err)
+	}
+	if len(queries) != 2 {
+		t.Fatalf("made %d queries, want both pages", len(queries))
+	}
+	for _, q := range queries {
+		if n := strings.Count(q, "states: OPEN"); n != 2 {
+			t.Errorf("the open read filtered %d of its two connections to OPEN", n)
+		}
+	}
+	if strings.Contains(pullsQuery, "states:") {
+		t.Error("the read of what moved filters by state, so a close would never be read")
+	}
+	if strings.Replace(openPullsQuery, "states: OPEN, ", "", 2) != pullsQuery {
+		t.Error("the open read asks for something other than the fields of the read of what moved")
+	}
+}
+
+// TestPullsReadsExactlyThePagesTheWalkAllows: a walk allowed a number of
+// pages reads that many and no more, however many pages the API offers.
 func TestPullsReadsExactlyThePagesTheWalkAllows(t *testing.T) {
 	t.Parallel()
 	for pages, want := range map[int]int{0: 1, 2: 2} {

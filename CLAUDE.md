@@ -246,7 +246,7 @@ empties the read: the default branch head's `committedDate` is what
 `history(since:)` filters on, and the newest `updatedAt` of issues and pull
 requests is what the other two order by and stop at. Change a collector's
 window or filter and change the gate with it. Never gated: a backfill, the
-daily whole page of `issues`, and a repository the query did not answer for.
+day's read of every open item of `issues`, and a repository the query did not answer for.
 
 **The slow families take turns, in the loop only.** The running service starts
 one family of six hours or more a sweep at the built-in cadences (`takeTurns`),
@@ -277,10 +277,14 @@ own out.
 
 **A batch carries each row once.** Two points with one identity in one batch
 both reach every sink: the write ledger reserves the whole batch before it
-records any of it, so it does not dedupe within one; the store keeps whichever
-came last; and the Reducer's count and sum rules add both. So a collector
+records any of it, so it does not dedupe within one; a store keeps one row,
+with whichever came last; the Reducer reduces the batch to one row per
+identity first (`rows`), since 2.6.2; and a sink that prints or streams what
+it is handed, stdout, the SQL file or Loki, carries both. So a collector
 merges before it returns: the entries of one Actions cache on one ref are
-summed into their row, and an answer both comment walks read is rendered once.
+summed into their row, an answer both comment walks read is rendered once, and
+the two reads of the day's pull requests and issues go through
+`sink.Distinct`.
 
 **A `url` field is absolute or it is absent.** 66 of the 95 measurements
 carry one (the measurements page says which), and a table listing the rows of

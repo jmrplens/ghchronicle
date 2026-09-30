@@ -499,8 +499,9 @@ abierta. Una ya fusionada sigue respondiendo `CONFLICTING` mucho después de
 fusionarse, que es rancio y no falso, pero se lee como un repositorio lleno de
 conflictos. Una pasada solo lee lo que se actualizó en las dos últimas
 cadencias, así que una pull request abierta que nadie toca ve reescritos sus
-`seconds_open`, `mergeable` y `merge_state` una vez al día, en la lectura de
-página entera, en vez de cada hora; todo lo que mueve `updatedAt`, una
+`seconds_open`, `mergeable` y `merge_state` una vez al día, en la lectura
+diaria de cada elemento abierto, en vez de cada hora, por mucho que haga que se
+movió por última vez; todo lo que mueve `updatedAt`, una
 revisión, un comentario, un push, un cierre, lo reescribe la pasada siguiente.
 
 `stack`, `stack_size` y `stack_position` describen una pila de pull requests

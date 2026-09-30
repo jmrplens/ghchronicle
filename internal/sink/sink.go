@@ -30,6 +30,28 @@ type Point struct {
 	Time        time.Time
 }
 
+// Distinct keeps one point of each identity, the last one given, in the
+// place the first one held. Two reads that can both render a row, such as the
+// day's read of every open pull request and the read of what moved, must not
+// hand a sink the row twice: the write ledger reserves the whole batch before
+// it records any of it, so it lets both through, and a store keeps one row but
+// a sink that prints or streams what it is handed, stdout, the SQL file or
+// Loki, carries both. The last is kept because it is the later read.
+func Distinct(points []Point) []Point {
+	at := make(map[string]int, len(points))
+	out := make([]Point, 0, len(points))
+	for _, p := range points {
+		id := identity(p)
+		if i, seen := at[id]; seen {
+			out[i] = p
+			continue
+		}
+		at[id] = len(out)
+		out = append(out, p)
+	}
+	return out
+}
+
 // Sink accepts dated points. Implementations must be safe for concurrent use.
 type Sink interface {
 	// Write sends one family's points and reports how many of them this sink
