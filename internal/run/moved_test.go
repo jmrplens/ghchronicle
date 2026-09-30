@@ -111,7 +111,9 @@ func movedRunner(t *testing.T, fake *movedFake, now time.Time, daily bool, names
 		r.State.Mark(family, now.Add(-time.Minute))
 	}
 	if !daily {
-		r.State.MarkFull("issues", now)
+		for _, repo := range r.repos {
+			r.State.MarkFull(dayReadKey("issues", repo), now)
+		}
 	}
 	return r
 }

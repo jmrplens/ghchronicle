@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -31,21 +32,27 @@ func pullsRunner(t *testing.T) *Runner {
 
 // TestPullsPageFollowsTheTotals is the sizing: the page is what the
 // repository holds, rounded up to the next size the gateway prices, and never
-// more than ten on an hourly read, twenty-five on the day's read of what
-// moved, or fifty on the day's read of every open item, which is sized from
-// the open counts. Each is its cap until the totals family has said anything.
+// more than ten on an hourly read or twenty-five on either of the day's reads,
+// the one of every open item sized from the open counts; each is its cap until
+// the totals family has said anything. A repository with no day's read on
+// record asks for a first page of fifty, the newest fifty 2.6.4 wrote on a new
+// state file.
 func TestPullsPageFollowsTheTotals(t *testing.T) {
 	t.Parallel()
 	r := pullsRunner(t)
 	now := time.Now()
 	repo := collect.Repo{Owner: "o", Name: "n", FullName: "o/n"}
-	if got := r.pulls(repo, now); got.First != 25 {
-		t.Errorf("the day's read before totals ran = %+v, want twenty-five", got)
+	if got := r.pulls(repo, now); got.First != 50 {
+		t.Errorf("the day's read on a new state file = %+v, want a first page of fifty", got)
 	}
 	if got := r.openPulls(repo); got.First != 25 || !got.Open {
 		t.Errorf("every open item before totals ran = %+v, want twenty-five a page, open only", got)
 	}
-	r.State.MarkFull("issues", now)
+	r.State.MarkFull("issues", now.Add(-24*time.Hour))
+	if got := r.pulls(repo, now); got.First != 25 {
+		t.Errorf("the day's read after 2.6.4's record = %+v, want twenty-five", got)
+	}
+	r.State.MarkFull(dayReadKey("issues", repo), now)
 	if got := r.pulls(repo, now); got.First != 10 {
 		t.Errorf("an hourly read before totals ran = %+v, want ten", got)
 	}
@@ -58,8 +65,8 @@ func TestPullsPageFollowsTheTotals(t *testing.T) {
 		t.Errorf("two open pull requests = %+v, want a page of five", got)
 	}
 	r.counts["o/n"] = collect.ItemCounts{Pulls: 12, Issues: 244, OpenIssues: 26}
-	if got := r.openPulls(repo); got.First != 50 {
-		t.Errorf("twenty-six open issues = %+v, want a page of fifty", got)
+	if got := r.openPulls(repo); got.First != 25 {
+		t.Errorf("twenty-six open issues = %+v, want pages of twenty-five", got)
 	}
 	// A count that went stale cannot lose a row: every read walks every page
 	// back to its bound, whatever the count said.
@@ -68,7 +75,7 @@ func TestPullsPageFollowsTheTotals(t *testing.T) {
 		if got := r.pulls(repo, now); got.First < min(total, 10) || got.Walk.Pages >= 0 {
 			t.Errorf("%d pull requests = %+v", total, got)
 		}
-		if got := r.openPulls(repo); got.First < min(total, 50) || got.Walk.Pages >= 0 || !got.Walk.Since.IsZero() {
+		if got := r.openPulls(repo); got.First < min(total, 25) || got.Walk.Pages >= 0 || !got.Walk.Since.IsZero() {
 			t.Errorf("%d open pull requests = %+v", total, got)
 		}
 	}
@@ -76,9 +83,9 @@ func TestPullsPageFollowsTheTotals(t *testing.T) {
 
 // TestPullsReadWhatMovedAndReachBackADayOnceADay is the shape decided on
 // 2026-09-30: every sweep walks by updatedAt back to twice the cadence, and
-// the first sweep of each UTC day reaches back to a cadence before the day's
-// read before it, and a month when there was none, beside its read of every
-// open item.
+// the first sweep of each UTC day reaches back to a cadence before the
+// repository's day's read before it, and a month when there was none, beside
+// its read of every open item.
 func TestPullsReadWhatMovedAndReachBackADayOnceADay(t *testing.T) {
 	t.Parallel()
 	r := pullsRunner(t)
@@ -88,13 +95,23 @@ func TestPullsReadWhatMovedAndReachBackADayOnceADay(t *testing.T) {
 
 	// Never read: this sweep is the day's first, on a state file with no
 	// day's read on record.
-	if !r.fullPassDue("issues", now) {
-		t.Fatal("a family that never took the day's read is due one")
+	if !r.dayReadDue("issues", repo, now) {
+		t.Fatal("a repository that never took the day's read is due one")
 	}
 	if got := r.pulls(repo, now); !got.Walk.Since.Equal(now.AddDate(0, -1, 0)) || got.Walk.Pages >= 0 {
 		t.Errorf("the day's read on a new state file = %+v, want every page back a month", got)
 	}
-	r.State.MarkFull("issues", now)
+	// A state file 2.6.4 wrote holds the family's record: the day's read
+	// reaches back to it, and no further than a month.
+	r.State.MarkFull("issues", now.Add(-26*time.Hour))
+	if got := r.pulls(repo, now); !got.Walk.Since.Equal(now.Add(-26*time.Hour - every)) {
+		t.Errorf("the day's read after 2.6.4's record = %+v, want a cadence before it", got)
+	}
+	r.State.MarkFull("issues", now.AddDate(0, -3, 0))
+	if got := r.pulls(repo, now); !got.Walk.Since.Equal(now.AddDate(0, -1, 0)) {
+		t.Errorf("the day's read of a repository added since 2.6.4's old record = %+v, want a month", got)
+	}
+	r.State.MarkFull(dayReadKey("issues", repo), now)
 
 	// The sweep after it reads what changed, twice the cadence back.
 	sweep := r.pulls(repo, now)
@@ -142,11 +159,11 @@ func TestTheDailyPullsPassIsMarkedWhenTheFamilyRan(t *testing.T) {
 	if counts := r.counts[repo.FullName]; counts.Pulls != 221 || counts.Issues != 43 {
 		t.Errorf("counts after the sweep = %+v, want what the totals family read", counts)
 	}
-	if _, marked := r.State.LastFull["issues"]; !marked {
+	if _, marked := r.State.LastFull[dayReadKey("issues", repo)]; !marked {
 		t.Fatal("the sweep took the day's read of pull requests and did not record it")
 	}
 	saved := LoadState(r.State.path)
-	if _, kept := saved.LastFull["issues"]; !kept {
+	if _, kept := saved.LastFull[dayReadKey("issues", repo)]; !kept {
 		t.Error("the day's read did not reach the state file")
 	}
 	if got := r.pulls(repo, time.Now()); got.Walk.Since.IsZero() || got.First != 10 {
@@ -208,41 +225,52 @@ func TestDiscussionsAreSizedForTheSweep(t *testing.T) {
 func TestTheDailyPullsPassIsOncePerUTCDay(t *testing.T) {
 	t.Parallel()
 	r := pullsRunner(t)
+	repo := collect.Repo{Owner: "o", Name: "n", FullName: "o/n"}
+	key := dayReadKey("issues", repo)
 	lateEvening := time.Date(2026, 9, 11, 23, 50, 0, 0, time.UTC)
-	r.State.MarkFull("issues", lateEvening)
-	if !r.fullPassDue("issues", lateEvening.Add(20*time.Minute)) {
+	r.State.MarkFull(key, lateEvening)
+	if !r.dayReadDue("issues", repo, lateEvening.Add(20*time.Minute)) {
 		t.Error("a new UTC day twenty minutes after the last pass is due one, whatever the clock says")
 	}
-	if r.fullPassDue("issues", lateEvening.Add(-23*time.Hour)) {
+	if r.dayReadDue("issues", repo, lateEvening.Add(-23*time.Hour)) {
 		t.Error("the same UTC day is not due a second pass")
 	}
 	// Midnight is decided in UTC, which is the day the open rows are stamped
 	// at, not in whatever zone the host runs in.
-	r.State.MarkFull("issues", lateEvening.In(time.FixedZone("east", 3*3600)))
-	if !r.fullPassDue("issues", lateEvening.Add(20*time.Minute).In(time.FixedZone("west", -5*3600))) {
+	r.State.MarkFull(key, lateEvening.In(time.FixedZone("east", 3*3600)))
+	if !r.dayReadDue("issues", repo, lateEvening.Add(20*time.Minute).In(time.FixedZone("west", -5*3600))) {
 		t.Error("the day boundary moved with the host's zone")
 	}
 }
 
-// TestTheDailyPullsPassIsNotOnRecordWhenARepositoryFailed is the other way
-// an untouched open pull request could go a day without its row: the daily
-// pass fails on one repository and is recorded as done for all of them, so
-// nothing rewrites that repository's open rows until the next day. Left
-// unrecorded, the next sweep takes the day's read again, which costs one more
-// and loses nothing.
-func TestTheDailyPullsPassIsNotOnRecordWhenARepositoryFailed(t *testing.T) {
+// TestTheDaysReadIsRecordedPerRepository is the other way an untouched open
+// pull request could go a day without its row, and the cost of guarding it:
+// the day's read fails on one repository, and that repository takes it again
+// on the next sweep while the one it reached does not. 2.6.4 recorded the read
+// for the family once every repository had answered, so one that kept failing
+// made every sweep take the day's read of every repository again.
+func TestTheDaysReadIsRecordedPerRepository(t *testing.T) {
 	t.Parallel()
 	broken := true
+	var mu sync.Mutex
+	openAsked := map[string]int{}
 	r := sweepRunner(t, func(w http.ResponseWriter, req *http.Request) {
 		var body struct {
+			Query     string         `json:"query"`
 			Variables map[string]any `json:"variables"`
 		}
 		if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
 			t.Error(err)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		if broken && body.Variables["name"] == "b" {
-			_, _ = w.Write([]byte(`{"errors":[{"type":"NOT_FOUND","message":"gone"}]}`))
+		name, _ := body.Variables["name"].(string)
+		if strings.Contains(body.Query, "states: OPEN") {
+			mu.Lock()
+			openAsked[name]++
+			mu.Unlock()
+		}
+		if broken && name == "b" {
+			_, _ = w.Write([]byte(`{"errors":[{"type":"INTERNAL","message":"boom"}]}`))
 			return
 		}
 		_, _ = w.Write([]byte(`{"data":{"repository":{"pullRequests":{"pageInfo":{},"nodes":[]},"issues":{"pageInfo":{},"nodes":[]}}}}`))
@@ -251,10 +279,9 @@ func TestTheDailyPullsPassIsNotOnRecordWhenARepositoryFailed(t *testing.T) {
 	if err := r.Cfg.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	r.repos = []collect.Repo{
-		{Owner: "o", Name: "a", FullName: "o/a"},
-		{Owner: "o", Name: "b", FullName: "o/b"},
-	}
+	a := collect.Repo{Owner: "o", Name: "a", FullName: "o/a"}
+	b := collect.Repo{Owner: "o", Name: "b", FullName: "o/b"}
+	r.repos = []collect.Repo{a, b}
 	now := time.Now()
 	if err := r.repoFamilies(t.Context(), now); err != nil {
 		t.Fatal(err)
@@ -262,15 +289,50 @@ func TestTheDailyPullsPassIsNotOnRecordWhenARepositoryFailed(t *testing.T) {
 	if _, ran := r.State.LastRun["issues"]; !ran {
 		t.Fatal("one repository failing is not the family failing: it ran")
 	}
-	if _, full := r.State.LastFull["issues"]; full {
-		t.Error("the daily pass failed on a repository and was put on record as done")
+	if _, done := r.State.LastFull[dayReadKey("issues", a)]; !done {
+		t.Error("the day's read reached o/a and was not put on record for it")
+	}
+	if _, done := r.State.LastFull[dayReadKey("issues", b)]; done {
+		t.Error("the day's read failed on o/b and was put on record for it")
 	}
 	broken = false
+	clear(openAsked)
+	r.State.Mark("issues", now.Add(-2*time.Hour))
 	if err := r.repoFamilies(t.Context(), now.Add(time.Minute)); err != nil {
 		t.Fatal(err)
 	}
-	if _, full := r.State.LastFull["issues"]; !full {
-		t.Error("the daily pass reached every repository and was not put on record")
+	if openAsked["a"] != 0 || openAsked["b"] != 1 {
+		t.Errorf("every open item asked again of %v, want o/b alone", openAsked)
+	}
+	if _, done := r.State.LastFull[dayReadKey("issues", b)]; !done {
+		t.Error("the day's read reached o/b and was not put on record for it")
+	}
+}
+
+// TestABackfillTakesNoDaysRead: a backfill reads no open item it has no
+// reason to, and records nothing, so the sweeps later that day still take the
+// day's read. 2.6.4 recorded it for the family after a backfill, and an open
+// item last touched before the backfill's bound went without its row that day.
+func TestABackfillTakesNoDaysRead(t *testing.T) {
+	t.Parallel()
+	r := sweepRunner(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"repository":{"pullRequests":{"pageInfo":{},"nodes":[]},"issues":{"pageInfo":{},"nodes":[]}}}}`))
+	})
+	r.Cfg.Every = everyOnly("issues")
+	if err := r.Cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	r.Backfill, r.BackfillSince = true, time.Now().AddDate(0, -3, 0)
+	if err := r.repoFamilies(t.Context(), time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if len(r.State.LastFull) != 0 {
+		t.Errorf("a backfill recorded a day's read: %v", r.State.LastFull)
+	}
+	r.Backfill = false
+	if !r.dayReadDue("issues", r.repos[0], time.Now()) {
+		t.Error("the sweep after a backfill is not due the day's read")
 	}
 }
 
@@ -344,8 +406,8 @@ func issuesServer(t *testing.T, items []issueItem, now time.Time) http.HandlerFu
 // 2026-09-30: open issue 961 of jmrplens/gitlab-mcp-server, 59th by
 // updatedAt, had no row for the 29th, because the day's read was the newest
 // fifty of every state. Here the open issue last touched two months ago is
-// 60th, behind fifty-eight closed in the last few minutes, and the day's read
-// writes its row of the day. The open issue that moved a minute ago is in
+// 160th, behind fifty-eight closed in the last few minutes and a hundred
+// closed forty days ago, and the day's read writes its row of the day. The open issue that moved a minute ago is in
 // both of the day's reads and is written once.
 func TestTheDaysReadWritesAnOpenItemFiftyOthersMovedPast(t *testing.T) {
 	t.Parallel()
@@ -353,6 +415,11 @@ func TestTheDaysReadWritesAnOpenItemFiftyOthersMovedPast(t *testing.T) {
 	items := []issueItem{{100, "OPEN", now.Add(-time.Minute)}}
 	for i := range 58 {
 		items = append(items, issueItem{i + 2, "CLOSED", now.Add(-2*time.Minute - time.Duration(i)*time.Second)})
+	}
+	// Past the day's read of what moved, which stops at the first page
+	// whose last item is older than its month.
+	for i := range 100 {
+		items = append(items, issueItem{i + 200, "CLOSED", now.AddDate(0, 0, -40).Add(-time.Duration(i) * time.Second)})
 	}
 	items = append(items, issueItem{1, "OPEN", now.AddDate(0, -2, 0)})
 
@@ -373,7 +440,7 @@ func TestTheDaysReadWritesAnOpenItemFiftyOthersMovedPast(t *testing.T) {
 		}
 	}
 	if rows["1"] != 1 {
-		t.Errorf("the open issue sixty items back has %d rows for today, want 1", rows["1"])
+		t.Errorf("the open issue 160 items back has %d rows for today, want 1", rows["1"])
 	}
 	if rows["100"] != 1 {
 		t.Errorf("the open issue both reads found has %d rows for today, want 1", rows["100"])

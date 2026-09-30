@@ -41,8 +41,9 @@ import (
 //     last ran. Without it the next sweep has only the photograph, no diff.
 //   - last_full: when each family that normally reads what changed last took
 //     the day's read, which for issues is every open item and what moved since
-//     the day's read before it. Absent reads as due, so the next sweep takes
-//     it.
+//     the day's read before it, recorded per repository under
+//     "issues/<full_name>" since 2.6.5. Absent reads as due, so the next
+//     sweep takes it.
 //   - last_notified: where the inbox window was cut. Zero asks for the whole
 //     inbox.
 //   - last_event: the newest event the feed had. Empty reads the whole feed.

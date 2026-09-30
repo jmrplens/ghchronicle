@@ -34,8 +34,9 @@ type Point struct {
 // place the first one held. Two reads that can both render a row, such as the
 // day's read of every open pull request and the read of what moved, must not
 // hand a sink the row twice: the write ledger reserves the whole batch before
-// it records any of it, so it lets both through, and the Reducer's count and
-// sum rules add both. The last is kept because it is the later read.
+// it records any of it, so it lets both through, and a store keeps one row but
+// a sink that prints or streams what it is handed, stdout, the SQL file or
+// Loki, carries both. The last is kept because it is the later read.
 func Distinct(points []Point) []Point {
 	at := make(map[string]int, len(points))
 	out := make([]Point, 0, len(points))

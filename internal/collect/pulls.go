@@ -759,6 +759,8 @@ func fieldSum(fields map[string]any, names ...string) int {
 // does. Measured against the live API on 2026-09-11 with the pull request
 // query at Threads=10, first 50 costs 8, 20 costs 3, 10 costs 2 and 5 costs
 // 1, on a repository with no pull requests at all as much as on the busiest.
+// Asked with dryRun on 2026-09-30, the query having grown since, 50 costs 9
+// and 25 costs 4, with the filter to the open items or without it.
 // Fifty is also the page the backfill uses and the one this walk halves
 // from, so nothing is ever asked for beyond it.
 func PageFor(total int) int {

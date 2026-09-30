@@ -147,8 +147,9 @@ Nueve cosas, y borrar el fichero cuesta una distinta por cada una:
   pasada siguiente tiene la fotografía y no el diff.
 - `last_full`, cuándo hizo la lectura del día cada familia que normalmente lee
   solo lo que ha cambiado: para `issues`, cada elemento abierto y lo que se
-  movió desde la lectura del día anterior. Sin él una familia se lee como
-  vencida, así que la pasada siguiente la hace, llegando un mes atrás.
+  movió desde la lectura del día anterior, anotada por repositorio, así que uno
+  que falló la repite y ningún otro. Sin él un repositorio se lee como vencido,
+  así que la pasada siguiente la hace, llegando un mes atrás.
 - `last_notified`, por dónde se cortó la ventana del buzón. Sin él a cero pide
   el buzón entero.
 - `last_event`, el evento más reciente que tenía el feed. Sin él vacío lee el

@@ -89,7 +89,7 @@ func (m Movement) CommitsSince(since time.Time) bool { return !m.Head.Before(sin
 // issueevents pass finds nothing then, because it skips an item last updated
 // before since, an event moving its item's updatedAt; the incremental issues
 // pass would rewrite the newest page of items nobody touched, which is the
-// daily whole-page read's job and not something that moved.
+// job of the day's read of every open item and not something that moved.
 func (m Movement) ItemsSince(since time.Time) bool { return !m.Items.Before(since) }
 
 // movedNode is one repository's answer.

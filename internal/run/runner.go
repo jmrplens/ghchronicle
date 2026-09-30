@@ -100,7 +100,7 @@ type Runner struct {
 	// one whole read of its daily star history, leaving every later sweep on
 	// the newest page; last_head would move the dependency diff's
 	// base past changes no range can name afterwards; last_full would spend
-	// the day's whole-page read of the pull requests nobody touched;
+	// the day's read of the pull requests nobody touched;
 	// last_notified would cut the inbox window past threads the stores never
 	// saw; and last_event would stop the next feed read at an event they never
 	// got. The state file is still read: what it remembers only makes this
@@ -171,7 +171,7 @@ type Runner struct {
 	// Only the first, because a totals pass that answers with no counts, on
 	// an account with nothing in it, would otherwise be forced on every
 	// sweep. What the counts save is the page of fifty they replace: on
-	// 2026-09-26 the daily whole-page read cost 328 points against the 139 of
+	// 2026-09-26 the day's read, a page of fifty then, cost 328 points against the 139 of
 	// each of the five days before it, the process having started eleven
 	// hours before the read with no counts, and totals not being due until
 	// forty-five minutes after it.
@@ -608,16 +608,6 @@ func (r *Runner) repoFamilies(ctx context.Context, now time.Time) error {
 			// is what the family covered.
 			r.checkpointFamily(family, len(r.repos), 0)
 		}
-		// Marked after the repositories ran, so every one of them saw the
-		// same answer to "is the read of every open item due" that the
-		// first did; and only when every one of them answered, because that
-		// read is the one that rewrites an open pull request nobody touched,
-		// and a repository it failed on would otherwise wait a day for the
-		// next. Left unrecorded, the next sweep reads every open item again,
-		// which costs one more daily read and loses nothing.
-		if pass.failed == 0 && r.fullPassDue(family, now) {
-			r.State.MarkFull(family, now)
-		}
 		r.markRun(family, due, now)
 	}
 	return nil
@@ -1000,7 +990,7 @@ func (r *Runner) sinceWindow(ctx context.Context, family string, repo collect.Re
 	case "issues":
 		pulls := r.pulls(repo, now)
 		since, read = pulls.Walk.Since, pulls
-		if !r.Backfill && r.fullPassDue(family, now) {
+		if r.dayReadDue(family, repo, now) {
 			every := r.openPulls(repo)
 			open = &every
 		}
@@ -1022,12 +1012,28 @@ func (r *Runner) sinceWindow(ctx context.Context, family string, repo collect.Re
 		points, openErr = open.Collect(ctx, r.API, repo, now)
 	}
 	if r.stayedPut(ctx, family, repo, since) {
+		r.dayReadDone(family, repo, open != nil && openErr == nil, now)
 		return points, openErr
 	}
 	moved, err := read.Collect(ctx, r.API, repo, now)
+	r.dayReadDone(family, repo, open != nil && openErr == nil && err == nil, now)
 	// An open item that moved in the window is in both reads, and a batch
 	// carries each row once.
 	return sink.Distinct(append(points, moved...)), errors.Join(openErr, err)
+}
+
+// dayReadDone records that the day's read of family reached repo, when it
+// did, both of its reads answering. Recorded per repository and at once,
+// rather than for the family once every repository has answered, which is
+// what 2.6.4 did: one repository that kept failing made every sweep take the
+// day's read of every repository again, each reaching back to the last day
+// all of them answered, and a backfill, which takes no read of the open
+// items, or a pass stopped for want of budget recorded it for repositories
+// it never read that way.
+func (r *Runner) dayReadDone(family string, repo collect.Repo, done bool, now time.Time) {
+	if done {
+		r.State.MarkFull(dayReadKey(family, repo), now)
+	}
 }
 
 // pulls is the pull request collector for this run's read of what moved.
@@ -1052,8 +1058,9 @@ func (r *Runner) sinceWindow(ctx context.Context, family string, repo collect.Re
 //
 // GitHub charges the query for the page asked for, not for what it returns:
 // measured on 2026-09-11, fifty costs eight points on a repository with no
-// pull requests at all. So the page is sized from the last lifetime totals
-// where they are known.
+// pull requests at all, and nine asked with dryRun on 2026-09-30, since the
+// query has grown. So the page is sized from the last lifetime totals where
+// they are known.
 func (r *Runner) pulls(repo collect.Repo, now time.Time) collect.Pulls {
 	if r.Backfill {
 		// Fifty, not the hundred this used to ask for. A pull request now
@@ -1071,34 +1078,68 @@ func (r *Runner) pulls(repo collect.Repo, now time.Time) collect.Pulls {
 	// longer walk rather than a lost row. The day's read covers a day and
 	// asks for twenty-five: fifty of jmrplens/phonometry's pull requests met
 	// the gateway's ten seconds on every day from 2026-09-19 to 29, and
-	// twenty-five answered in 3 to 9 s.
-	first, daily := 10, 25
+	// twenty-five answered in 3.2 to 9.5 s on eleven of those days and met it
+	// once, on the 19th, at 10.6 s, answering when halved to twelve.
+	size := 50
 	if counts, known := r.counts[repo.FullName]; known {
-		size := collect.PageFor(counts.Most())
-		first, daily = min(size, first), min(size, daily)
+		size = collect.PageFor(counts.Most())
 	}
+	first := min(size, 10)
 	every, _ := r.Cfg.Interval("issues")
 	since := now.Add(-2 * every)
 	if last, ran := r.State.LastRun["issues"]; ran && last.Before(since) {
 		since = last.Add(-every)
 	}
-	if r.fullPassDue("issues", now) {
-		from := now.AddDate(0, -1, 0)
-		if last, read := r.State.LastFull["issues"]; read {
-			from = last.Add(-every)
+	if r.dayReadDue("issues", repo, now) {
+		var from time.Time
+		from, first = r.dayReadFrom(repo, now, every), min(size, 25)
+		if _, recorded := r.lastDayRead(repo); !recorded {
+			// Nothing on record: a new state file, which is what every run
+			// of the Action starts from, or a repository never read before.
+			// A first page of fifty keeps what 2.6.4 wrote there, the newest
+			// fifty of each kind whatever their age, beside the month.
+			first = size
 		}
 		if from.Before(since) {
 			since = from
 		}
-		first = daily
 	}
 	return collect.Pulls{First: first, Walk: collect.Walk{Pages: -1, Since: since}}
 }
 
+// lastDayRead is when the day's read of issues last reached repo: its own
+// record, or, in a state file 2.6.4 wrote, the family's, which it recorded
+// once every repository had answered.
+func (r *Runner) lastDayRead(repo collect.Repo) (time.Time, bool) {
+	if last, ok := r.State.LastFull[dayReadKey("issues", repo)]; ok {
+		return last, true
+	}
+	last, ok := r.State.LastFull["issues"]
+	return last, ok
+}
+
+// dayReadFrom is how far back the day's read of what moved reaches for repo:
+// a cadence before the day's read before it, and a month when there is none
+// on record or the family's record 2.6.4 left is older than that, which a
+// repository added since would otherwise inherit.
+func (r *Runner) dayReadFrom(repo collect.Repo, now time.Time, every time.Duration) time.Time {
+	month := now.AddDate(0, -1, 0)
+	if last, ok := r.State.LastFull[dayReadKey("issues", repo)]; ok {
+		return last.Add(-every)
+	}
+	if last, ok := r.State.LastFull["issues"]; ok && last.Add(-every).After(month) {
+		return last.Add(-every)
+	}
+	return month
+}
+
 // openPulls is the day's read of every open pull request and issue of a
 // repository, beside the read of what moved: see collect.Pulls.Open. It walks
-// every page, sized from the open counts the totals family last read, and
-// twenty-five a page, the day's read of what moved, until it has read any.
+// every page, sized from the open counts the totals family last read and never
+// more than twenty-five a page, the day's page of what moved, which is also
+// what it asks for until it has read any: two pages of twenty-five cost 8
+// points where one of fifty costs 9, and fifty open pull requests are what
+// meets the gateway's ten seconds.
 // Until 2.6.5 this was the newest fifty of
 // every state instead, which missed an open item once fifty others had moved
 // after it, and read half of that on a day the gateway gave up on fifty, as it
@@ -1107,7 +1148,7 @@ func (r *Runner) pulls(repo collect.Repo, now time.Time) collect.Pulls {
 func (r *Runner) openPulls(repo collect.Repo) collect.Pulls {
 	first := 25
 	if counts, known := r.counts[repo.FullName]; known {
-		first = collect.PageFor(counts.MostOpen())
+		first = min(collect.PageFor(counts.MostOpen()), first)
 	}
 	return collect.Pulls{First: first, Open: true, Walk: collect.Walk{Pages: -1}}
 }
@@ -1160,14 +1201,21 @@ func (r *Runner) discussions() collect.Discussions {
 	return d
 }
 
-// fullPassDue reports whether this sweep of family reads every open item as
-// well as what changed. Only issues has the two reads: see openPulls.
+// dayReadKey is where last_full records the day's read of family for one
+// repository.
+func dayReadKey(family string, repo collect.Repo) string {
+	return family + "/" + repo.FullName
+}
+
+// dayReadDue reports whether this sweep takes the day's read of family for
+// repo: every open item, and what moved since the day's read before it. Only
+// issues has one, and a backfill takes none.
 //
 // Due once per UTC day, not once every twenty-four hours. An open pull
-// request nobody touches is stamped at the start of the UTC day and this pass
-// is the only read that rewrites it, so the day that matters is the one the
-// row is stamped at. Twenty-four hours after the last pass is not that: an
-// hourly family slips a tick now and then and the pass drifts later with it,
+// request nobody touches is stamped at the start of the UTC day and this read
+// is the only one that rewrites it, so the day that matters is the one the
+// row is stamped at. Twenty-four hours after the last read is not that: an
+// hourly family slips a tick now and then and the read drifts later with it,
 // and the day it drifted across midnight would hold no row at all for any
 // untouched open pull request.
 //
@@ -1176,21 +1224,21 @@ func (r *Runner) discussions() collect.Discussions {
 // hash(full_name) mod 24, would take its points out of the first hour, and it
 // keeps a day the service starts after a repository's hour, whose first sweep
 // is already past it. It does not keep a day the family stops running before
-// that hour. As it is, any sweep of the day reads the page, the first and, if
-// that one failed, each one after it; spread, only the sweeps after the hour
-// could. Such a day loses the row of every untouched open pull request of each
-// repository whose hour had not come, and nothing can write it later, because
-// a read stamps the day it happens on. The production service was stopped
-// from 14:11Z on 2026-09-17 to 22:46Z, and had it come back after midnight,
-// every repository whose hour fell in that gap would have no row for the day;
-// and every.groups.work: 6h has no issues sweep after its last of the day, at
-// the same hour every day, so a repository whose hour fell after it would
-// never be read whole.
-func (r *Runner) fullPassDue(family string, now time.Time) bool {
-	if family != "issues" {
+// that hour. As it is, any sweep of the day takes the read, the first and, for
+// a repository it failed on, each one after it; spread, only the sweeps after
+// the hour could. Such a day loses the row of every untouched open pull
+// request of each repository whose hour had not come, and nothing can write it
+// later, because a read stamps the day it happens on. The production service
+// was stopped from 14:11Z on 2026-09-17 to 22:46Z, and had it come back after
+// midnight, every repository whose hour fell in that gap would have no row for
+// the day; and every.groups.work: 6h has no issues sweep after its last of the
+// day, at the same hour every day, so a repository whose hour fell after it
+// would never be read whole.
+func (r *Runner) dayReadDue(family string, repo collect.Repo, now time.Time) bool {
+	if family != "issues" || r.Backfill {
 		return false
 	}
-	last, ok := r.State.LastFull[family]
+	last, ok := r.State.LastFull[dayReadKey(family, repo)]
 	return !ok || !sameUTCDay(last, now)
 }
 
@@ -1289,7 +1337,7 @@ func (r *Runner) commits(now time.Time) collect.Commits {
 // that makes the read come back empty, not a guess at it, so what it gives up
 // is the charge and never a row, with one difference: the incremental issues
 // pass on a repository nothing moved in would have rewritten the newest page
-// of items nobody touched, which is the daily whole-page read's to do.
+// of items nobody touched, which is the day's read of every open item's to do.
 //
 // The query is asked once per sweep, by the first of the three families to
 // reach a repository, rather than at the top of the sweep, because whether
