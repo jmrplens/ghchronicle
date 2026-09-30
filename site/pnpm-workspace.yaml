@@ -10,14 +10,16 @@ overrides:
   lodash: 4.18.1
   yaml: 2.9.0
   yaml-language-server@1.20.0>yaml: 2.9.0
-  # brace-expansion ReDoS (GHSA-3jxr-9vmj-r5cp) and unbounded-expansion DoS
-  # (GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895); dev/build deps only.
-  # The 1.x line now has a fixed release on the maintenance-v1 tag (1.1.18), so
-  # both branches can be pinned to a patched version and neither needs an audit
-  # exception. Do not force 5.x onto a 1.x consumer: v1 exported the expand
-  # function directly where v5 exports an object.
-  "brace-expansion@<1.1.18": 1.1.18
-  "brace-expansion@>=3.0.0 <5.0.9": 5.0.9
+  # brace-expansion ReDoS (GHSA-3jxr-9vmj-r5cp), unbounded-expansion DoS
+  # (GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895), and the three DoS advisories of
+  # 2026-09-30 (GHSA-6j4f-fj2g-mc7p, GHSA-qhr7-859c-m2p7, GHSA-q2hr-2g5m-vwhr,
+  # fixed in 1.1.21 and 5.0.12); dev/build deps only. The 1.x line has fixed
+  # releases on its 1.x tag, so both branches can be pinned to a patched
+  # version and neither needs an audit exception. Do not force 5.x onto a 1.x
+  # consumer: v1 exported the expand function directly where v5 exports an
+  # object.
+  "brace-expansion@<1.1.21": 1.1.21
+  "brace-expansion@>=3.0.0 <5.0.12": 5.0.12
   # js-yaml quadratic CPU consumption in !!omap resolution (GHSA-5p4m-2wfm-xmqj,
   # CVE-2026-59870), and then maxTotalMergeKeys not bounding CPU for empty
   # merge sources (GHSA-2883-xcg3-v3hh), which 4.3.1 is itself vulnerable to.

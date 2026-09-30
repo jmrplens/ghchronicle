@@ -93,17 +93,29 @@ not moved while what moved is gated as before, and of `sink.Distinct` are new.
 The fake GitHub of the end-to-end suites now answers a query filtered to the
 open items with the open items of its fixture only.
 
+Production has run this release since 30 September at 02:16 CEST. Its first
+day's read, at 00:35 UTC, asked the 40 repositories for their open items in 41
+queries and 45 points, the slowest answered in 4.8 seconds and the 10 open pull
+requests of `jmrplens/phonometry` in 3.8, and no later sweep of the day asked
+again. The next day's path was then taken by moving each repository's record
+back a day: the open items were read the same way, and what had moved since
+was read in the 5 repositories where something had, in 20 points, the slowest
+in 8.3 seconds. Every pull request and issue open on GitHub had its row of the
+day, 42 of 42, the open issue 961 of `jmrplens/gitlab-mcp-server` among them.
+
 Not verified:
 
-- Production had not run this release when it was written. Its first day's read
-  is what writes `jmrplens/gitlab-mcp-server`'s open issue 961 its first row
-  since 28 September.
 - The net for two failed sweeps in a row is tested as the window it reads, not
   by failing a repository twice against GitHub.
-- A closed item can change without moving `updatedAt` only in fields this
-  account could not show: it has no reactions, and a resolved review thread
-  carries no time. 2.6.4's daily page rewrote such a field on the fifty items
-  updated last; nothing rewrites it now once the item has closed.
+- What a closed item's row carries can change without moving its `updatedAt`:
+  its reactions (16 of 200 reactions on 320 open items of `cli/cli`,
+  `microsoft/vscode`, `kubernetes/kubernetes` and `golang/go` came after the
+  item's `updatedAt`), and the name of a milestone renamed in its repository
+  (`microsoft/TypeScript` issue 26306, last updated on 2018-08-08 when it was
+  put in the milestone "Future", now called "Backlog"). An open item's row is
+  rewritten by every day's read; 2.6.4's daily page also rewrote such a field
+  on the closed items among the fifty updated last, and nothing rewrites it
+  once the item has closed.
 
 ## 2.6.4 - 2026-09-30
 
