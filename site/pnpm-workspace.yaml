@@ -27,6 +27,18 @@ overrides:
   # v4-legacy tag: the 4.x line is what Astro depends on, and pinning 5.x onto
   # it is a major bump an advisory fix should not drag in.
   "js-yaml@>=4.0.0 <4.3.2": 4.3.2
+  # basic-ftp quadratic-time CPU denial of service in the Unix directory-listing
+  # parser (GHSA-c475-qrg2-pj4r), fixed in 6.2.1 with no 5.x release. Dev-only
+  # path: pa11y-ci > puppeteer > @puppeteer/browsers > proxy-agent >
+  # pac-proxy-agent > get-uri, and get-uri, up to its latest 8.0.1, still asks
+  # for ^5.3.1, so no parent update reaches a fixed version. Forcing 6.x onto
+  # it is safe where forcing brace-expansion 5.x onto a 1.x consumer is not:
+  # 6.0.0's one breaking change is that a client refuses a separate transfer
+  # host unless told otherwise, and get-uri only calls Client, access, lastMod,
+  # list, downloadTo and close, which kept their signatures. 6.2.3 also carries
+  # the fixes for GHSA-5rfr-xx34-2xxv (6.2.2) and GHSA-r4jh-29pc-gfqr (6.2.3).
+  # Lift this once get-uri depends on a fixed basic-ftp itself.
+  "basic-ftp@<6.2.3": 6.2.3
   # 7.3.1 added a pass that moves a <style> element's text into a `set:html`
   # property, and runs it before the pass that collapses static MDX subtrees
   # to an HTML string. Starlight turns that collapsing on, so the property is
