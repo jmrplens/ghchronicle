@@ -200,7 +200,7 @@ jobs:
         timeout-minutes: 4
         working-directory: site
         env:
-          BASE: https://jmrplens.github.io/ghchronicle/
+          BASE: https://docs.jmrp.io/ghchronicle/
           ALL: ${{ github.event_name == 'workflow_dispatch' && inputs.indexnow_all }}
           BUDGET: 120
         run: |
@@ -286,13 +286,14 @@ jobs:
   #
   # The key is not a secret. IndexNow proves that the submitter controls the
   # host by fetching the key from it, so it is public by design:
-  # https://jmrplens.github.io/dc7e97bcf6a14edea77efc1983e3e751.txt, served by
-  # the jmrplens.github.io repository and answering 200 with the key on
-  # 2026-09-24. A key file at the root of the host covers every URL on it,
-  # /ghchronicle/ included (indexnow.org/documentation, "Option 2"), which is
-  # why the URLs submitted are the Pages ones and not the jmrp.io/docs
-  # addresses that redirect to them. It runs no code from this repository and
-  # needs no token, hence `permissions: {}`.
+  # https://docs.jmrp.io/dc7e97bcf6a14edea77efc1983e3e751.txt, served by the
+  # jmrplens.github.io repository, the account's user site, at the root of the
+  # custom domain its Pages answer on (on its github.io host it answered 200
+  # with the key on 2026-09-24). A key file at the root of the host covers
+  # every URL on it, /ghchronicle/ included (indexnow.org/documentation,
+  # "Option 2"), which is why the URLs submitted are the docs.jmrp.io ones
+  # Pages serves and not the old addresses that redirect to them. It runs no
+  # code from this repository and needs no token, hence `permissions: {}`.
   #
   # Only in this repository: a fork with Pages switched on would otherwise
   # submit this host's URLs under this host's key, listed by how the fork's
@@ -309,7 +310,7 @@ jobs:
       - name: Submit the pages this deploy changed
         env:
           URLS: ${{ needs.build.outputs.indexnow_urls }}
-          HOST: jmrplens.github.io
+          HOST: docs.jmrp.io
           KEY: dc7e97bcf6a14edea77efc1983e3e751
         run: |
           set -u

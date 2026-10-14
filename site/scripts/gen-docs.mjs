@@ -76,10 +76,10 @@ process.env.BASE_URL = fromConfig(
 const { reduceBody } = await import("../src/lib/page-markdown.mjs");
 const { BASE, routeOf } = await import("../src/lib/site.mjs");
 
-// The origin these files advertise, which is the canonical domain rather than
-// the one the pages are served from; astro.config.mjs says why beside the
-// declaration. `site.mjs` keeps building the served URLs for the site itself,
-// so only the links that leave the site are rewritten here.
+// The URL these files advertise, the publicDocs declaration in
+// astro.config.mjs, which says what it is. It states the same address as
+// `site` today; `site.mjs` keeps building the served URLs for the site itself
+// from `site`, and only the links that leave the site are rewritten here.
 const PUBLIC = fromConfig(
 	/const publicDocs\s*=\s*"([^"]+)"/,
 	"public docs URL",

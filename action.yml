@@ -61,7 +61,7 @@ inputs:
     description: >
       Card width in pixels. Empty, or 0, draws the layout at its own width. Each layout draws between
       two ends of its own and refuses anything outside them; `ghchronicle -card-layouts` prints both,
-      and so does each layout's section at https://jmrp.io/docs/ghchronicle/card/layouts/.
+      and so does each layout's section at https://docs.jmrp.io/ghchronicle/card/layouts/.
       `badge-row` ignores this input, its width following its pills. Only `activity-heatmap` spends
       the room on data, a week of the contribution calendar at a time until its far end, where the
       whole year is drawn; every other layout spreads the same content wider.

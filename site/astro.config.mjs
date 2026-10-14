@@ -17,17 +17,20 @@ import { fileURLToPath } from "node:url";
 const siteRoot = fileURLToPath(new URL(".", import.meta.url));
 const siteBase = "/ghchronicle";
 
-// Where the documentation is advertised, which is not where it is served.
+// Where the documentation is advertised, which is also where it is served.
 //
-// `site` below has to name GitHub Pages, because that is where the bytes are
-// and it is what the canonical link, the sitemap and the hreflang pairs must
-// agree with. What a reader is handed is the other one: jmrp.io 301s
-// /docs/ghchronicle and everything under it to the Pages URL, so a link that
-// carries it reaches the same page and puts the canonical domain in the
-// places a mention counts, which is the arrangement the other six projects
-// already use. Every absolute link written OUTSIDE the site, the README, the
-// generated docs/, the issue templates, the dashboards, uses this one; the
-// site's own internal links stay relative and never see it.
+// `site` below names the host GitHub Pages serves the bytes from, and the
+// canonical link, the sitemap and the hreflang pairs agree with it. The two
+// addresses used to differ: the pages were served from the account's github.io
+// host, and readers were handed jmrp.io/docs/ghchronicle, a 301 to them. Since
+// the account's Pages answer on the custom domain docs.jmrp.io, GitHub serves
+// this site at the URL below and 301s the github.io one to it, so there is one
+// address and this constant states the same URL as `site`. The
+// jmrp.io/docs/ghchronicle redirect stays alive for the links that already
+// carry it; nothing written here uses it any more. Every absolute link written
+// OUTSIDE the site, the README, the generated docs/, the issue templates, the
+// dashboards, uses this one; the site's own internal links stay relative and
+// never see it.
 //
 // Exported, and nothing in this file reads it. Its consumer is
 // scripts/gen-docs.mjs, which reads this declaration out of the file as text
@@ -36,7 +39,7 @@ const siteBase = "/ghchronicle";
 // without it the only honest reading is that it is dead, and deleting it
 // leaves gen-docs.mjs throwing "astro.config.mjs declares no public docs URL"
 // on the next `make docs`.
-export const publicDocs = "https://jmrp.io/docs/ghchronicle";
+export const publicDocs = "https://docs.jmrp.io/ghchronicle";
 
 // What og.png shows, for the readers and previews that cannot see it. It is
 // the image brand/og.svg draws, so a change to the tagline there is a change
@@ -115,7 +118,7 @@ const mermaidVars = (block) => ({
 });
 
 export default defineConfig({
-	site: "https://jmrplens.github.io/ghchronicle",
+	site: "https://docs.jmrp.io/ghchronicle",
 	base: siteBase,
 	trailingSlash: "always",
 	markdown: {
@@ -195,7 +198,7 @@ export default defineConfig({
 					tag: "meta",
 					attrs: {
 						property: "og:image",
-						content: "https://jmrplens.github.io/ghchronicle/og.png",
+						content: "https://docs.jmrp.io/ghchronicle/og.png",
 					},
 				},
 				{
@@ -216,7 +219,7 @@ export default defineConfig({
 					tag: "meta",
 					attrs: {
 						name: "twitter:image",
-						content: "https://jmrplens.github.io/ghchronicle/og.png",
+						content: "https://docs.jmrp.io/ghchronicle/og.png",
 					},
 				},
 				{
@@ -227,9 +230,12 @@ export default defineConfig({
 				// here, and the web manifest's theme_color too.
 				{ tag: "meta", attrs: { name: "theme-color", content: "#1a7f37" } },
 				// Ownership proofs for Google Search Console and Bing Webmaster
-				// Tools, for the https://jmrplens.github.io/ghchronicle/ property.
-				// Both read them from the property's home page and re-check them
-				// later, so they stay. Public by design: neither is a credential.
+				// Tools, added for the property the site had before the custom
+				// domain, https://jmrplens.github.io/ghchronicle/. Both read them
+				// from the property's home page and re-check them later, so they
+				// stay; a property for https://docs.jmrp.io/ghchronicle/ that a
+				// console proves with other values needs its own tags here.
+				// Public by design: neither is a credential.
 				{
 					tag: "meta",
 					attrs: {

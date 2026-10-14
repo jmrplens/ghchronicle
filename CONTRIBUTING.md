@@ -4,7 +4,7 @@ Issues and pull requests are welcome. This page is what a contributor needs to
 know before opening one: where things live, what has to pass, and what a change
 owes the documentation.
 
-The full documentation is at <https://jmrp.io/docs/ghchronicle/>. This is
+The full documentation is at <https://docs.jmrp.io/ghchronicle/>. This is
 the shorter, repository-side version of it.
 
 ## What this is, in one paragraph

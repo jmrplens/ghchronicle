@@ -21,7 +21,7 @@ import (
 // cannot do this here.
 var errNotATerminal = errors.New("-setup asks questions and this is not a terminal: " +
 	"run it from a shell, or write the configuration yourself " +
-	"(https://jmrp.io/docs/ghchronicle/configuration/builder/ writes one)")
+	"(https://docs.jmrp.io/ghchronicle/configuration/builder/ writes one)")
 
 // asker carries the conversation: where the answers come from, where the
 // questions go, and whether a secret can be hidden while it is typed.
