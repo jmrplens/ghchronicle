@@ -2,7 +2,7 @@
 
 The reader's half of this, why the files are already in the right shape and
 what a new revision means, is on
-<https://jmrp.io/docs/ghchronicle/dashboards/>. This page is the
+<https://docs.jmrp.io/ghchronicle/dashboards/>. This page is the
 maintainer's half: the steps, in order.
 
 The five dashboards are already in the shape <https://grafana.com/grafana/dashboards>

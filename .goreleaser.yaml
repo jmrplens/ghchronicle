@@ -219,7 +219,7 @@ release:
     {{ if isEnvSet "DOCKERHUB_USERNAME" }}`docker pull jmrplens/ghchronicle:v{{ .Version }}`
     {{ end }}
 
-    **Verify the image** (keyless, the same identity as the checksums; needs cosign 3, since an older cosign answers `no signatures found` for these images, see https://jmrp.io/docs/ghchronicle/install/docker/#verify-the-image):
+    **Verify the image** (keyless, the same identity as the checksums; needs cosign 3, since an older cosign answers `no signatures found` for these images, see https://docs.jmrp.io/ghchronicle/install/docker/#verify-the-image):
     ```
     cosign verify \
       --certificate-identity-regexp 'https://github.com/jmrplens/ghchronicle/.github/workflows/release.yml@refs/tags/.*' \

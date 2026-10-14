@@ -24,11 +24,11 @@ import (
 //go:embed mark-dark.svg
 var brandMark string
 
-// The two pages the header links to. The documentation is named by the
-// canonical domain, which 301s to where the pages are served; site/astro.config.mjs
-// says why beside the declaration this repeats.
+// The two pages the header links to. The documentation is named by the URL
+// it is served and advertised at, which site/astro.config.mjs declares as
+// publicDocs; this repeats that declaration.
 const (
-	docsURL   = "https://jmrp.io/docs/ghchronicle/"
+	docsURL   = "https://docs.jmrp.io/ghchronicle/"
 	sourceURL = "https://github.com/jmrplens/ghchronicle"
 )
 

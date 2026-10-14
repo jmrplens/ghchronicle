@@ -6,9 +6,9 @@ body:
     attributes:
       value: |
         Before opening this, two pages answer most of what lands here:
-        [troubleshooting](https://jmrp.io/docs/ghchronicle/reference/troubleshooting/),
+        [troubleshooting](https://docs.jmrp.io/ghchronicle/reference/troubleshooting/),
         which lists the messages that look like errors and are not, and
-        [what GitHub will not give](https://jmrp.io/docs/ghchronicle/api/limits/),
+        [what GitHub will not give](https://docs.jmrp.io/ghchronicle/api/limits/),
         which lists the endpoints that are verified not to answer.
 
         A security vulnerability does not go here. See SECURITY.md.

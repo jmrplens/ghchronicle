@@ -270,9 +270,10 @@ the previous release. A prerelease never moves `latest`.
       that changes panels is a new revision of the same five rather than five
       new ones. `dashboards/PUBLISHING.md` has the detail.
 - [ ] The repository's `homepage` field points at
-      <https://jmrp.io/docs/ghchronicle/>, and the topics are set. That URL
-      301s to the Pages one: the canonical domain is what a fiche, a scrape
-      or a citation carries, and the reader still lands on the docs.
+      <https://docs.jmrp.io/ghchronicle/>, and the topics are set. That is
+      the URL Pages serves the site from and the one its canonical links
+      name, so a fiche, a scrape or a citation carries the address the reader
+      lands on.
 
 ## Putting it on a server
 

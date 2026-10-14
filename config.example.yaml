@@ -6,7 +6,7 @@
 # home directory.
 #
 # This file is the inventory: every setting there is, with a comment. The prose
-# that explains them is at https://jmrp.io/docs/ghchronicle/configuration/
+# that explains them is at https://docs.jmrp.io/ghchronicle/configuration/
 
 github:
   # A classic or fine-grained personal access token. Read scopes are enough,
@@ -170,7 +170,7 @@ sinks:
   # Graphite's plaintext protocol over TCP. Graphite keeps a point at the time
   # it was given, so the dated history goes out as it is. The path is
   # <prefix>.<measurement without gh_>.<tag values in key order>.<field>;
-  # see https://jmrp.io/docs/ghchronicle/sinks/graphite/ for the exact
+  # see https://docs.jmrp.io/ghchronicle/sinks/graphite/ for the exact
   # rules, they are the dashboard's contract.
   # graphite:
   #   addr: graphite:2003

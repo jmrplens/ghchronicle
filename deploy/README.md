@@ -23,7 +23,7 @@ Every combination was brought up against the real images when these files were
 added, for 2.4.0; nothing brings them up since, and what holds them now is the
 check below.
 
-The [Docker page](https://jmrp.io/docs/ghchronicle/install/docker/) shows the
+The [Docker page](https://docs.jmrp.io/ghchronicle/install/docker/) shows the
 same files with a picker, which is the easier way in if you are reading the
 documentation rather than the repository.
 

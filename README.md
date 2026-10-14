@@ -51,7 +51,7 @@ and then the same `-setup`.
 Or with Docker, where the whole stack comes up together:
 
 ```sh
-# compose.yaml from https://jmrp.io/docs/ghchronicle/install/docker/
+# compose.yaml from https://docs.jmrp.io/ghchronicle/install/docker/
 printf 'GITHUB_TOKEN=github_pat_...\nGITHUB_USER=your-login\n' > .env
 docker compose up -d
 ```
@@ -59,7 +59,7 @@ docker compose up -d
 Grafana is on `http://localhost:3000` with the dashboard already in it: the
 collector publishes it on start and points it at the store beside it, so there
 is nothing to import and no datasource to fill in. The
-[Docker page](https://jmrp.io/docs/ghchronicle/install/docker/) has one compose
+[Docker page](https://docs.jmrp.io/ghchronicle/install/docker/) has one compose
 file per store, written by one generator that CI holds them to.
 
 ```sh
@@ -100,20 +100,20 @@ that matches the theme you read it in:
 ghchronicle -config config.yaml -card card.svg -card-layout animated-counters -card-theme both
 ```
 
-[The thirteen layouts](https://jmrp.io/docs/ghchronicle/card/layouts/), with what
+[The thirteen layouts](https://docs.jmrp.io/ghchronicle/card/layouts/), with what
 each one draws and how to put one in a profile README.
 
 ## Documentation
 
 The full documentation is at
-**<https://jmrp.io/docs/ghchronicle/>**, in English and Spanish:
-[quickstart](https://jmrp.io/docs/ghchronicle/start/quickstart/),
-[the 95 measurements](https://jmrp.io/docs/ghchronicle/collectors/measurements/),
-[choosing a store](https://jmrp.io/docs/ghchronicle/sinks/),
-[the cost of a sweep](https://jmrp.io/docs/ghchronicle/api/cost/) and
-[troubleshooting](https://jmrp.io/docs/ghchronicle/reference/troubleshooting/).
+**<https://docs.jmrp.io/ghchronicle/>**, in English and Spanish:
+[quickstart](https://docs.jmrp.io/ghchronicle/start/quickstart/),
+[the 95 measurements](https://docs.jmrp.io/ghchronicle/collectors/measurements/),
+[choosing a store](https://docs.jmrp.io/ghchronicle/sinks/),
+[the cost of a sweep](https://docs.jmrp.io/ghchronicle/api/cost/) and
+[troubleshooting](https://docs.jmrp.io/ghchronicle/reference/troubleshooting/).
 Every page also serves itself as markdown at its own path with `index.md` on
-the end, and [llms.txt](https://jmrp.io/docs/ghchronicle/llms.txt) indexes the
+the end, and [llms.txt](https://docs.jmrp.io/ghchronicle/llms.txt) indexes the
 lot. The copies under [docs/](docs/README.md) are generated from those pages.
 
 [CHANGELOG.md](CHANGELOG.md) says what changed in each release and what was
@@ -210,14 +210,14 @@ configuration that names no `state_file` writes to the container's working
 directory instead, which is writable and goes with the container.
 
 For the whole path on one system rather than these few lines:
-[Linux](https://jmrp.io/docs/ghchronicle/install/linux/),
-[macOS](https://jmrp.io/docs/ghchronicle/install/macos/) and
-[Windows](https://jmrp.io/docs/ghchronicle/install/windows/) each name the
+[Linux](https://docs.jmrp.io/ghchronicle/install/linux/),
+[macOS](https://docs.jmrp.io/ghchronicle/install/macos/) and
+[Windows](https://docs.jmrp.io/ghchronicle/install/windows/) each name the
 archive, check it against `checksums.txt` and the cosign signature published
 beside it, and end with something that keeps the sweep running: a systemd unit,
 a launchd agent, a scheduled task.
-[Docker](https://jmrp.io/docs/ghchronicle/install/docker/) and
-[GitHub Actions](https://jmrp.io/docs/ghchronicle/install/actions/) are the two
+[Docker](https://docs.jmrp.io/ghchronicle/install/docker/) and
+[GitHub Actions](https://docs.jmrp.io/ghchronicle/install/actions/) are the two
 that want no host of your own.
 
 ## Configure
@@ -350,7 +350,7 @@ The repository ships as a composite Action:
     card-motion: once
 ```
 
-Paste `<picture><source media="(prefers-color-scheme: dark)" srcset="generated/card_dark.svg"><img src="generated/card.svg" alt="My GitHub statistics"></picture>` into the README once; the workflow only ever replaces the files. The whole workflow, and what `include-private` would publish, is in [A card in your profile README](https://jmrp.io/docs/ghchronicle/install/actions/#a-card-in-your-profile-readme).
+Paste `<picture><source media="(prefers-color-scheme: dark)" srcset="generated/card_dark.svg"><img src="generated/card.svg" alt="My GitHub statistics"></picture>` into the README once; the workflow only ever replaces the files. The whole workflow, and what `include-private` would publish, is in [A card in your profile README](https://docs.jmrp.io/ghchronicle/install/actions/#a-card-in-your-profile-readme).
 
 See [docs/card.md](docs/card.md), and
 [.github/ACTION.md](.github/ACTION.md) for how the Action is published and

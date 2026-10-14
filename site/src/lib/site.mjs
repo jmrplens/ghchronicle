@@ -14,7 +14,7 @@
 // disagree with the config and still build.
 const ENV = import.meta.env ?? globalThis.process?.env ?? {};
 
-const ORIGIN = new URL(ENV.SITE ?? "https://jmrplens.github.io").origin;
+const ORIGIN = new URL(ENV.SITE ?? "https://docs.jmrp.io").origin;
 
 const BASE = (ENV.BASE_URL ?? "/").replace(/\/$/, "");
 
