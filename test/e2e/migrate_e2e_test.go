@@ -33,7 +33,11 @@ type oldInflux struct {
 	// fresh answers as a store with no table at all.
 	fresh bool
 	// deleted is the name the table was given when a delete set it aside,
-	// the way 3.11.2 renames it, and empty before.
+	// the way 3.11.2 renames it, and empty before. Like 3.11.2 it carries
+	// the instant of the delete, in UTC: the binary reads that instant as
+	// when the copy was made, and declines to compare a copy whose 72 hours
+	// have passed, so a stamp written out by hand fails every run from three
+	// days after the date it names.
 	deleted string
 	// written is every comment written since the delete.
 	written map[string]bool
@@ -60,7 +64,7 @@ func (s *oldInflux) start(t *testing.T) string {
 		case r.URL.Path == "/api/v2/write":
 			s.write(w, string(body))
 		case r.Method == http.MethodDelete && r.URL.Path == "/api/v3/configure/table" && !s.fresh && s.deleted == "":
-			s.deleted = r.URL.Query().Get("table") + "-20261001T091004"
+			s.deleted = r.URL.Query().Get("table") + "-" + time.Now().UTC().Format("20060102T150405")
 		case s.deleted != "":
 			s.afterDelete(w, q)
 		case strings.Contains(q, "information_schema.tables") && !s.fresh:
@@ -161,6 +165,13 @@ func (s *oldInflux) writes() []string {
 		}
 	}
 	return out
+}
+
+// aside is the name the delete gave the table, empty before it.
+func (s *oldInflux) aside() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.deleted
 }
 
 // requests is everything the store was sent.
@@ -497,15 +508,19 @@ func TestMigrateYesClearsOnlyTheMeasurementItNames(t *testing.T) {
 	if err != nil {
 		t.Fatalf("-migrate -yes: %v\n%s\n%s", err, stdout, stderr)
 	}
+	aside := store.aside()
+	if aside == "" {
+		t.Fatalf("-migrate -yes never deleted gh_discussion_comment:\n%s\n%s", stdout, stderr)
+	}
 	for _, want := range []string{
 		"  applied     2.6.1/gh_discussion_comment/is_answer in influxdb: InfluxDB set the table gh_discussion_comment aside",
-		"the old rows are kept as gh_discussion_comment-20261001T091004",
+		"the old rows are kept as " + aside,
 		"  applied     2.6.1/gh_discussion_comment/is_answer in sql: wrote DROP TABLE IF EXISTS \"gh_discussion_comment\";",
 		// The SQL file's bound is backfill.since, unset here, and the walk
 		// reads as far back as the furthest any store is owed.
 		"  refill      read discussions and outbound again, with no bound, writing gh_discussion_comment to " +
 			"influxdb and sql\n",
-		"  reconciled  gh_discussion_comment in influxdb: 2 items in gh_discussion_comment-20261001T091004, 6 now; " +
+		"  reconciled  gh_discussion_comment in influxdb: 2 items in " + aside + ", 6 now; " +
 			"1 GitHub no longer serves, whose rows are only in the copy until it is purged: 999999\n",
 		"\n2 applied.\n",
 	} {
@@ -536,7 +551,7 @@ func TestMigrateYesClearsOnlyTheMeasurementItNames(t *testing.T) {
 	}
 	influx := saved.Stores["influxdb"]
 	if _, ok := influx.Applied["2.6.1/gh_discussion_comment/is_answer"]; !ok || len(influx.SetAside) != 1 ||
-		influx.SetAside[0].Name != "gh_discussion_comment-20261001T091004" || !influx.SetAside[0].ByServer {
+		influx.SetAside[0].Name != aside || !influx.SetAside[0].ByServer {
 		t.Errorf("the record of influxdb is %+v", influx)
 	}
 	for name, rec := range saved.Stores {

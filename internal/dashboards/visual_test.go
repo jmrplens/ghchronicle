@@ -87,9 +87,9 @@ func nullableTiles(t *testing.T) map[string][]string {
 			sql, _ := target["rawSql"].(string)
 			for _, item := range selectList(sql) {
 				// The alias is the last AS of the item: a CAST has one of its own.
-				at := strings.LastIndex(item, " AS ")
-				if at >= 0 && nullableMeasure.MatchString(item[:at]) {
-					out[title] = append(out[title], strings.Trim(item[at+len(" AS "):], `"`))
+				expr, alias, aliased := strings.CutLast(item, " AS ")
+				if aliased && nullableMeasure.MatchString(expr) {
+					out[title] = append(out[title], strings.Trim(alias, `"`))
 				}
 			}
 		}

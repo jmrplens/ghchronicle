@@ -130,6 +130,7 @@ func refused(ctx context.Context, client grafana.Client, ds any, target map[stri
 func exportedNames(path string) (map[string]bool, error) {
 	// The dump is named on the command line and read as given; cleaning it
 	// first means the path opened is the path printed in any error.
+	//#nosec G703 -- the path is the metrics dump named on this development command's own command line
 	f, err := os.Open(filepath.Clean(path))
 	if err != nil {
 		return nil, err
