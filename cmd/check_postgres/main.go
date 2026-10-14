@@ -167,6 +167,7 @@ func run(ctx context.Context, args []string, stdout io.Writer) (int, error) {
 // readSchema turns the dumped InfluxDB schema into the CREATE TABLE statements
 // the SQL sink would have written.
 func readSchema(path string) ([]string, error) {
+	//#nosec G703 -- the path is the schema file named on this development command's own command line
 	raw, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
 		return nil, err
@@ -476,5 +477,6 @@ func dump(ctx context.Context, uid, path string) error {
 	if err != nil {
 		return err
 	}
+	//#nosec G703 -- the path is the file --dump was told to write, on this development command's own command line
 	return os.WriteFile(filepath.Clean(path), body, 0o600)
 }

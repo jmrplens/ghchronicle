@@ -142,6 +142,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	if *check {
+		//#nosec G703 -- the path is this generator's own -out flag, given by whoever runs it on this repository
 		old, readErr := os.ReadFile(path)
 		if readErr != nil {
 			fmt.Fprintf(stderr, "%s: %v\n", path, readErr)
@@ -155,6 +156,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "%s is up to date\n", path)
 		return 0
 	}
+	//#nosec G703 -- the path is this generator's own -out flag, given by whoever runs it on this repository
 	if err = os.WriteFile(path, body, 0o600); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
@@ -244,6 +246,7 @@ func cadences(families []string) []family {
 // readInputs reads the composite Action's inputs, in the order it declares
 // them, which is the order a reader meets them in the Actions page.
 func readInputs(path string) ([]input, error) {
+	//#nosec G703 -- the path is this generator's own -action flag, given by whoever runs it on this repository
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err

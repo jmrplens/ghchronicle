@@ -306,6 +306,7 @@ func rasterJobs() []rasterJob {
 // hundred kilobytes with a mean difference under one level in 255, and the
 // file as it is otherwise, with a note saying so.
 func optimizedOG(ctx context.Context, brand, work string, stdout io.Writer) ([]byte, error) {
+	//#nosec G703 -- the path is this generator's own -brand flag joined to a file name it declares itself
 	source, err := os.ReadFile(filepath.Clean(filepath.Join(brand, ogImage)))
 	if err != nil {
 		return nil, err
@@ -425,10 +426,12 @@ func iconsCmd(ctx context.Context, args []string, stdout, stderr io.Writer) int 
 	}
 	files = append(files, namedFile{ogImage, og})
 
+	//#nosec G703 -- the path is this generator's own -out flag, given by whoever runs it on this repository
 	if err = os.MkdirAll(filepath.Clean(outDir), 0o750); err != nil {
 		return fail(stderr, err)
 	}
 	for _, f := range files {
+		//#nosec G703 -- the path is this generator's own -out flag joined to a file name it declares itself
 		if err = os.WriteFile(filepath.Clean(filepath.Join(outDir, f.name)), f.data, 0o600); err != nil {
 			return fail(stderr, err)
 		}
