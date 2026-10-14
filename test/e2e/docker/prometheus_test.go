@@ -197,8 +197,8 @@ func promWant(t *testing.T, page, name string, labels map[string]string, want fl
 // taken after the closing brace rather than over the whole line.
 func promHasTimestamp(line string) bool {
 	rest := line
-	if brace := strings.LastIndexByte(line, '}'); brace >= 0 {
-		rest = line[brace+1:]
+	if _, afterBrace, braced := strings.CutLast(line, "}"); braced {
+		rest = afterBrace
 	} else if _, after, found := strings.Cut(line, " "); found {
 		rest = after
 	}
@@ -207,16 +207,16 @@ func promHasTimestamp(line string) bool {
 
 // promSample reads one exposition line into its labels and its value.
 func promSample(line string) (labels map[string]string, value float64, ok bool) {
-	cut := strings.LastIndexByte(line, ' ')
-	if cut < 0 {
+	series, sample, spaced := strings.CutLast(line, " ")
+	if !spaced {
 		return nil, 0, false
 	}
-	value, err := strconv.ParseFloat(strings.TrimSpace(line[cut+1:]), 64)
+	value, err := strconv.ParseFloat(strings.TrimSpace(sample), 64)
 	if err != nil {
 		return nil, 0, false
 	}
 	labels = map[string]string{}
-	_, set, braced := strings.Cut(line[:cut], "{")
+	_, set, braced := strings.Cut(series, "{")
 	if !braced {
 		return labels, value, true
 	}

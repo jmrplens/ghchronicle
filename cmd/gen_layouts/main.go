@@ -85,6 +85,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	path := filepath.Clean(*out)
 	if *check {
+		//#nosec G703 -- the path is this generator's own -out flag, given by whoever runs it on this repository
 		old, readErr := os.ReadFile(path)
 		if readErr != nil {
 			fmt.Fprintf(stderr, "%s: %v\n", path, readErr)
@@ -98,6 +99,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "%s is up to date\n", path)
 		return 0
 	}
+	//#nosec G703 -- the path is this generator's own -out flag, given by whoever runs it on this repository
 	if err = os.WriteFile(path, body, 0o600); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1

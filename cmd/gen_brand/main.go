@@ -213,6 +213,7 @@ func markCmd(args []string, stdout, stderr io.Writer) int {
 	if !proceed {
 		return status
 	}
+	//#nosec G703 -- the path is this generator's own -out flag, given by whoever runs it on this repository
 	if err := os.MkdirAll(filepath.Clean(dir), 0o750); err != nil {
 		return fail(stderr, err)
 	}
@@ -230,6 +231,7 @@ func markCmd(args []string, stdout, stderr io.Writer) int {
 		{"favicon-light.svg", mark(light, faviconRampLight, 3, 4)},
 	}
 	for _, f := range files {
+		//#nosec G703 -- the path is this generator's own -out flag joined to a file name it declares itself
 		if err := os.WriteFile(filepath.Clean(filepath.Join(dir, f.name)), []byte(f.svg), 0o600); err != nil {
 			return fail(stderr, err)
 		}
@@ -318,6 +320,7 @@ func baseline(top, size int, ratio float64) float64 {
 // is quietest. The raster is embedded rather than linked because it is this SVG
 // that gets rasterized, and a relative href would not survive being moved.
 func compose(background string, t target) (string, error) {
+	//#nosec G703 -- the path is this generator's own -out flag joined to a background its target table names
 	raw, err := os.ReadFile(background)
 	if err != nil {
 		return "", err
@@ -366,6 +369,7 @@ func composeCmd(ctx context.Context, args []string, stdout, stderr io.Writer) in
 		}
 		svgPath := pyJoin(dir, t.name+".svg")
 		pngPath := pyJoin(dir, t.name+".png")
+		//#nosec G703 -- the path is this generator's own -out flag joined to a name its target table declares
 		if err = os.WriteFile(filepath.Clean(svgPath), []byte(svg), 0o600); err != nil {
 			return fail(stderr, err)
 		}

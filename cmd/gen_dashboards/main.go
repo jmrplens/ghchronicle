@@ -84,6 +84,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 			}
 			continue
 		}
+		//#nosec G703 -- the path is this generator's own -dir flag joined to a file name each store declares
 		if err = os.WriteFile(filepath.Clean(path), body, 0o600); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
@@ -99,6 +100,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 // checkUpToDate reports why the file at path does not hold the dashboard in
 // body, and nothing when it does.
 func checkUpToDate(path string, body []byte) error {
+	//#nosec G703 -- the path is this generator's own -dir flag joined to a file name each store declares
 	old, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
 		return fmt.Errorf("%s: %w", path, err)

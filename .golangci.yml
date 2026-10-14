@@ -5,9 +5,10 @@
 # The same linters with the same settings as github.com/jmrplens/gitlab-mcp-server,
 # which is itself based on https://github.com/maratori/golangci-lint-config.
 # The only values that differ are the ones that name a project: the module
-# path, the build tag of the end to end suite, misspell's extra words and the
-# G101 exclusion for action_specs.go, both of which exist for files only the
-# reference has. A setting changed here should change there too, and the
+# path, the build tag of the end to end suite, misspell's extra words, the
+# G101 exclusion for action_specs.go and the exclusion of the "`%s`" form of
+# gocritic's sprintfQuotedString, the last three of which exist for code only
+# the reference has. A setting changed here should change there too, and the
 # other way round, so the two repositories keep one standard rather than two.
 
 version: "2"

@@ -101,13 +101,13 @@ func orderGaps(sql string) []string {
 		}
 	}
 	outer, groups := foldParens(q)
-	at := strings.LastIndex(outer, " ORDER BY ")
-	if at < 0 {
+	head, orderBy, ordered := strings.CutLast(outer, " ORDER BY ")
+	if !ordered {
 		return gaps
 	}
-	order := orderKeys(outer[at+len(" ORDER BY "):])
-	identity, what := rowIdentity(outer[:at], groups)
-	selected := selectedExprs(outer[:at])
+	order := orderKeys(orderBy)
+	identity, what := rowIdentity(head, groups)
+	selected := selectedExprs(head)
 	for _, key := range identity {
 		// The short name and the owner are the full name's to name, and a
 		// gap in it is said once, under the full name.
@@ -129,8 +129,8 @@ func orderGaps(sql string) []string {
 // each item, looked for through a subquery that only passes rows on. A list
 // of raw rows answers nothing.
 func rowIdentity(head string, groups []string) (keys []string, what string) {
-	if at := strings.LastIndex(head, " GROUP BY "); at >= 0 {
-		list, _, _ := strings.Cut(head[at+len(" GROUP BY "):], " HAVING ")
+	if _, groupBy, grouped := strings.CutLast(head, " GROUP BY "); grouped {
+		list, _, _ := strings.Cut(groupBy, " HAVING ")
 		return splitKeys(list), "grouping key"
 	}
 	from := strings.Index(head, " FROM ")
