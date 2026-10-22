@@ -9,7 +9,7 @@
 # build would run the whole Go toolchain under emulation for every foreign
 # architecture, which is slower by an order of magnitude and buys nothing: the
 # binary is pure Go and compiles the same either way.
-FROM --platform=$BUILDPLATFORM golang:1.27.2-alpine3.24@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine3.24@sha256:d530cf60723abf1ffae0cd16bb546b379ec0550d2f3815e5b16ed69dbc00fba4 AS build
 
 WORKDIR /src
 
