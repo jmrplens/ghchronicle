@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
+# syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
 
 # Every base image is pinned by version and by digest. The version says what a
 # reader is looking at; the digest is what makes a rebuild of the same commit
@@ -9,7 +9,7 @@
 # build would run the whole Go toolchain under emulation for every foreign
 # architecture, which is slower by an order of magnitude and buys nothing: the
 # binary is pure Go and compiles the same either way.
-FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine3.24@sha256:d530cf60723abf1ffae0cd16bb546b379ec0550d2f3815e5b16ed69dbc00fba4 AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine3.24@sha256:b8c9b82affbbb82a020bbcf998dad2ba9516944ac7e883524642a481a9505e9c AS build
 
 WORKDIR /src
 
@@ -58,7 +58,7 @@ WORKDIR /var/lib/ghchronicle
 # keeps the container off root even when the orchestrator sets no
 # securityContext of its own. Debian 13 because it is the only release the
 # distroless project still publishes: the -debian12 tags are no longer updated.
-FROM gcr.io/distroless/static-debian13:nonroot@sha256:1c2c046bc09ed40fad370b599a0b1ae7987f55b01e247cf27a7c27cd97e5bbc7
+FROM gcr.io/distroless/static-debian13:nonroot@sha256:d62067879de890a1def9da0e7766b7d20810a5e5555cef8506b752437d7a3e88
 
 # ARG is stage-scoped, so the three have to be declared again to reach the
 # labels below.
