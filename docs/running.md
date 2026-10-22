@@ -328,7 +328,7 @@ a single line, at the cost of giving every family the same cadence.
 
 ### Build it from source
 
-Go 1.27.2 or newer is what the module declares. Nothing else is needed: the
+Go 1.27.3 or newer is what the module declares. Nothing else is needed: the
 build sets `CGO_ENABLED=0`, so there is no compiler and no header package to
 find.
 
@@ -678,7 +678,7 @@ file beside it is what lets a run ask GitHub only for what changed.
 
 ### Build it from source
 
-Go 1.27.2 or newer is what the module declares. The build sets `CGO_ENABLED=0`,
+Go 1.27.3 or newer is what the module declares. The build sets `CGO_ENABLED=0`,
 so the Xcode command line tools are not needed for it.
 
 - **go install**
@@ -1140,7 +1140,7 @@ default.
 
 ### Build it from source
 
-Go 1.27.2 or newer, which is the version `go.mod` declares. `CGO_ENABLED=0`
+Go 1.27.3 or newer, which is the version `go.mod` declares. `CGO_ENABLED=0`
 means no MSVC, no MinGW and no Windows SDK.
 
 - **go install**
