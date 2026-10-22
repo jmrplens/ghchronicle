@@ -480,7 +480,7 @@ jobs:
         with:
           persist-credentials: false
 
-      # go.mod names an exact release, `go 1.27.2`, and setup-go installs
+      # go.mod names an exact release, `go 1.27.3`, and setup-go installs
       # exactly that one. Most of what govulncheck reports here is the standard
       # library, so its answer is a property of the commit: when a later patch
       # fixes a standard-library advisory, this job fails until go.mod moves to
