@@ -1,4 +1,5 @@
 # Shown as a "Sponsor" button on the repository, and on every release page.
-# Same single entry as the other projects here: one place to sponsor, which is
-# GitHub's own, so nothing on this list is a third party asking for a payment.
+# The same two entries as the other projects here, GitHub Sponsors and Ko-fi,
+# both pointing at the author's own profiles.
 github: [jmrplens]
+ko_fi: jmrplens
