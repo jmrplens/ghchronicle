@@ -8,8 +8,14 @@ overrides:
   # Astro tracks it at withastro/roadmap#1321; lift this when that closes.
   typescript: 6.0.3
   lodash: 4.18.1
-  yaml: 2.9.0
-  yaml-language-server@1.20.0>yaml: 2.9.0
+  # One yaml across the tree, at the release package.json names. It came with a
+  # selector for yaml-language-server 1.20.0 (under @astrojs/check), whose yaml
+  # 2.7.1 is inside GHSA-48c2-rrv3-qjmp (< 2.8.3); the tree now has 1.23.0,
+  # which asks for 2.8.3, so that selector matched nothing and is gone. Move
+  # this line with the yaml entry in package.json: left at 2.9.0 while
+  # package.json said 2.9.1, it held the lockfile on 2.9.0, so Dependabot's
+  # update of yaml changed no file and failed its run with NoChangeError.
+  yaml: 2.9.1
   # brace-expansion ReDoS (GHSA-3jxr-9vmj-r5cp), unbounded-expansion DoS
   # (GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895), and the three DoS advisories of
   # 2026-09-30 (GHSA-6j4f-fj2g-mc7p, GHSA-qhr7-859c-m2p7, GHSA-q2hr-2g5m-vwhr,
@@ -27,18 +33,6 @@ overrides:
   # v4-legacy tag: the 4.x line is what Astro depends on, and pinning 5.x onto
   # it is a major bump an advisory fix should not drag in.
   "js-yaml@>=4.0.0 <4.3.2": 4.3.2
-  # basic-ftp quadratic-time CPU denial of service in the Unix directory-listing
-  # parser (GHSA-c475-qrg2-pj4r), fixed in 6.2.1 with no 5.x release. Dev-only
-  # path: pa11y-ci > puppeteer > @puppeteer/browsers > proxy-agent >
-  # pac-proxy-agent > get-uri, and get-uri, up to its latest 8.0.1, still asks
-  # for ^5.3.1, so no parent update reaches a fixed version. Forcing 6.x onto
-  # it is safe where forcing brace-expansion 5.x onto a 1.x consumer is not:
-  # 6.0.0's one breaking change is that a client refuses a separate transfer
-  # host unless told otherwise, and get-uri only calls Client, access, lastMod,
-  # list, downloadTo and close, which kept their signatures. 6.2.3 also carries
-  # the fixes for GHSA-5rfr-xx34-2xxv (6.2.2) and GHSA-r4jh-29pc-gfqr (6.2.3).
-  # Lift this once get-uri depends on a fixed basic-ftp itself.
-  "basic-ftp@<6.2.3": 6.2.3
   # 7.3.1 added a pass that moves a <style> element's text into a `set:html`
   # property, and runs it before the pass that collapses static MDX subtrees
   # to an HTML string. Starlight turns that collapsing on, so the property is
@@ -46,22 +40,13 @@ overrides:
   # `<style set:html="...">` on every page with a code block, and every code
   # block lost its frame, its colors and its copy button. 7.3.0 predates the
   # new pass and has no such bug. Lift this pin once a release fixes the order
-  # and scripts/check-directives.mjs passes on its build.
+  # and scripts/check-directives.mjs passes on its build. 7.3.4 (2026-10-21)
+  # with astro 7.4.2 still fails it, on 66 pages. package.json names 7.3.0
+  # exactly too, so the manifest says what is installed, and
+  # .github/dependabot.yml ignores the package while this pin stands: an
+  # update there rewrites package.json and this line keeps the lockfile on
+  # 7.3.0, so the pull request would move nothing but the manifest.
   "@astrojs/markdown-remark": 7.3.0
-
-auditConfig:
-  ignoreGhsas:
-    # extract-zip symlink path traversal: the advisory lists >=2.0.2 as patched,
-    # but no release after 2.0.1 exists on npm, so there is nothing to pin to.
-    # Dev-only path (pa11y-ci > puppeteer > @puppeteer/browsers). Remove this
-    # exception once extract-zip publishes a fixed release.
-    - GHSA-jmr9-qjv8-65gv
-    # extract-zip arbitrary file writes through symlink archive entries: the
-    # same package, the same dev-only path, and the same absence of anywhere to
-    # go. This one records no patched version at all, and 2.0.1 is still the
-    # last release published. Both exceptions retire together, on the release
-    # that fixes either.
-    - GHSA-7pqw-9j4j-h8q3
 
 peerDependencyRules:
   allowedVersions:

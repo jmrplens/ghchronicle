@@ -75,6 +75,17 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    # The two direct dependencies site/pnpm-workspace.yaml holds below their
+    # latest release with an override, each with its reason written there. An
+    # update to either rewrites package.json while the override keeps the
+    # lockfile where it was, so the pull request would announce a bump that
+    # installs nothing new: #123 listed @astrojs/markdown-remark 7.3.0 to 7.3.2
+    # and its lockfile kept 7.3.0. Remove an entry together with its override.
+    ignore:
+      - dependency-name: "@astrojs/markdown-remark"
+      - dependency-name: "typescript"
+        update-types:
+          - "version-update:semver-major"
     open-pull-requests-limit: 5
 
   # GitHub Actions workflows

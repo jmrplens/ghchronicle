@@ -119,7 +119,7 @@ LDFLAGS    := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.
 # source (slower, and results can vary with the compiling Go). It is the
 # release gitlab-mcp-server runs, because the two repositories share one lint
 # standard and a different linter release is a different standard.
-GOLANGCI_LINT_VERSION := v2.14.0
+GOLANGCI_LINT_VERSION := v2.15.0
 
 # govulncheck is the opposite case: a `tool` directive in go.mod. `go install
 # golang.org/x/vuln/cmd/govulncheck` without @version installs the release
