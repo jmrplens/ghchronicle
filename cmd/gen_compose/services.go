@@ -10,7 +10,7 @@ import "strings"
 // account in it.
 const grafanaService = `
   grafana:
-    image: grafana/grafana:12.3.0
+    image: grafana/grafana:13.2
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-ghchronicle}
     ports:
@@ -61,7 +61,7 @@ func (c Combination) storeService() string {
 	case "postgres":
 		return `
   postgres:
-    image: postgres:18.6-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_USER: ghchronicle
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ghchronicle}
