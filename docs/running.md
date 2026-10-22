@@ -1493,7 +1493,7 @@ services:
       retries: 30
 
   grafana:
-    image: grafana/grafana:12.3.0
+    image: grafana/grafana:13.2
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-ghchronicle}
     ports:
@@ -1644,7 +1644,7 @@ name: ghchronicle
 services:
 
   postgres:
-    image: postgres:18.6-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_USER: ghchronicle
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ghchronicle}
@@ -1662,7 +1662,7 @@ services:
       retries: 30
 
   grafana:
-    image: grafana/grafana:12.3.0
+    image: grafana/grafana:13.2
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-ghchronicle}
     ports:
@@ -1741,7 +1741,7 @@ name: ghchronicle
 services:
 
   postgres:
-    image: postgres:18.6-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_USER: ghchronicle
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ghchronicle}
