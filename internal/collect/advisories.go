@@ -45,14 +45,12 @@ type repoAdvisory struct {
 	// Author is null to anyone but the author and the repository's
 	// maintainers, measured on 2026-11-16: an unauthenticated read of a
 	// published advisory names nobody.
-	Author *struct {
-		Login string `json:"login"`
-	} `json:"author"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
-	PublishedAt *time.Time `json:"published_at"`
-	ClosedAt    *time.Time `json:"closed_at"`
-	WithdrawnAt *time.Time `json:"withdrawn_at"`
+	Author      *advisoryUser `json:"author"`
+	CreatedAt   time.Time     `json:"created_at"`
+	UpdatedAt   time.Time     `json:"updated_at"`
+	PublishedAt *time.Time    `json:"published_at"`
+	ClosedAt    *time.Time    `json:"closed_at"`
+	WithdrawnAt *time.Time    `json:"withdrawn_at"`
 	// Submission is set on a report sent through private vulnerability
 	// reporting and null on an advisory a maintainer drafted.
 	Submission *struct {
@@ -73,18 +71,22 @@ type repoAdvisory struct {
 			Score *float64 `json:"score"`
 		} `json:"cvss_v4"`
 	} `json:"cvss_severities"`
-	CWEIDs  []string `json:"cwe_ids"`
-	Credits []struct {
-		User struct {
-			Login string `json:"login"`
-		} `json:"user"`
-		Type  string `json:"type"`
-		State string `json:"state"`
-	} `json:"credits_detailed"`
-	Collaborators []struct {
-		Login string `json:"login"`
-	} `json:"collaborating_users"`
-	Comments int `json:"comments"`
+	CWEIDs        []string         `json:"cwe_ids"`
+	Credits       []advisoryCredit `json:"credits_detailed"`
+	Collaborators []advisoryUser   `json:"collaborating_users"`
+	Comments      int              `json:"comments"`
+}
+
+// advisoryUser is a person an advisory names.
+type advisoryUser struct {
+	Login string `json:"login"`
+}
+
+// advisoryCredit is one credit: who, in what role, and whether they accepted.
+type advisoryCredit struct {
+	User  advisoryUser `json:"user"`
+	Type  string       `json:"type"`
+	State string       `json:"state"`
 }
 
 // public reports whether the advisory has been published, which is what
@@ -95,11 +97,12 @@ func (a *repoAdvisory) public() bool {
 
 // advisoryPages walks one repository's advisory list, newest update first.
 //
-// It pages by cursor through the Link header, as the Dependabot list does.
-// answered is false when the first page was refused, which is "nothing here"
-// for a repository and not a failure.
-func advisoryPages(ctx context.Context, c *ghapi.Client, memory *Refusals, w Walk, fullName string) (rows []repoAdvisory, answered bool, err error) {
+// It pages by cursor through the Link header, as the Dependabot list does. A
+// refusal is "nothing here" for a repository, a fork's above all, and not a
+// failure.
+func advisoryPages(ctx context.Context, c *ghapi.Client, memory *Refusals, w Walk, fullName string) ([]repoAdvisory, error) {
 	path := fmt.Sprintf("/repos/%s/security-advisories?per_page=100&sort=updated&direction=desc", fullName)
+	var rows []repoAdvisory
 	after := ""
 	// Ten pages is a thousand advisories, more than any repository measured
 	// holds (getarcaneapp/arcane, 18; opencloud-eu/opencloud, 5), so a sweep
@@ -114,9 +117,9 @@ func advisoryPages(ctx context.Context, c *ghapi.Client, memory *Refusals, w Wal
 		link, _, e := memory.GetJSON(ctx, c, next, &batch, "")
 		if e != nil {
 			if isSkippable(e) {
-				return rows, page > 1, nil
+				return rows, nil
 			}
-			return rows, page > 1, e
+			return rows, e
 		}
 		rows = append(rows, batch...)
 		after = afterCursor(link)
@@ -127,7 +130,7 @@ func advisoryPages(ctx context.Context, c *ghapi.Client, memory *Refusals, w Wal
 			break
 		}
 	}
-	return rows, true, nil
+	return rows, nil
 }
 
 // advisoryStamp dates an advisory's row.
@@ -201,7 +204,7 @@ func advisoryFields(a *repoAdvisory, details bool, now time.Time) map[string]any
 
 // Collect renders a row per advisory of the repository.
 func (ad Advisories) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now time.Time) ([]sink.Point, error) {
-	rows, _, err := advisoryPages(ctx, c, ad.Refusals, ad.Walk, repo.FullName)
+	rows, err := advisoryPages(ctx, c, ad.Refusals, ad.Walk, repo.FullName)
 	base := repoTags(repo.Owner, repo.Name)
 	points := make([]sink.Point, 0, len(rows))
 	for i := range rows {

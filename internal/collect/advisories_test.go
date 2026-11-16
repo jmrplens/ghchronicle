@@ -1,6 +1,7 @@
 package collect
 
 import (
+	"fmt"
 	"net/http"
 	"slices"
 	"strings"
@@ -141,7 +142,7 @@ func TestAdvisoriesFollowTheCursor(t *testing.T) {
 	t.Parallel()
 	f := newFixtureServer(t)
 	full := repeat(t, "repo_advisories.json", "", 100, func(i int, row map[string]any) {
-		row["ghsa_id"] = "GHSA-page-one-" + string(rune('a'+i%26)) + string(rune('a'+i/26))
+		row["ghsa_id"] = fmt.Sprintf("GHSA-page-one-%04d", i)
 	})
 	f.handle(advisoriesPath, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("after") == "" {

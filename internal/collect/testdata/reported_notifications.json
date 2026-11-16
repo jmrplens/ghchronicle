@@ -1,0 +1,6 @@
+[
+  {"reason": "state_change", "updated_at": "2026-09-07T10:00:00Z", "repository": {"full_name": "a/notified"}, "subject": {"type": "RepositoryAdvisory", "title": "A report", "url": null}},
+  {"reason": "comment", "updated_at": "2026-09-06T10:00:00Z", "repository": {"full_name": "octocat/hello-world"}, "subject": {"type": "RepositoryAdvisory", "title": "Received", "url": null}},
+  {"reason": "comment", "updated_at": "2026-09-05T10:00:00Z", "repository": {"full_name": "Some-Org/x"}, "subject": {"type": "RepositoryAdvisory", "title": "Received by an organisation", "url": null}},
+  {"reason": "mention", "updated_at": "2026-09-04T10:00:00Z", "repository": {"full_name": "z/pulls-only"}, "subject": {"type": "PullRequest", "title": "Not an advisory", "url": "https://api.github.com/repos/z/pulls-only/pulls/1"}}
+]
