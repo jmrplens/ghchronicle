@@ -405,6 +405,10 @@ func (c closedResults) Query() (pgx.Rows, error)         { return nil, c.err }
 func (c closedResults) QueryRow() pgx.Row                { return nil }
 func (c closedResults) Close() error                     { return c.err }
 
+// Tx is the transaction the batch ran in, which pgx 5.13 added to the
+// interface; a batch sent outside one, as these are, has none.
+func (c closedResults) Tx() pgx.Tx { return nil }
+
 // TestATableDroppedBehindTheSinkIsDeclaredAgain: the sink remembers every
 // table it declared, so a table another connection dropped or renamed made
 // every later write of it fail with 42P01, taking the rest of the batch
