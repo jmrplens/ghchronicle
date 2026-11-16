@@ -13,6 +13,78 @@ day the tag was pushed, with two exceptions: 2.5.2 has a section and no tag,
 and its changes shipped in 2.6.0; 2.6.2 has a tag and no release, since its
 release stopped at the containerised suite, and its changes shipped in 2.6.3.
 
+## 2.7.0 - 2026-11-17
+
+GitHub's security advisories, in both directions: the reports sent to the
+account's repositories, whatever became of them, and the reports the account
+sent to other people's, found with no list in the configuration. Every
+dependency moves to its latest release.
+
+- **Two new families, `advisories` and `reported`, and two new measurements.**
+  `advisories` reads `GET /repos/{owner}/{repo}/security-advisories` for every
+  collected repository and writes `gh_repo_advisory`: the reports others sent
+  through private vulnerability reporting, in triage, accepted, published or
+  closed, and the maintainers' own drafts and publications. A report closed
+  without publication is visible nowhere else. `reported` writes
+  `gh_advisory_reported`, every advisory the account reported, authored, is
+  credited in or collaborates on in a repository it neither owns nor collects.
+  An advisory is dated when it was published or closed, and is a daily
+  snapshot while it is in triage or a draft. Both run hourly; a list that has
+  not moved answers 304.
+- **No endpoint lists the advisories an account reported, so `reported` finds
+  the repositories to ask.** Checked on 2026-11-16 against the whole GraphQL
+  schema and REST's OpenAPI description 1.1.4: GraphQL has no repository
+  advisories and no credits, and `/advisories?credit=` is ignored. A
+  repository's own list shows its author every report in every state, so the
+  family asks the repositories four sources name: the inbox's advisory threads,
+  which arrive when a report moves and which `all=true` keeps listing after
+  they are marked done; the issues and pull requests that involve the account
+  elsewhere and the repositories GitHub says it contributed to, which hold a
+  report still in triage that has notified nothing; and the reviewed global
+  advisory database, read by update. Every repository that named one is kept
+  in the state file, under `reported`, because inbox threads expire after
+  months. Measured on this account, a first complete read cost 98 inbox pages,
+  379 pages of the global database, 4 GraphQL points and 71 candidate lists in
+  6.5 minutes; a sweep with no read on record reads the last thirty days of the
+  inbox and the database instead, and a backfill reads both whole.
+- **A new setting, `advisories.unpublished_details`, off by default.** An
+  advisory that is not published describes a vulnerability under embargo. Off,
+  its row keeps the GHSA, the state, the severity, the scores, the dates and
+  the url, a page only its author and the repository's maintainers can open,
+  and its `summary` reads `(not published)`; the CVE, the CWEs and the packages
+  are left out. The `notifs` family wrote the title of an advisory's inbox
+  thread, which is its summary, whatever any setting said; with this setting
+  off it now writes `(security advisory)` there.
+- **Two tables at the foot of the Security section, in all five dashboards.**
+  "Security advisories" and "Advisories reported" list each advisory's newest
+  row; Prometheus and Graphite say why they cannot. Both measurements have a
+  Loki rendering once an advisory is published, withdrawn or closed, which
+  makes twenty-four.
+- **Every dependency to its latest release**
+  ([#136](https://github.com/jmrplens/ghchronicle/pull/136)): pgx 5.13.0 and
+  the golang.org/x modules; seven actions; GoReleaser 2.20.2 and syft 1.57.2;
+  the base image digests; the documentation site on Node 26 and pnpm 12.21,
+  with astro 7.4.12 and Starlight 0.43.1, and the pin on
+  `@astrojs/markdown-remark` lifted now that 7.3.9 no longer breaks the code
+  blocks; and the containerized suite against the latest release of every
+  store, InfluxDB 3.12.2, PostgreSQL 18.7, Elasticsearch 9.5.6, Prometheus
+  3.16.0, Loki 3.7.10 and Grafana 13.3.1 among them. The ready-made stacks take
+  Grafana by `13.3`.
+
+What production showed before the tag. The build of
+[#135](https://github.com/jmrplens/ghchronicle/pull/135) and #136 ran on this
+account's own server with `unpublished_details: true` and a new organization
+under `targets.orgs`. Its first sweep wrote the three published advisories of
+the account's one repository that has any, two of them private reports with
+their reporters, and found every report the account had sent, in three other
+people's repositories, with no list; `-migrate` had nothing to do, and every
+panel of the InfluxDB dashboard answered against the store, the two new tables
+included, with no panel failing or empty.
+
+Left unproven: a report sent to a repository the account never otherwise took
+part in is found only once it moves or is commented on, which is when its
+inbox thread arrives. Nothing lists it before that.
+
 ## 2.6.5 - 2026-09-30
 
 A check of 2.6.4 in production found that the read which writes each open pull
