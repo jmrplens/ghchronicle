@@ -212,7 +212,7 @@ func TestReportedReadsEachCandidateOnce(t *testing.T) {
 			t.Errorf("%s asked %d times", p, n)
 		}
 	}
-	if n := len(f.calls("/repos/B/Searched/security-advisories")); n != 0 {
+	if len(f.calls("/repos/B/Searched/security-advisories")) != 0 {
 		t.Errorf("a second spelling of one repository was asked as another")
 	}
 }
@@ -228,7 +228,7 @@ func TestReportedHidesUnpublishedDetailsByDefault(t *testing.T) {
 	r := reportedOf()
 	r.Details = true
 	run = runReported(t, reportedServer(t, "a/notified", "b/searched", "c/contributed", "d/credited"), r)
-	if v := find(t, run.Points, "gh_advisory_reported", tags).Fields["summary"]; v == withheldSummary {
+	if find(t, run.Points, "gh_advisory_reported", tags).Fields["summary"] == withheldSummary {
 		t.Error("asked for every detail, a report in triage still lacks its summary")
 	}
 }

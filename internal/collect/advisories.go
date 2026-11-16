@@ -64,12 +64,8 @@ type repoAdvisory struct {
 	} `json:"vulnerabilities"`
 	// A draft has no score at all: both keys arrive with a null score.
 	CVSSSeverities struct {
-		V3 struct {
-			Score *float64 `json:"score"`
-		} `json:"cvss_v3"`
-		V4 struct {
-			Score *float64 `json:"score"`
-		} `json:"cvss_v4"`
+		V3 advisoryScore `json:"cvss_v3"`
+		V4 advisoryScore `json:"cvss_v4"`
 	} `json:"cvss_severities"`
 	CWEIDs        []string         `json:"cwe_ids"`
 	Credits       []advisoryCredit `json:"credits_detailed"`
@@ -80,6 +76,11 @@ type repoAdvisory struct {
 // withheldSummary is the summary of an advisory not yet published when
 // advisories.unpublished_details is off.
 const withheldSummary = "(not published)"
+
+// advisoryScore is one CVSS version of an advisory, null until it is rated.
+type advisoryScore struct {
+	Score *float64 `json:"score"`
+}
 
 // advisoryUser is a person an advisory names.
 type advisoryUser struct {

@@ -92,6 +92,11 @@ const reportedContributedQuery = `query($after: String) {
   }
 }`
 
+// reportedRepository is a repository as either GraphQL source names it.
+type reportedRepository struct {
+	NameWithOwner string `json:"nameWithOwner"`
+}
+
 type reportedPageInfo struct {
 	HasNextPage bool   `json:"hasNextPage"`
 	EndCursor   string `json:"endCursor"`
@@ -259,9 +264,7 @@ func (r Reported) involved(ctx context.Context, c *ghapi.Client, set *candidates
 			Search struct {
 				PageInfo reportedPageInfo `json:"pageInfo"`
 				Nodes    []struct {
-					Repository struct {
-						NameWithOwner string `json:"nameWithOwner"`
-					} `json:"repository"`
+					Repository reportedRepository `json:"repository"`
 				} `json:"nodes"`
 			} `json:"search"`
 		}
@@ -287,10 +290,8 @@ func (r Reported) contributed(ctx context.Context, c *ghapi.Client, set *candida
 		var res struct {
 			Viewer struct {
 				Repos struct {
-					PageInfo reportedPageInfo `json:"pageInfo"`
-					Nodes    []struct {
-						NameWithOwner string `json:"nameWithOwner"`
-					} `json:"nodes"`
+					PageInfo reportedPageInfo     `json:"pageInfo"`
+					Nodes    []reportedRepository `json:"nodes"`
 				} `json:"repositoriesContributedTo"`
 			} `json:"viewer"`
 		}
