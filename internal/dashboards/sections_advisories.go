@@ -89,7 +89,7 @@ func advisoryTable(b *builder, title, m string, y int, received bool) Panel {
 		Desc: desc,
 		Overrides: []any{
 			fullNameColumn(), width("GHSA", 170), when("When"), width("State", 90),
-			width("Severity", 90), ownerLinkOn("GHSA", "the advisory"),
+			width("Severity", 90), width(extraName, 110), ownerLinkOn("GHSA", "the advisory"),
 		},
 		ES: esT, ESTF: esTF, ESOpts: Opts{"sort": "When"},
 		ESDesc: "Elasticsearch reads each advisory's newest document in the range, over the " +

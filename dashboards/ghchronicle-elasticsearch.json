@@ -21483,6 +21483,18 @@
               {
                 "matcher": {
                   "id": "byName",
+                  "options": "Comments"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 110
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
                   "options": "GHSA"
                 },
                 "properties": [
@@ -21765,6 +21777,18 @@
                   {
                     "id": "custom.width",
                     "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Credit"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 110
                   }
                 ]
               },

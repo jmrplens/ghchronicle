@@ -209,8 +209,11 @@ func advisoryHome(htmlURL, fallback string) string {
 
 // inbox reads the notifications for the repositories of advisory threads.
 //
-// all=true is what keeps a thread already read; one marked done has left the
-// inbox and is not listed, which is why the found repositories are kept.
+// all=true is what keeps a thread already read, and it keeps one marked done
+// as well: measured on 2026-11-16, two threads marked done through the API,
+// one of September and one of that morning, were still listed with all=true
+// minutes later and only left the list without it. The inbox still forgets
+// a thread after months, which is why the found repositories are kept.
 func (r Reported) inbox(ctx context.Context, c *ghapi.Client, set *candidates) error {
 	since := ""
 	if !r.Notified.IsZero() {

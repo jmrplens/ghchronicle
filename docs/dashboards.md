@@ -910,7 +910,7 @@ the secrets with when each was last rotated. At the foot, the security
 advisories in both directions: the ones of these repositories, reports received
 and the maintainers' own, and the ones this account reported in other people's.
 
-![The Security section: the open alerts tile reading 25 from Dependabot and 29 from code scanning, alerts by severity and by ecosystem, open alerts per severity over time, the security feature table with on and off per repository, code scanning runs per day by tool, the time to resolve table with each advisory and its CVSS, the resolved scanning alerts, scan results by tool, the oldest open alerts, the security settings and default code scanning setup tables, workflow token permissions, and the secret rotation table](../site/src/assets/dashboards/security.png)
+![The Security section: the open alerts tile reading 25 from Dependabot and 29 from code scanning, alerts by severity and by ecosystem, open alerts per severity over time, the security feature table with on and off per repository, code scanning runs per day by tool, the time to resolve table with each advisory and its CVSS, the resolved scanning alerts, scan results by tool, the oldest open alerts, the security settings and default code scanning setup tables, workflow token permissions, the secret rotation table, and the two advisory tables, five received in states from draft to published and four reported in other repositories, the unpublished ones reading (not published)](../site/src/assets/dashboards/security.png)
 
 The feature table is what tells "no alerts" apart from "the feature is switched
 off". Without `gh_security_feature`, a repository with Dependabot disabled

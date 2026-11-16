@@ -465,7 +465,8 @@ Verified, so nobody spends an afternoon on it again:
   answers 304 to `If-None-Match`; `author` is null to anyone else. So
   `reported` finds the repositories to ask: inbox threads of subject type
   `RepositoryAdvisory`, which arrive on a state change or a comment and never on
-  submission (a report in triage had none); `involves:` and
+  submission (a report in triage had none), and which `all=true` keeps listing
+  after they are marked done; `involves:` and
   `repositoriesContributedTo`, which each held all three repositories with a
   report; and the reviewed global database by update, about 130 a day of which
   half carry credits, while 360 unreviewed ones carried none. That database
