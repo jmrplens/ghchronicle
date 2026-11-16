@@ -55,7 +55,7 @@ services:
   # behavior has no reason to touch a disk. --without-auth removes the token
   # dance; the sink still sends one and the server ignores it.
   influxdb:
-    image: influxdb:3.11.2-core
+    image: influxdb:3.12.2-core
     command:
       - influxdb3
       - serve
@@ -86,7 +86,7 @@ services:
   # drew their rows in another order until the PostgreSQL dashboard compared
   # text by its bytes (measured 2026-09-29).
   postgres:
-    image: postgres:18.6
+    image: postgres:18.7
     environment:
       POSTGRES_USER: ghchronicle
       POSTGRES_PASSWORD: ghchronicle
@@ -115,7 +115,7 @@ services:
   # a nearly full runner disk cannot flip the indices to read-only mid-suite
   # and turn a mapping question into a disk question.
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.3
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.6
     environment:
       discovery.type: single-node
       xpack.security.enabled: "false"
@@ -176,7 +176,7 @@ services:
   # exporter is. The harness reports that as ErrExporterUnreachable rather than
   # as a failure of the sink.
   prometheus:
-    image: prom/prometheus:v3.14.0
+    image: prom/prometheus:v3.16.0
     user: "0:0"
     command:
       - --config.file=/etc/prometheus/prometheus.yml
@@ -202,7 +202,7 @@ services:
   # compose can run: the harness polls /ready from the host instead, which is
   # the gate that actually matters. Same for otelcol below.
   loki:
-    image: grafana/loki:3.7.7
+    image: grafana/loki:3.7.10
     command: ["-config.file=/etc/loki/local-config.yaml"]
     volumes:
       - ./config/loki.yaml:/etc/loki/local-config.yaml:ro
@@ -216,7 +216,7 @@ services:
   # a test can assert the data points rather than a rendering of them. It runs
   # as root to write that file into a host directory the test process owns.
   otelcol:
-    image: otel/opentelemetry-collector-contrib:0.160.0
+    image: otel/opentelemetry-collector-contrib:0.165.0
     user: "0:0"
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
@@ -231,7 +231,7 @@ services:
   # a file output that keeps every timestamp as given, which is the property
   # the Telegraf sink claims. Root, again, to write into the host directory.
   telegraf:
-    image: telegraf:1.39.3
+    image: telegraf:1.40.3
     # The image's entrypoint drops back to the telegraf user whenever it finds
     # itself running as root, which would undo the user below and leave the
     # file output unable to write into a host directory the test owns. So the
@@ -256,7 +256,7 @@ services:
   # create one. The uids are fixed and the harness exports them, because
   # /api/ds/query addresses a datasource by uid.
   grafana:
-    image: grafana/grafana:13.2.1
+    image: grafana/grafana:13.3.1
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin

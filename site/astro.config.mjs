@@ -121,6 +121,11 @@ export default defineConfig({
 	site: "https://docs.jmrp.io/ghchronicle",
 	base: siteBase,
 	trailingSlash: "always",
+	// Starlight forced "where" until 0.43, which now takes Astro's setting
+	// and would default to "attribute": selectors of a higher specificity
+	// than the ones src/styles overrides were written against. Named here so
+	// the site renders as it did; move it only with a look at every page.
+	scopedStyleStrategy: "where",
 	markdown: {
 		syntaxHighlight: false, // expressive-code owns it
 		processor: unified({
