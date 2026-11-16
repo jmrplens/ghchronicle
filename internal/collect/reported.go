@@ -97,6 +97,12 @@ type reportedRepository struct {
 	NameWithOwner string `json:"nameWithOwner"`
 }
 
+// reportedConnection is a page of repositories GraphQL lists.
+type reportedConnection struct {
+	PageInfo reportedPageInfo     `json:"pageInfo"`
+	Nodes    []reportedRepository `json:"nodes"`
+}
+
 type reportedPageInfo struct {
 	HasNextPage bool   `json:"hasNextPage"`
 	EndCursor   string `json:"endCursor"`
@@ -289,10 +295,7 @@ func (r Reported) contributed(ctx context.Context, c *ghapi.Client, set *candida
 	for page := 1; page <= 20; page++ {
 		var res struct {
 			Viewer struct {
-				Repos struct {
-					PageInfo reportedPageInfo     `json:"pageInfo"`
-					Nodes    []reportedRepository `json:"nodes"`
-				} `json:"repositoriesContributedTo"`
+				Repos reportedConnection `json:"repositoriesContributedTo"`
 			} `json:"viewer"`
 		}
 		if err := c.GraphQL(ctx, reportedContributedQuery, vars, &res); err != nil {
