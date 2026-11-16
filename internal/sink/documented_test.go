@@ -20,12 +20,12 @@ import (
 // Raising the count means changing lokiEventCount and, if it crosses into a
 // word neither language has here, lokiEventWords. The failure names the file
 // and the word it is still carrying.
-const lokiEventCount = 22
+const lokiEventCount = 24
 
 // How each language spells lokiEventCount. English hyphenates, Spanish does
 // not, and both are compared literally rather than spelled by a helper: a
 // speller for two words is more code than the two words.
-var lokiEventWords = map[string]string{"en": "twenty-two", "es": "veintidós"}
+var lokiEventWords = map[string]string{"en": "twenty-four", "es": "veinticuatro"}
 
 // lokiEventClaims is the written claim in each document, as a pattern whose
 // one group is the number word.

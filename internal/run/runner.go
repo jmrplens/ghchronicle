@@ -102,8 +102,9 @@ type Runner struct {
 	// base past changes no range can name afterwards; last_full would spend
 	// the day's read of the pull requests nobody touched;
 	// last_notified would cut the inbox window past threads the stores never
-	// saw; and last_event would stop the next feed read at an event they never
-	// got. The state file is still read: what it remembers only makes this
+	// saw; last_event would stop the next feed read at an event they never
+	// got; and reported would move the inbox and the global database past
+	// advisories no store holds. The state file is still read: what it remembers only makes this
 	// sweep cheaper, never less complete.
 	CardOnly bool
 
@@ -452,6 +453,11 @@ func (r *Runner) accountFamilies(ctx context.Context, now time.Time) {
 	// cap of a thousand results, and the rows past it are missing with nothing
 	// failing. Said once per count: the open states are read whole on every
 	// sweep, and an account past the cap stays past it.
+	// The advisories the account reported in other people's repositories,
+	// found without a list: see collect.Reported and Runner.reported.
+	r.family(ctx, "reported", now, func() ([]sink.Point, error) {
+		return r.reported(ctx, now)
+	})
 	r.family(ctx, "outbound", now, func() ([]sink.Point, error) {
 		return collect.Outbound{
 			Login: user, Walk: r.walk(), Moved: r.outboundMoved(now), Warn: r.warnOnce,
@@ -518,7 +524,7 @@ var perRepoFamilies = []string{
 	"traffic", "repo", "branches", "stars", "issues", "issueevents", "actions",
 	"artifacts", "security", "stats", "discussions", "commits", "activity",
 	"analyses", "forks", "planning", "joblogs", "settings", "rulesets", "inventory",
-	"deployments", "policyfiles", "deps",
+	"deployments", "policyfiles", "deps", "advisories",
 }
 
 // PerRepository says whether a family runs once per repository, so that
@@ -945,6 +951,10 @@ func (r *Runner) repoFamily(ctx context.Context, family string, repo collect.Rep
 		return collect.Artifacts{Walk: r.walk()}.Collect(ctx, r.API, repo, now)
 	case "security":
 		return collect.Security{Walk: r.walk(), Refusals: r.refusalsFor(family)}.Collect(ctx, r.API, repo, now)
+	case "advisories":
+		return collect.Advisories{
+			Walk: r.walk(), Refusals: r.refusalsFor(family), Details: r.Cfg.Advisories.UnpublishedDetails,
+		}.Collect(ctx, r.API, repo, now)
 	case "stats":
 		return collect.RepoActivity{}.Collect(ctx, r.API, repo, now)
 	case "discussions":

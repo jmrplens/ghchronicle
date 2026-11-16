@@ -70,8 +70,8 @@ func TestReportedFindsTheRepositoriesWithoutAList(t *testing.T) {
 	if got := slices.Sorted(slices.Values(run.Remember)); !slices.Equal(got, want) {
 		t.Errorf("remember %v, want every repository that held one %v", got, want)
 	}
-	if !run.Scanned {
-		t.Error("a global walk that reached the end is not marked scanned")
+	if !run.Scanned || !run.InboxRead {
+		t.Errorf("scanned %v, inbox read %v: both walks reached their end", run.Scanned, run.InboxRead)
 	}
 	// e/someone-elses credits someone else, and z/pulls-only notified about a
 	// pull request: neither is a candidate.

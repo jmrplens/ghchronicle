@@ -30,7 +30,7 @@ var lokiKinds = map[string]bool{
 	"pull_request": true, "review": true, "issue": true, "commit": true,
 	"workflow_run": true, "repo_activity": true, "alert": true, "code_scanning": true,
 	"event": true, "notification": true, "discussion": true, "webhook": true,
-	"job_log": true, "external_contribution": true,
+	"job_log": true, "external_contribution": true, "advisory": true, "advisory_reported": true,
 	"deployment": true, "review_thread": true, "ruleset": true,
 }
 

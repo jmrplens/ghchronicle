@@ -83,25 +83,32 @@ const graphQLNoFixture = `{"errors":[{"type":"UNKNOWN","message":"no fixture for
 
 // rest maps a request path to the fixture that answers it.
 var rest = map[string]string{
-	"/user/repos":                                   "user_repos.json",
-	repoPath:                                        "repo.json",
-	repoPath + "/traffic/views":                     "traffic_views.json",
-	repoPath + "/traffic/clones":                    "traffic_clones.json",
-	repoPath + "/traffic/popular/referrers":         "traffic_referrers.json",
-	repoPath + "/traffic/popular/paths":             "traffic_paths.json",
-	repoPath + "/languages":                         "repo_languages.json",
-	repoPath + "/community/profile":                 "repo_community.json",
-	repoPath + "/topics":                            "repo_topics.json",
-	repoPath + "/releases":                          "releases.json",
-	repoPath + "/stargazers":                        "stargazers_page1.json",
-	repoPath + "/stargazers/history":                "stargazers_history.json",
-	repoPath + "/actions/runs/1000163135/jobs":      "actions_jobs.json",
-	repoPath + "/actions/runs/1000163134/jobs":      "actions_jobs_failed.json",
-	repoPath + "/actions/cache/usage":               "actions_cache.json",
-	repoPath + "/actions/caches":                    "actions_caches.json",
-	repoPath + "/actions/artifacts":                 "artifacts.json",
-	repoPath + "/actions/workflows":                 "workflows.json",
-	repoPath + "/dependabot/alerts":                 "dependabot_alerts.json",
+	"/user/repos":                              "user_repos.json",
+	repoPath:                                   "repo.json",
+	repoPath + "/traffic/views":                "traffic_views.json",
+	repoPath + "/traffic/clones":               "traffic_clones.json",
+	repoPath + "/traffic/popular/referrers":    "traffic_referrers.json",
+	repoPath + "/traffic/popular/paths":        "traffic_paths.json",
+	repoPath + "/languages":                    "repo_languages.json",
+	repoPath + "/community/profile":            "repo_community.json",
+	repoPath + "/topics":                       "repo_topics.json",
+	repoPath + "/releases":                     "releases.json",
+	repoPath + "/stargazers":                   "stargazers_page1.json",
+	repoPath + "/stargazers/history":           "stargazers_history.json",
+	repoPath + "/actions/runs/1000163135/jobs": "actions_jobs.json",
+	repoPath + "/actions/runs/1000163134/jobs": "actions_jobs_failed.json",
+	repoPath + "/actions/cache/usage":          "actions_cache.json",
+	repoPath + "/actions/caches":               "actions_caches.json",
+	repoPath + "/actions/artifacts":            "artifacts.json",
+	repoPath + "/actions/workflows":            "workflows.json",
+	repoPath + "/dependabot/alerts":            "dependabot_alerts.json",
+	repoPath + "/security-advisories":          "repo_advisories.json",
+	// The reported family's candidates: someone/elsewhere is named by an
+	// inbox thread, the search and the contributions, someone/credited by
+	// the global database alone.
+	"/advisories": "global_advisories.json",
+	"/repos/someone/elsewhere/security-advisories":  "reported_advisories.json",
+	"/repos/someone/credited/security-advisories":   "reported_advisories.json",
 	repoPath + "/code-scanning/alerts":              "code_scanning_alerts.json",
 	repoPath + "/code-scanning/analyses":            "code_scanning_analyses.json",
 	repoPath + "/stats/participation":               "stats_participation.json",
@@ -181,6 +188,10 @@ var graphQL = []struct{ marker, fixture string }{
 	// totals counters search ISSUE as well, with no page: the page size is
 	// what only an outbound search carries.
 	{"starredRepositories(first:", "graphql_starred.json"},
+	// The reported family's two queries ask for nothing but repository
+	// names, which is what tells them from every other search.
+	{"... on Issue { repository { nameWithOwner } }", "graphql_reported_search.json"},
+	{"repositoriesContributedTo(", "graphql_contributed.json"},
 	{"search(type: ISSUE, first: 100", outboundSearchFixture},
 	{"search(type: REPOSITORY", "graphql_search_counts.json"},
 	{"fragment totals on Repository", "graphql_repo_totals.json"},

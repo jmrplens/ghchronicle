@@ -592,6 +592,7 @@
         "achievements",
         "actions",
         "activity",
+        "advisories",
         "analyses",
         "artifacts",
         "billing",
@@ -615,6 +616,7 @@
         "profile",
         "ratelimit",
         "repo",
+        "reported",
         "rulesets",
         "security",
         "settings",
@@ -710,6 +712,18 @@
       "kind": "string",
       "group": "run",
       "example": "2y"
+    },
+    {
+      "key": "advisories",
+      "kind": "block",
+      "group": "run"
+    },
+    {
+      "key": "advisories.unpublished_details",
+      "kind": "bool",
+      "group": "run",
+      "default": "false",
+      "example": "false"
     },
     {
       "key": "migrate",
@@ -868,7 +882,9 @@
       "name": "security",
       "description": "Dependabot alerts and code scanning",
       "families": [
+        "advisories",
         "analyses",
+        "reported",
         "security"
       ]
     },
@@ -905,6 +921,11 @@
       "name": "activity",
       "group": "feeds",
       "every": "15m"
+    },
+    {
+      "name": "advisories",
+      "group": "security",
+      "every": "1h"
     },
     {
       "name": "analyses",
@@ -1019,6 +1040,11 @@
     {
       "name": "repo",
       "group": "repos",
+      "every": "1h"
+    },
+    {
+      "name": "reported",
+      "group": "security",
       "every": "1h"
     },
     {

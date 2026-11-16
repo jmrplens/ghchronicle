@@ -1,0 +1,3 @@
+{"data": {"search": {"pageInfo": {"hasNextPage": false, "endCursor": "c1"}, "nodes": [
+  {"repository": {"nameWithOwner": "someone/elsewhere"}}
+]}}}

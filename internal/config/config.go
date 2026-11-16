@@ -40,6 +40,10 @@ type Config struct {
 	// Backfill settings. They only apply to a run started with -backfill.
 	Backfill Backfill `yaml:"backfill"`
 
+	// Advisories says how much of a security advisory that is not public yet
+	// reaches the stores.
+	Advisories Advisories `yaml:"advisories"`
+
 	// Migrate is what a run that writes to the stores does, before its first
 	// sweep, about a store an earlier release left in a shape this one no
 	// longer writes: MigrateAuto brings it along when nothing can be lost by
@@ -79,6 +83,17 @@ type Config struct {
 	// notes are the things worth saying about a configuration that is legal.
 	// Validate has no logger, and main has one only after the config is loaded.
 	notes []string
+}
+
+// Advisories is what the advisories and reported families write about an
+// advisory that has not been published.
+type Advisories struct {
+	// UnpublishedDetails writes the summary, the CVE, the CWEs and the
+	// affected packages of a report still in triage, a draft or a closed
+	// report, which are a vulnerability under embargo. Off, the default, such
+	// a row keeps the GHSA, the state, the severity, the scores, the dates
+	// and the page, which only the author and the maintainers can open.
+	UnpublishedDetails bool `yaml:"unpublished_details" ghc:"example=false"`
 }
 
 // Backfill bounds how far back a backfill reaches.
@@ -620,6 +635,14 @@ var defaultEvery = map[string]family{
 	"security": {
 		every: 1 * time.Hour, group: "security",
 		why: "an alert is something to act on today, and the list of open ones is short",
+	},
+	"advisories": {
+		every: 1 * time.Hour, group: "security",
+		why: "a report waiting in triage is something to act on today, and a list that has not moved answers 304 at no cost",
+	},
+	"reported": {
+		every: 1 * time.Hour, group: "security",
+		why: "a maintainer's answer moves a report, and every repository whose list has not moved answers 304 at no cost",
 	},
 	"issues": {
 		every: 1 * time.Hour, group: "work",

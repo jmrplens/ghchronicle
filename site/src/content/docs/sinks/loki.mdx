@@ -1,6 +1,6 @@
 ---
 title: Loki
-description: The twenty-two measurements that are events rather than numbers, and the age horizon that keeps a push from being refused.
+description: The twenty-four measurements that are events rather than numbers, and the age horizon that keeps a push from being refused.
 searchTitle: Send GitHub events to Loki
 ---
 
@@ -27,12 +27,13 @@ release was published, that workflow failed on main, this alert was raised" are
 events: each happened once, at a known moment, and what you want later is to
 read them in order and search them, not to average them.
 
-**Twenty-two measurements have an event rendering**: stars in both directions,
+**Twenty-four measurements have an event rendering**: stars in both directions,
 forks, releases, published package versions, pull requests, reviews, review
 threads, issues, commits, workflow runs, job logs, repository activity,
 Dependabot alerts, code scanning analyses, the event feed, notifications,
-discussions, webhook deliveries, deployments, ruleset versions and external
-contributions. Everything else is a gauge in disguise and is not sent.
+discussions, webhook deliveries, deployments, ruleset versions, external
+contributions, and security advisories both received and reported, once each is
+published or closed. Everything else is a gauge in disguise and is not sent.
 
 A measurement with no rendering is dropped in silence, which is right for a
 gauge and wrong for an event nobody has got round to: deployments and review

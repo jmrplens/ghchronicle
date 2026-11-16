@@ -64,6 +64,9 @@ type ReportedRun struct {
 	// Scanned says the global walk reached its bound or the end, so the
 	// next run may start from this one.
 	Scanned bool
+	// InboxRead says the inbox was read to its end, so the next run may
+	// read only what changed after this one started.
+	InboxRead bool
 }
 
 const reportedSearchQuery = `query($query: String!, $after: String) {
@@ -122,8 +125,9 @@ func (c *candidates) add(fullName string, remember bool) {
 func (r Reported) Collect(ctx context.Context, c *ghapi.Client, now time.Time) (ReportedRun, error) {
 	set := &candidates{own: r.Own, names: map[string]string{}, remember: map[string]bool{}}
 	var errs []error
-	if err := r.inbox(ctx, c, set); err != nil {
-		errs = append(errs, fmt.Errorf("inbox: %w", err))
+	inboxErr := r.inbox(ctx, c, set)
+	if inboxErr != nil {
+		errs = append(errs, fmt.Errorf("inbox: %w", inboxErr))
 	}
 	if err := r.involved(ctx, c, set); err != nil {
 		errs = append(errs, fmt.Errorf("search: %w", err))
@@ -139,7 +143,7 @@ func (r Reported) Collect(ctx context.Context, c *ghapi.Client, now time.Time) (
 		set.add(k, true)
 	}
 
-	out := ReportedRun{Scanned: scanned}
+	out := ReportedRun{Scanned: scanned, InboxRead: inboxErr == nil}
 	keys := make([]string, 0, len(set.names))
 	for k := range set.names {
 		keys = append(keys, k)

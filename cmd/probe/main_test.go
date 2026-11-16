@@ -23,6 +23,7 @@ var families = []string{
 	"traffic", "repo", "stars", "starhistory", "account", "pulls", "actions", "artifacts", "activity",
 	"discuss", "billing", "profile", "commits", "activity2", "analyses", "forks",
 	"planning", "outbound", "history", "settings", "rulesets", "joblogs", "events", "notifs",
+	"advisories", "reported",
 }
 
 // probeFake runs the probe against the fake GitHub the end-to-end suites

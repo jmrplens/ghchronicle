@@ -1,0 +1,30 @@
+[
+  {
+    "ghsa_id": "GHSA-e2e0-aaaa-0001", "cve_id": "CVE-2026-1001",
+    "html_url": "https://github.com/octocat/hello-world/security/advisories/GHSA-e2e0-aaaa-0001",
+    "summary": "A crafted archive writes outside the upload directory", "severity": "high", "state": "published",
+    "author": {"login": "a-reporter"},
+    "created_at": "@DAYS_AGO_9@T10:00:00Z", "updated_at": "@DAYS_AGO_3@T12:00:00Z",
+    "published_at": "@DAYS_AGO_3@T12:00:00Z", "closed_at": null, "withdrawn_at": null,
+    "submission": {"accepted": true},
+    "vulnerabilities": [{"package": {"ecosystem": "go", "name": "github.com/octocat/hello-world"}}],
+    "cvss_severities": {"cvss_v3": {"vector_string": "CVSS:3.1/AV:N", "score": 7.5}, "cvss_v4": {"vector_string": null, "score": null}},
+    "cwe_ids": ["CWE-22"],
+    "credits_detailed": [{"user": {"login": "a-reporter"}, "type": "reporter", "state": "accepted"}],
+    "collaborating_users": [{"login": "a-reporter"}], "comments": 2
+  },
+  {
+    "ghsa_id": "GHSA-e2e0-aaaa-0002", "cve_id": null,
+    "html_url": "https://github.com/octocat/hello-world/security/advisories/GHSA-e2e0-aaaa-0002",
+    "summary": "Sessions survive a password change", "severity": "medium", "state": "triage",
+    "author": {"login": "another-reporter"},
+    "created_at": "@DAYS_AGO_2@T08:00:00Z", "updated_at": "@DAYS_AGO_2@T08:00:00Z",
+    "published_at": null, "closed_at": null, "withdrawn_at": null,
+    "submission": {"accepted": false},
+    "vulnerabilities": [],
+    "cvss_severities": {"cvss_v3": {"vector_string": null, "score": null}, "cvss_v4": {"vector_string": null, "score": null}},
+    "cwe_ids": ["CWE-613"],
+    "credits_detailed": [{"user": {"login": "another-reporter"}, "type": "reporter", "state": "accepted"}],
+    "collaborating_users": [], "comments": 0
+  }
+]

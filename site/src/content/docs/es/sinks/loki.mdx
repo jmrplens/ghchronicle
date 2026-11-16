@@ -1,6 +1,6 @@
 ---
 title: Loki
-description: Las veintidós medidas que son eventos y no números, y el horizonte de antigüedad que evita que se rechace un envío.
+description: Las veinticuatro medidas que son eventos y no números, y el horizonte de antigüedad que evita que se rechace un envío.
 searchTitle: Enviar eventos de GitHub a Loki
 ---
 
@@ -27,13 +27,14 @@ las 03:03, se publicó esta release, aquel workflow falló en main, se abrió es
 alerta" son eventos: cada uno ocurrió una vez, en un momento conocido, y lo que
 uno quiere después es leerlos en orden y buscarlos, no promediarlos.
 
-**Veintidós medidas tienen una representación de evento**: estrellas en ambas
-direcciones, forks, releases, versiones de paquete publicadas, pull requests,
-revisiones, hilos de revisión, issues, commits, ejecuciones de workflows, logs
-de jobs, actividad del repositorio, alertas de Dependabot, análisis de code
-scanning, el feed de eventos, las notificaciones, las discusiones, las entregas
-de webhook, los despliegues, las versiones de ruleset y las contribuciones
-externas. Todo lo demás es un gauge disfrazado y no se envía.
+**Veinticuatro medidas tienen una representación de evento**: estrellas en
+ambas direcciones, forks, releases, versiones de paquete publicadas, pull
+requests, revisiones, hilos de revisión, issues, commits, ejecuciones de
+workflows, logs de jobs, actividad del repositorio, alertas de Dependabot,
+análisis de code scanning, el feed de eventos, las notificaciones, las
+discusiones, las entregas de webhook, los despliegues, las versiones de ruleset,
+las contribuciones externas y los advisories de seguridad, recibidos y
+reportados, cuando se publican o se cierran. Todo lo demás es un gauge disfrazado y no se envía.
 
 Una medida sin representación se descarta en silencio, lo cual está bien para un
 gauge y mal para un evento que nadie ha llegado a escribir: los despliegues y los

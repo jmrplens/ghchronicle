@@ -31,7 +31,7 @@ flowchart TD
     B -- "yes" --> C["Collect"]
     C --> P["Dated points"]
     P --> H["Destinations that keep the date<br/>InfluxDB, file, stdout, Telegraf, Graphite,<br/>PostgreSQL to a file, PostgreSQL,<br/>Elasticsearch"]
-    P --> L["Loki<br/>the twenty-two event renderings"]
+    P --> L["Loki<br/>the twenty-four event renderings"]
     P --> RD["Reducer<br/>current values"]
     RD --> G["Prometheus<br/>OTLP, when raw: false"]
     C --> M["Mark the family as run<br/>in the state file"]

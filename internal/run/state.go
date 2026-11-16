@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/jmrplens/ghchronicle/v2/internal/collect"
@@ -17,11 +18,13 @@ import (
 
 // State is what a sweep has to remember between runs.
 //
-// Nine things, and deleting the file costs a different thing for each of
-// them. Seven of the nine cost only rate limit, because what is collected
+// Ten things, and deleting the file costs a different thing for each of
+// them. Seven of the ten cost only rate limit, because what is collected
 // again overwrites what is already stored. last_head loses something: the
 // dependency changes between the head it held and the next one are read from
-// a range that nothing can name once the head is gone. So does stores: which
+// a range that nothing can name once the head is gone. So does reported: a
+// repository only an inbox thread named, once the thread has gone, is found
+// again only when one of its advisories moves. So does stores: which
 // release first wrote a store that cannot be asked what shape its rows are
 // in, and the history a migration cleared out of a store and has not read
 // back, which the store, asked, shows as a store that never held the old
@@ -50,6 +53,11 @@ import (
 //   - coauthored: the Pair Extraordinaire count and the last day it covers,
 //     so the achievements family walks the pull requests merged since instead
 //     of the account's whole history. Absent walks the whole history.
+//   - reported: every repository outside the account's own where an
+//     advisory naming it was found, or that the inbox or the global
+//     database named, with when it was first seen; and where the inbox and
+//     the global database were last read to, so the next pass reads what
+//     changed since. See ReportedMemory.
 //   - stores: per configured store, where it points, which release first
 //     wrote it and which last did, the migrations applied to it, the copies
 //     set aside there and the refill still owed. See StoreRecord.
@@ -83,6 +91,10 @@ type State struct {
 	// file reads as, is a count made by no rule, and the next pass walks the
 	// whole history for it.
 	Coauthored collect.CoauthoredTally `json:"coauthored,omitzero"`
+	// Reported is what the reported family found that no single source
+	// would find again. Zero, which is what an older state file reads as,
+	// reads the whole inbox and the whole global database once.
+	Reported ReportedMemory `json:"reported,omitzero"`
 	// Stores is what this file remembers about each store it has written,
 	// keyed by the sink's name in the configuration. Absent in a state file
 	// written before 2.6.2, which is itself an answer: every store it served
@@ -92,6 +104,40 @@ type State struct {
 	// loaded is Stores as this process read them, which is what Save tells
 	// this process's changes from another's by.
 	loaded map[string]*StoreRecord
+}
+
+// ReportedMemory is the reported family's memory between runs.
+type ReportedMemory struct {
+	// Repos is each repository worth asking again, with when it was first
+	// seen. Nothing is removed: a repository is one request, a 304 when its
+	// list has not moved, and a report there can move years later.
+	Repos map[string]time.Time `json:"repos,omitempty"`
+	// Notified is when the last complete read of the inbox started.
+	Notified time.Time `json:"notified,omitzero"`
+	// Scanned is when the last complete walk of the global database started.
+	Scanned time.Time `json:"scanned,omitzero"`
+}
+
+// Known lists the remembered repositories in a stable order.
+func (m *ReportedMemory) Known() []string {
+	out := make([]string, 0, len(m.Repos))
+	for full := range m.Repos {
+		out = append(out, full)
+	}
+	slices.Sort(out)
+	return out
+}
+
+// Remember keeps each repository not already kept, dated now.
+func (m *ReportedMemory) Remember(names []string, now time.Time) {
+	for _, full := range names {
+		if m.Repos == nil {
+			m.Repos = map[string]time.Time{}
+		}
+		if _, kept := m.Repos[full]; !kept {
+			m.Repos[full] = now
+		}
+	}
 }
 
 // LoadState is the state file at path, or a state with nothing in it when

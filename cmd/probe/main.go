@@ -74,6 +74,9 @@ type probed struct {
 // collectors is every collector the probe runs, in the order it prints them,
 // each set up the way a short look at one repository wants it.
 func collectors(ctx context.Context, c *ghapi.Client, repo collect.Repo, now time.Time) []probed {
+	// GHC_ADVISORY_DETAILS set to anything writes what an unpublished
+	// advisory says about the flaw, as advisories.unpublished_details does.
+	details := os.Getenv("GHC_ADVISORY_DETAILS") != ""
 	return []probed{
 		{"traffic", func() ([]sink.Point, error) { return collect.Traffic{}.Collect(ctx, c, repo, now) }},
 		{"repo", func() ([]sink.Point, error) { return collect.RepoCore{}.Collect(ctx, c, repo, now) }},
@@ -128,6 +131,13 @@ func collectors(ctx context.Context, c *ghapi.Client, repo collect.Repo, now tim
 		}},
 		{"notifs", func() ([]sink.Point, error) {
 			return (&collect.Notifications{All: true}).Collect(ctx, c, now)
+		}},
+		{"advisories", func() ([]sink.Point, error) {
+			return collect.Advisories{Details: details}.Collect(ctx, c, repo, now)
+		}},
+		{"reported", func() ([]sink.Point, error) {
+			run, err := collect.Reported{Login: repo.Owner, Own: []string{repo.Owner}, Details: details}.Collect(ctx, c, now)
+			return run.Points, err
 		}},
 	}
 }
