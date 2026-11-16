@@ -11085,7 +11085,7 @@
         "x": 0,
         "y": 446
       },
-      "id": 123,
+      "id": 125,
       "panels": [
         {
           "datasource": "${DS_INFLUXDB}",
@@ -12749,6 +12749,292 @@
           ],
           "title": "Secret rotation",
           "type": "table"
+        },
+        {
+          "datasource": "${DS_INFLUXDB}",
+          "description": "Every security advisory of these repositories: the reports others sent through private vulnerability reporting, and the drafts and publications of their maintainers. No other endpoint lists a report, and the ones closed without publication are seen nowhere else. When is the row's own date: when it was published or closed, or for one still in triage or a draft the day it was last seen so. The Summary of one not yet published is empty unless advisories.unpublished_details is on.",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "filterable": false,
+                "minWidth": 90
+              },
+              "fieldMinMax": true
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Repository"
+                },
+                "properties": [
+                  {
+                    "id": "custom.minWidth",
+                    "value": 160
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "GHSA"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 170
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "When"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "time: YYYY-MM-DD HH:mm"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 135
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "State"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Severity"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "GHSA"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "targetBlank": true,
+                        "title": "Open the advisory (owner only)",
+                        "url": "${__data.fields.Link}"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Link"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hidden",
+                    "value": true
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 24,
+            "x": 0,
+            "y": 507
+          },
+          "id": 123,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "reducer": [
+                "sum"
+              ],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": []
+          },
+          "targets": [
+            {
+              "datasource": "${DS_INFLUXDB}",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT x.full_name AS \"Repository\", x.ghsa AS \"GHSA\", x.time AS \"When\", x.advisory_state AS \"State\", x.severity AS \"Severity\", x.summary AS \"Summary\", x.comments AS \"Comments\", x.url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, ghsa ORDER BY time DESC) AS rn FROM gh_repo_advisory WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE x.rn = 1 ORDER BY x.time DESC, x.full_name, x.ghsa LIMIT 40",
+              "refId": "A"
+            }
+          ],
+          "title": "Security advisories",
+          "type": "table"
+        },
+        {
+          "datasource": "${DS_INFLUXDB}",
+          "description": "The advisories this account reported, is credited in or collaborates on in other people's repositories, found without a list: the inbox, the issues and pull requests it took part in, the repositories it contributed to and the reviewed global database each name repositories to ask. Credit is what the advisory credits the account as. When is the row's own date, as in the table above, and the Summary of one not yet published is empty unless advisories.unpublished_details is on.",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "filterable": false,
+                "minWidth": 90
+              },
+              "fieldMinMax": true
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Repository"
+                },
+                "properties": [
+                  {
+                    "id": "custom.minWidth",
+                    "value": 160
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "GHSA"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 170
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "When"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "time: YYYY-MM-DD HH:mm"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 135
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "State"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Severity"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "GHSA"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "targetBlank": true,
+                        "title": "Open the advisory (owner only)",
+                        "url": "${__data.fields.Link}"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Link"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hidden",
+                    "value": true
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 24,
+            "x": 0,
+            "y": 516
+          },
+          "id": 124,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "reducer": [
+                "sum"
+              ],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": []
+          },
+          "targets": [
+            {
+              "datasource": "${DS_INFLUXDB}",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT x.full_name AS \"Repository\", x.ghsa AS \"GHSA\", x.time AS \"When\", x.advisory_state AS \"State\", x.severity AS \"Severity\", x.summary AS \"Summary\", x.credit AS \"Credit\", x.url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, ghsa ORDER BY time DESC) AS rn FROM gh_advisory_reported WHERE $__timeFilter(time)) x WHERE x.rn = 1 ORDER BY x.time DESC, x.full_name, x.ghsa LIMIT 40",
+              "refId": "A"
+            }
+          ],
+          "title": "Advisories reported",
+          "type": "table"
         }
       ],
       "title": "Security",
@@ -12760,9 +13046,9 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 508
+        "y": 526
       },
-      "id": 130,
+      "id": 132,
       "panels": [
         {
           "datasource": "${DS_INFLUXDB}",
@@ -12900,9 +13186,9 @@
             "h": 4,
             "w": 24,
             "x": 0,
-            "y": 509
+            "y": 527
           },
-          "id": 124,
+          "id": 126,
           "options": {
             "colorMode": "none",
             "graphMode": "none",
@@ -12959,9 +13245,9 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 513
+            "y": 531
           },
-          "id": 125,
+          "id": 127,
           "interval": "1d",
           "maxDataPoints": 100,
           "options": {
@@ -13019,9 +13305,9 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 513
+            "y": 531
           },
-          "id": 126,
+          "id": 128,
           "interval": "1d",
           "maxDataPoints": 100,
           "options": {
@@ -13181,9 +13467,9 @@
             "h": 9,
             "w": 24,
             "x": 0,
-            "y": 521
+            "y": 539
           },
-          "id": 127,
+          "id": 129,
           "links": [
             {
               "targetBlank": true,
@@ -13297,9 +13583,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 530
+            "y": 548
           },
-          "id": 128,
+          "id": 130,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -13410,9 +13696,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 538
+            "y": 556
           },
-          "id": 129,
+          "id": 131,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -13452,9 +13738,9 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 547
+        "y": 565
       },
-      "id": 140,
+      "id": 142,
       "panels": [
         {
           "datasource": "${DS_INFLUXDB}",
@@ -13487,9 +13773,9 @@
             "h": 8,
             "w": 16,
             "x": 0,
-            "y": 548
+            "y": 566
           },
-          "id": 131,
+          "id": 133,
           "interval": "1h",
           "maxDataPoints": 100,
           "options": {
@@ -13539,9 +13825,9 @@
             "h": 16,
             "w": 8,
             "x": 16,
-            "y": 548
+            "y": 566
           },
-          "id": 132,
+          "id": 134,
           "options": {
             "displayLabels": [],
             "legend": {
@@ -13617,9 +13903,9 @@
             "h": 8,
             "w": 8,
             "x": 0,
-            "y": 556
+            "y": 574
           },
-          "id": 133,
+          "id": 135,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -13710,9 +13996,9 @@
             "h": 8,
             "w": 8,
             "x": 8,
-            "y": 556
+            "y": 574
           },
-          "id": 134,
+          "id": 136,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -13773,9 +14059,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 564
+            "y": 582
           },
-          "id": 135,
+          "id": 137,
           "interval": "1d",
           "maxDataPoints": 100,
           "options": {
@@ -13930,9 +14216,9 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 572
+            "y": 590
           },
-          "id": 136,
+          "id": 138,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -14105,9 +14391,9 @@
             "h": 9,
             "w": 24,
             "x": 0,
-            "y": 579
+            "y": 597
           },
-          "id": 137,
+          "id": 139,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -14155,9 +14441,9 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 588
+            "y": 606
           },
-          "id": 138,
+          "id": 140,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -14318,9 +14604,9 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 588
+            "y": 606
           },
-          "id": 139,
+          "id": 141,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -14355,9 +14641,9 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 597
+        "y": 615
       },
-      "id": 157,
+      "id": 159,
       "panels": [
         {
           "datasource": "${DS_INFLUXDB}",
@@ -14381,9 +14667,9 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 598
+            "y": 616
           },
-          "id": 141,
+          "id": 143,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -14804,9 +15090,9 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 598
+            "y": 616
           },
-          "id": 142,
+          "id": 144,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -15044,9 +15330,9 @@
             "h": 11,
             "w": 24,
             "x": 0,
-            "y": 606
+            "y": 624
           },
-          "id": 143,
+          "id": 145,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -15140,9 +15426,9 @@
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 617
+            "y": 635
           },
-          "id": 144,
+          "id": 146,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -15276,9 +15562,9 @@
             "h": 8,
             "w": 9,
             "x": 6,
-            "y": 617
+            "y": 635
           },
-          "id": 145,
+          "id": 147,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -15440,9 +15726,9 @@
             "h": 8,
             "w": 9,
             "x": 15,
-            "y": 617
+            "y": 635
           },
-          "id": 146,
+          "id": 148,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -15547,9 +15833,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 625
+            "y": 643
           },
-          "id": 147,
+          "id": 149,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -15770,9 +16056,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 633
+            "y": 651
           },
-          "id": 148,
+          "id": 150,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -15849,9 +16135,9 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 641
+            "y": 659
           },
-          "id": 149,
+          "id": 151,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -15899,9 +16185,9 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 641
+            "y": 659
           },
-          "id": 150,
+          "id": 152,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -15983,9 +16269,9 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 648
+            "y": 666
           },
-          "id": 151,
+          "id": 153,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -16074,9 +16360,9 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 648
+            "y": 666
           },
-          "id": 152,
+          "id": 154,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -16249,9 +16535,9 @@
             "h": 12,
             "w": 12,
             "x": 0,
-            "y": 655
+            "y": 673
           },
-          "id": 153,
+          "id": 155,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -16373,9 +16659,9 @@
             "h": 12,
             "w": 12,
             "x": 12,
-            "y": 655
+            "y": 673
           },
-          "id": 154,
+          "id": 156,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -16428,9 +16714,9 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 667
+            "y": 685
           },
-          "id": 155,
+          "id": 157,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -16519,9 +16805,9 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 667
+            "y": 685
           },
-          "id": 156,
+          "id": 158,
           "interval": "1d",
           "maxDataPoints": 100,
           "options": {
@@ -16558,9 +16844,9 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 675
+        "y": 693
       },
-      "id": 166,
+      "id": 168,
       "panels": [
         {
           "datasource": "${DS_INFLUXDB}",
@@ -16686,9 +16972,9 @@
             "h": 4,
             "w": 24,
             "x": 0,
-            "y": 676
+            "y": 694
           },
-          "id": 158,
+          "id": 160,
           "options": {
             "colorMode": "none",
             "graphMode": "none",
@@ -16895,9 +17181,9 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 680
+            "y": 698
           },
-          "id": 159,
+          "id": 161,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -17102,9 +17388,9 @@
             "h": 10,
             "w": 12,
             "x": 12,
-            "y": 680
+            "y": 698
           },
-          "id": 160,
+          "id": 162,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -17238,9 +17524,9 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 690
+            "y": 708
           },
-          "id": 161,
+          "id": 163,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -17377,9 +17663,9 @@
             "h": 10,
             "w": 12,
             "x": 12,
-            "y": 690
+            "y": 708
           },
-          "id": 162,
+          "id": 164,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -17548,9 +17834,9 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 700
+            "y": 718
           },
-          "id": 163,
+          "id": 165,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -17656,9 +17942,9 @@
             "h": 10,
             "w": 24,
             "x": 0,
-            "y": 707
+            "y": 725
           },
-          "id": 164,
+          "id": 166,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -17963,9 +18249,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 717
+            "y": 735
           },
-          "id": 165,
+          "id": 167,
           "options": {
             "cellHeight": "lg",
             "footer": {
@@ -18000,9 +18286,9 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 726
+        "y": 744
       },
-      "id": 171,
+      "id": 173,
       "panels": [
         {
           "datasource": "${DS_INFLUXDB}",
@@ -18034,9 +18320,9 @@
             "h": 11,
             "w": 12,
             "x": 0,
-            "y": 727
+            "y": 745
           },
-          "id": 167,
+          "id": 169,
           "interval": "5m",
           "maxDataPoints": 100,
           "options": {
@@ -18084,9 +18370,9 @@
             "h": 11,
             "w": 12,
             "x": 12,
-            "y": 727
+            "y": 745
           },
-          "id": 168,
+          "id": 170,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -18213,9 +18499,9 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 738
+            "y": 756
           },
-          "id": 169,
+          "id": 171,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -18307,9 +18593,9 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 738
+            "y": 756
           },
-          "id": 170,
+          "id": 172,
           "options": {
             "cellHeight": "sm",
             "footer": {

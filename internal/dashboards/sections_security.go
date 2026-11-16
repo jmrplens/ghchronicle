@@ -6,9 +6,10 @@ import "fmt"
 
 // security is what GitHub's own scanners have to say, in three parts: what is
 // open right now, what the scans that found it did, and what is switched on to
-// find any of it at all.
+// find any of it at all; and what people reported, to these repositories and
+// from this account to others.
 func security(b *builder) []Panel {
-	return append(append(openAlerts(b), scanningAndResolution(b)...), posture(b)...)
+	return append(append(append(openAlerts(b), scanningAndResolution(b)...), posture(b)...), advisories(b)...)
 }
 
 // How the word columns below are drawn: the cell option that colors the text

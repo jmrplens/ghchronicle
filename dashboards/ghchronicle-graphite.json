@@ -11957,7 +11957,7 @@
         "x": 0,
         "y": 446
       },
-      "id": 123,
+      "id": 125,
       "panels": [
         {
           "datasource": "${DS_GRAPHITE}",
@@ -13748,6 +13748,48 @@
             }
           ],
           "type": "table"
+        },
+        {
+          "description": "",
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 24,
+            "x": 0,
+            "y": 507
+          },
+          "id": 123,
+          "options": {
+            "content": "**Not available from Graphite.** In the InfluxDB dashboard this panel shows each advisory, newest first, with its state, severity and summary and a link to it.\n\nGraphite keeps no strings, and an advisory is its state, its severity and its summary.\n\nEach row of it links to the item on GitHub.",
+            "mode": "markdown"
+          },
+          "targets": [],
+          "title": "Security advisories",
+          "type": "text"
+        },
+        {
+          "description": "",
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 24,
+            "x": 0,
+            "y": 516
+          },
+          "id": 124,
+          "options": {
+            "content": "**Not available from Graphite.** In the InfluxDB dashboard this panel shows each advisory, newest first, with its state, severity and summary and a link to it.\n\nGraphite keeps no strings, and an advisory is its state, its severity and its summary.\n\nEach row of it links to the item on GitHub.",
+            "mode": "markdown"
+          },
+          "targets": [],
+          "title": "Advisories reported",
+          "type": "text"
         }
       ],
       "title": "Security",
@@ -13759,9 +13801,9 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 508
+        "y": 526
       },
-      "id": 130,
+      "id": 132,
       "panels": [
         {
           "datasource": "${DS_GRAPHITE}",
@@ -13899,9 +13941,9 @@
             "h": 4,
             "w": 24,
             "x": 0,
-            "y": 509
+            "y": 527
           },
-          "id": 124,
+          "id": 126,
           "maxDataPoints": 5000,
           "options": {
             "colorMode": "none",
@@ -13975,9 +14017,9 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 513
+            "y": 531
           },
-          "id": 125,
+          "id": 127,
           "interval": "1d",
           "maxDataPoints": 5000,
           "options": {
@@ -14036,9 +14078,9 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 513
+            "y": 531
           },
-          "id": 126,
+          "id": 128,
           "interval": "1d",
           "maxDataPoints": 5000,
           "options": {
@@ -14200,9 +14242,9 @@
             "h": 9,
             "w": 24,
             "x": 0,
-            "y": 521
+            "y": 539
           },
-          "id": 127,
+          "id": 129,
           "links": [
             {
               "targetBlank": true,
@@ -14350,9 +14392,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 530
+            "y": 548
           },
-          "id": 128,
+          "id": 130,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -14497,9 +14539,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 538
+            "y": 556
           },
-          "id": 129,
+          "id": 131,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -14573,9 +14615,9 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 547
+        "y": 565
       },
-      "id": 140,
+      "id": 142,
       "panels": [
         {
           "datasource": "${DS_GRAPHITE}",
@@ -14607,9 +14649,9 @@
             "h": 8,
             "w": 16,
             "x": 0,
-            "y": 548
+            "y": 566
           },
-          "id": 131,
+          "id": 133,
           "interval": "1h",
           "maxDataPoints": 5000,
           "options": {
@@ -14661,9 +14703,9 @@
             "h": 16,
             "w": 8,
             "x": 16,
-            "y": 548
+            "y": 566
           },
-          "id": 132,
+          "id": 134,
           "maxDataPoints": 5000,
           "options": {
             "displayLabels": [],
@@ -14760,9 +14802,9 @@
             "h": 8,
             "w": 8,
             "x": 0,
-            "y": 556
+            "y": 574
           },
-          "id": 133,
+          "id": 135,
           "maxDataPoints": 5000,
           "options": {
             "legend": {
@@ -14876,9 +14918,9 @@
             "h": 8,
             "w": 8,
             "x": 8,
-            "y": 556
+            "y": 574
           },
-          "id": 134,
+          "id": 136,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -14972,9 +15014,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 564
+            "y": 582
           },
-          "id": 135,
+          "id": 137,
           "interval": "1d",
           "maxDataPoints": 5000,
           "options": {
@@ -15013,9 +15055,9 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 572
+            "y": 590
           },
-          "id": 136,
+          "id": 138,
           "options": {
             "content": "**Not available from Graphite.** In the InfluxDB dashboard this panel shows the newest notification threads, with their titles and a link to each.\n\nGraphite keeps no strings, and has no way to list by date.\n\nEach row of it links to the item on GitHub.",
             "mode": "markdown"
@@ -15142,9 +15184,9 @@
             "h": 9,
             "w": 24,
             "x": 0,
-            "y": 579
+            "y": 597
           },
-          "id": 137,
+          "id": 139,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -15226,9 +15268,9 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 588
+            "y": 606
           },
-          "id": 138,
+          "id": 140,
           "maxDataPoints": 5000,
           "options": {
             "legend": {
@@ -15382,9 +15424,9 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 588
+            "y": 606
           },
-          "id": 139,
+          "id": 141,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -15453,9 +15495,9 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 597
+        "y": 615
       },
-      "id": 157,
+      "id": 159,
       "panels": [
         {
           "datasource": "${DS_GRAPHITE}",
@@ -15479,9 +15521,9 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 598
+            "y": 616
           },
-          "id": 141,
+          "id": 143,
           "maxDataPoints": 5000,
           "options": {
             "legend": {
@@ -15895,9 +15937,9 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 598
+            "y": 616
           },
-          "id": 142,
+          "id": 144,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -16139,9 +16181,9 @@
             "h": 11,
             "w": 24,
             "x": 0,
-            "y": 606
+            "y": 624
           },
-          "id": 143,
+          "id": 145,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -16239,9 +16281,9 @@
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 617
+            "y": 635
           },
-          "id": 144,
+          "id": 146,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -16379,9 +16421,9 @@
             "h": 8,
             "w": 9,
             "x": 6,
-            "y": 617
+            "y": 635
           },
-          "id": 145,
+          "id": 147,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -16559,9 +16601,9 @@
             "h": 8,
             "w": 9,
             "x": 15,
-            "y": 617
+            "y": 635
           },
-          "id": 146,
+          "id": 148,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -16709,9 +16751,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 625
+            "y": 643
           },
-          "id": 147,
+          "id": 149,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -16935,9 +16977,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 633
+            "y": 651
           },
-          "id": 148,
+          "id": 150,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -17017,9 +17059,9 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 641
+            "y": 659
           },
-          "id": 149,
+          "id": 151,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -17101,9 +17143,9 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 641
+            "y": 659
           },
-          "id": 150,
+          "id": 152,
           "maxDataPoints": 5000,
           "options": {
             "legend": {
@@ -17190,9 +17232,9 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 648
+            "y": 666
           },
-          "id": 151,
+          "id": 153,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -17260,9 +17302,9 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 648
+            "y": 666
           },
-          "id": 152,
+          "id": 154,
           "options": {
             "content": "**Not available from Graphite.** In the InfluxDB dashboard this panel shows the repositories whose configuration changed inside the range.\n\nEach combination is its own path in Graphite, and counting how many paths a repository has is not something the function list does.\n\nEach row of it links to the item on GitHub.",
             "mode": "markdown"
@@ -17389,9 +17431,9 @@
             "h": 12,
             "w": 12,
             "x": 0,
-            "y": 655
+            "y": 673
           },
-          "id": 153,
+          "id": 155,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -17547,9 +17589,9 @@
             "h": 12,
             "w": 12,
             "x": 12,
-            "y": 655
+            "y": 673
           },
-          "id": 154,
+          "id": 156,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -17636,9 +17678,9 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 667
+            "y": 685
           },
-          "id": 155,
+          "id": 157,
           "maxDataPoints": 5000,
           "options": {
             "legend": {
@@ -17749,9 +17791,9 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 667
+            "y": 685
           },
-          "id": 156,
+          "id": 158,
           "interval": "1d",
           "maxDataPoints": 5000,
           "options": {
@@ -17796,9 +17838,9 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 675
+        "y": 693
       },
-      "id": 166,
+      "id": 168,
       "panels": [
         {
           "datasource": "${DS_GRAPHITE}",
@@ -17924,9 +17966,9 @@
             "h": 4,
             "w": 24,
             "x": 0,
-            "y": 676
+            "y": 694
           },
-          "id": 158,
+          "id": 160,
           "maxDataPoints": 5000,
           "options": {
             "colorMode": "none",
@@ -18121,9 +18163,9 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 680
+            "y": 698
           },
-          "id": 159,
+          "id": 161,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -18332,9 +18374,9 @@
             "h": 10,
             "w": 12,
             "x": 12,
-            "y": 680
+            "y": 698
           },
-          "id": 160,
+          "id": 162,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -18472,9 +18514,9 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 690
+            "y": 708
           },
-          "id": 161,
+          "id": 163,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -18627,9 +18669,9 @@
             "h": 10,
             "w": 12,
             "x": 12,
-            "y": 690
+            "y": 708
           },
-          "id": 162,
+          "id": 164,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -18814,9 +18856,9 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 700
+            "y": 718
           },
-          "id": 163,
+          "id": 165,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -18926,9 +18968,9 @@
             "h": 10,
             "w": 24,
             "x": 0,
-            "y": 707
+            "y": 725
           },
-          "id": 164,
+          "id": 166,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -19237,9 +19279,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 717
+            "y": 735
           },
-          "id": 165,
+          "id": 167,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "lg",
@@ -19308,9 +19350,9 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 726
+        "y": 744
       },
-      "id": 171,
+      "id": 173,
       "panels": [
         {
           "datasource": "${DS_GRAPHITE}",
@@ -19341,9 +19383,9 @@
             "h": 11,
             "w": 12,
             "x": 0,
-            "y": 727
+            "y": 745
           },
-          "id": 167,
+          "id": 169,
           "interval": "5m",
           "maxDataPoints": 5000,
           "options": {
@@ -19393,9 +19435,9 @@
             "h": 11,
             "w": 12,
             "x": 12,
-            "y": 727
+            "y": 745
           },
-          "id": 168,
+          "id": 170,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -19556,9 +19598,9 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 738
+            "y": 756
           },
-          "id": 169,
+          "id": 171,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -19684,9 +19726,9 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 738
+            "y": 756
           },
-          "id": 170,
+          "id": 172,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
