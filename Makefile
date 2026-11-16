@@ -95,10 +95,10 @@ COVERAGE_COVERPKG := ./cmd/...,./internal/...
 # `make test-race`, so the bound is the same there.
 RACE_TIMEOUT ?= 60m
 
-# markdownlint-cli2 is the release DavidAnson/markdownlint-cli2-action v24.2.0
+# markdownlint-cli2 is the release DavidAnson/markdownlint-cli2-action v25.0.0
 # bundles, so `make mdlint` and the Markdown job in CI are the same linter.
 # Bump the two together.
-MARKDOWNLINT_CLI2_VERSION := 0.23.2
+MARKDOWNLINT_CLI2_VERSION := 0.24.0
 
 # Version from the VERSION file (single source of truth); commit and date from
 # git. Use shell `cat` (portable to GNU Make 3.81 on macOS; `$(file ...)` needs

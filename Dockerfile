@@ -9,7 +9,7 @@
 # build would run the whole Go toolchain under emulation for every foreign
 # architecture, which is slower by an order of magnitude and buys nothing: the
 # binary is pure Go and compiles the same either way.
-FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine3.24@sha256:0a5f7fe796599ff487605987432e7619ae45beeb2fba4c2ce0b907879932aebf AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine3.24@sha256:70bd7ddea8b6cbe5d6943cde279d6b67feb10cc924fb9100d1d8757c1575b280 AS build
 
 WORKDIR /src
 
@@ -58,7 +58,7 @@ WORKDIR /var/lib/ghchronicle
 # keeps the container off root even when the orchestrator sets no
 # securityContext of its own. Debian 13 because it is the only release the
 # distroless project still publishes: the -debian12 tags are no longer updated.
-FROM gcr.io/distroless/static-debian13:nonroot@sha256:d62067879de890a1def9da0e7766b7d20810a5e5555cef8506b752437d7a3e88
+FROM gcr.io/distroless/static-debian13:nonroot@sha256:aafe993665bf6200db38a02c11a9351e782a84b6a45e7f33b6695638c88e3931
 
 # ARG is stage-scoped, so the three have to be declared again to reach the
 # labels below.
