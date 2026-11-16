@@ -14,16 +14,16 @@ importer to choose their own.
 
 | File                             | Panels | Store                                                                   |
 | -------------------------------- | ------ | ----------------------------------------------------------------------- |
-| `ghchronicle-influxdb.json`      | 154 | InfluxDB 3, queried with SQL                                            |
-| `ghchronicle-prometheus.json`    | 154 | Prometheus                                                              |
-| `ghchronicle-postgres.json`      | 154 | PostgreSQL or TimescaleDB, from the sink that connects or the SQL file |
-| `ghchronicle-graphite.json`      | 154 | Graphite, from the Graphite sink                                        |
-| `ghchronicle-elasticsearch.json` | 154 | Elasticsearch or OpenSearch, from the Elasticsearch sink                |
+| `ghchronicle-influxdb.json`      | 156 | InfluxDB 3, queried with SQL                                            |
+| `ghchronicle-prometheus.json`    | 156 | Prometheus                                                              |
+| `ghchronicle-postgres.json`      | 156 | PostgreSQL or TimescaleDB, from the sink that connects or the SQL file |
+| `ghchronicle-graphite.json`      | 156 | Graphite, from the Graphite sink                                        |
+| `ghchronicle-elasticsearch.json` | 156 | Elasticsearch or OpenSearch, from the Elasticsearch sink                |
 
 The five hold the same panels in the same order. What differs is how many of
 them the store behind each one can answer.
 
-Each cell is the panels that store answers with a query, out of the panels in that section. A panel a store cannot answer ships as a text panel with the same title, so every dashboard has the same 154 panels; the 2 that are prose in all five are left out here.
+Each cell is the panels that store answers with a query, out of the panels in that section. A panel a store cannot answer ships as a text panel with the same title, so every dashboard has the same 156 panels; the 2 that are prose in all five are left out here.
 
 | Section | InfluxDB | PostgreSQL | Elasticsearch | Graphite | Prometheus | Panels |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -38,13 +38,13 @@ Each cell is the panels that store answers with a query, out of the panels in th
 | Planning and community | 10 | 10 | 10 | 10 | 8 | 10 |
 | Delivery and access | 13 | 13 | 13 | 13 | 13 | 13 |
 | Releases | 4 | 4 | 3 | 4 | 2 | 4 |
-| Security | 14 | 14 | 14 | 13 | 13 | 14 |
+| Security | 16 | 16 | 16 | 13 | 13 | 16 |
 | Cost | 6 | 6 | 6 | 6 | 6 | 6 |
 | Activity | 9 | 9 | 9 | 8 | 7 | 9 |
 | Inventory | 16 | 16 | 15 | 15 | 14 | 16 |
 | Profile and sponsorship | 8 | 8 | 8 | 8 | 8 | 8 |
 | The collector itself | 4 | 4 | 4 | 4 | 4 | 4 |
-| **Total** | **152** | **152** | **147** | **146** | **128** | **152** |
+| **Total** | **154** | **154** | **149** | **146** | **128** | **154** |
 
 ![The InfluxDB dashboard over ninety days of the demonstration database: the repository picker and the range across the top, the Overview with the ghchronicle badge and four tile groups reading 5 repositories with 350 stars and 51 forks, 37.5 thousand views with 21.1 thousand unique visitors and 19.6 thousand clones, 117 followers and 58 following with 4 sponsors and 2 sponsored, and 3.22 thousand contributions over 7.78 years, then the collapsed Lifetime header and the Audience section with views, unique visitors and clones per day, the top referrers, the top paths and clone amplification](../site/src/assets/dashboard-influxdb-demo.png)
 
@@ -345,12 +345,12 @@ in the repository.
 
 ## What they show
 
-The seventeen sections and their one hundred and fifty four panels, one capture each, and what changes when the store cannot answer.
+The seventeen sections and their one hundred and fifty six panels, one capture each, and what changes when the store cannot answer.
 
 Source: <https://docs.jmrp.io/ghchronicle/dashboards/panels/>
 
 One dashboard, rendered once per store. Seventeen sections, one hundred and
-fifty four panels, in the same places with the same titles whichever database
+fifty six panels, in the same places with the same titles whichever database
 you chose. One capture per section below, in the order the dashboard puts them.
 
 Every section but the Overview opens collapsed. Open, the first seven were
@@ -906,9 +906,11 @@ Open Dependabot and code scanning alerts, the breakdowns by severity and by
 ecosystem, open alerts over time, the feature table, and the time taken to
 resolve an alert by severity. Under those, the oldest open alerts, the security
 settings, the default code scanning setup, the workflow token permissions and
-the secrets with when each was last rotated.
+the secrets with when each was last rotated. At the foot, the security
+advisories in both directions: the ones of these repositories, reports received
+and the maintainers' own, and the ones this account reported in other people's.
 
-![The Security section: the open alerts tile reading 25 from Dependabot and 29 from code scanning, alerts by severity and by ecosystem, open alerts per severity over time, the security feature table with on and off per repository, code scanning runs per day by tool, the time to resolve table with each advisory and its CVSS, the resolved scanning alerts, scan results by tool, the oldest open alerts, the security settings and default code scanning setup tables, workflow token permissions, and the secret rotation table](../site/src/assets/dashboards/security.png)
+![The Security section: the open alerts tile reading 25 from Dependabot and 29 from code scanning, alerts by severity and by ecosystem, open alerts per severity over time, the security feature table with on and off per repository, code scanning runs per day by tool, the time to resolve table with each advisory and its CVSS, the resolved scanning alerts, scan results by tool, the oldest open alerts, the security settings and default code scanning setup tables, workflow token permissions, the secret rotation table, and the two advisory tables, five received in states from draft to published and four reported in other repositories, the unpublished ones reading (not published)](../site/src/assets/dashboards/security.png)
 
 The feature table is what tells "no alerts" apart from "the feature is switched
 off". Without `gh_security_feature`, a repository with Dependabot disabled
@@ -949,10 +951,20 @@ ones, raised before the collector started, is counted and not listed, and an
 alert fixed while it sat behind the newest hundred stays listed as open, until a
 backfill reads the whole list.
 
+"Security advisories" and "Advisories reported" list each advisory once, its
+newest row inside the range: one still in triage or a draft is a row a day, and
+the row says the day it was last seen so, while a published or closed one is
+dated when that happened. Its Summary reads `(not published)` until it is
+published, unless `advisories.unpublished_details` is on, and its link, on the GHSA, opens for its
+author and the repository's maintainers alone until then. Prometheus and
+Graphite cannot list them, an advisory being its state, severity and summary,
+all of them strings, and say so in the panel.
+
 Reads `gh_dependabot_alert`, `gh_dependabot_alert_item`,
 `gh_code_scanning_alert`, `gh_code_scanning_alert_item`,
 `gh_code_scanning_analysis`, `gh_security_feature`, `gh_security_setting`,
-`gh_code_scanning_setup`, `gh_actions_policy` and `gh_secret`.
+`gh_code_scanning_setup`, `gh_actions_policy`, `gh_secret`, `gh_repo_advisory`
+and `gh_advisory_reported`.
 
 ### Cost
 

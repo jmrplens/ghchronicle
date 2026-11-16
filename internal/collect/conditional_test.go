@@ -70,6 +70,7 @@ func restCollectors(now time.Time) []struct {
 		run  func(ctx context.Context, c *ghapi.Client) ([]sink.Point, error)
 	}{
 		{"Actions", repo(&Actions{Since: since, Jobs: true})},
+		{"Advisories", repo(&Advisories{})},
 		{"Analyses", repo(&Analyses{})},
 		{"Artifacts", repo(&Artifacts{})},
 		{"Billing", account(&Billing{Login: fakegh.Login, Months: 2})},

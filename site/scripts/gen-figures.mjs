@@ -1279,8 +1279,8 @@ for (const sink of sinks) {
  * were never asked about.
  */
 const NUMBER_WORDS = {
-	en: { 22: "twenty-two" },
-	es: { 22: "veintidós" },
+	en: { 24: "twenty-four" },
+	es: { 24: "veinticuatro" },
 };
 
 /** @param {number} count @param {"en"|"es"} locale @returns {string} */

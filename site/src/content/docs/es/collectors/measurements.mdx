@@ -8,7 +8,7 @@ compactTables:
 
 import { Aside } from "@astrojs/starlight/components";
 
-Noventa y cinco medidas. Cada fila dice cómo se fecha un punto, porque eso es
+Noventa y siete medidas. Cada fila dice cómo se fecha un punto, porque eso es
 lo que decide qué preguntas puede responder.
 
 ## Cómo leer las tablas
@@ -226,13 +226,14 @@ almacén para cada panel, que es el sitio del que copiar.
 
 ### Todas las medidas, por orden alfabético
 
-Noventa y cinco, y cada enlace cae en la tabla en la que está.
+Noventa y siete, y cada enlace cae en la tabla en la que está.
 
 [`gh_account`](#cuenta) · [`gh_account_total`](#cuenta) ·
 [`gh_achievement`](#cuenta) · [`gh_achievement_progress`](#cuenta) ·
 [`gh_actions_cache`](#integración-continua) ·
 [`gh_actions_cache_entry`](#integración-continua) ·
-[`gh_actions_policy`](#seguridad) · [`gh_artifact`](#integración-continua) ·
+[`gh_actions_policy`](#seguridad) · [`gh_advisory_reported`](#seguridad) ·
+[`gh_artifact`](#integración-continua) ·
 [`gh_artifact_total`](#integración-continua) · [`gh_billing_usage`](#coste) ·
 [`gh_branch`](#configuración-y-entrega) ·
 [`gh_branch_protection`](#configuración-y-entrega) ·
@@ -268,6 +269,7 @@ Noventa y cinco, y cada enlace cae en la tabla en la que está.
 [`gh_release_asset`](#repositorios) ·
 [`gh_release_published`](#repositorios) · [`gh_repo`](#repositorios) ·
 [`gh_repo_activity`](#integración-continua) ·
+[`gh_repo_advisory`](#seguridad) ·
 [`gh_repo_archived`](#repositorios) · [`gh_repo_community`](#repositorios) ·
 [`gh_repo_created`](#cuenta) · [`gh_repo_language`](#repositorios) ·
 [`gh_repo_policy`](#configuración-y-entrega) ·
@@ -767,6 +769,37 @@ los dos casos.
 | `gh_code_scanning_setup` | diario | `state`, `query_suite`, `schedule` | `setups`, `languages`, `days_since_change` |
 | `gh_secret` | diario | `kind` (actions, dependabot), `secret` | `secrets`, `age_days`, `days_since_rotation` |
 | `gh_actions_policy` | diario | `permissions` | `policies`, `can_approve_pr` |
+| `gh_repo_advisory` | fechado, al publicarse o cerrarse; diario mientras está abierto | `ghsa` | `advisory_state`, `severity`, `cvss`, `cvss_v4`, `comments`, `credits`, `submitted`, `reporter`, `seconds_open`, `seconds_to_publish`, `seconds_to_close`, `summary`, `cve`, `cwes`, `ecosystems`, `packages`, `url` |
+| `gh_advisory_reported` | fechado, al publicarse o cerrarse; diario mientras está abierto | `ghsa`, `user` | `advisory_state`, `severity`, `cvss`, `cvss_v4`, `comments`, `credits`, `authored`, `credit`, `credit_state`, `seconds_open`, `seconds_to_publish`, `seconds_to_close`, `summary`, `cve`, `cwes`, `ecosystems`, `packages`, `url` |
+
+`gh_repo_advisory` es cada advisory de seguridad de un repositorio recogido:
+los reportes que otros le enviaron por el reporte privado de vulnerabilidades,
+en triage, aceptados, publicados o cerrados, y los borradores y publicaciones
+de sus mantenedores. `gh_advisory_reported` es cada advisory que la cuenta
+reportó, en el que se la acredita o en el que colabora, en un repositorio que no
+es de la cuenta, ni de una organización configurada, ni se recoge. Ningún endpoint los lista, así que la familia `reported`
+encuentra los repositorios a los que preguntar en los hilos de advisory del
+buzón, los issues y pull requests ajenos en los que participa la cuenta, los
+repositorios a los que GitHub dice que contribuyó y la base global de
+advisories revisados leída por actualización, y recuerda en el fichero de estado
+cada repositorio que nombró alguno. `credit` es como qué acredita el advisory a
+la cuenta, `authored` si escribió el reporte, y `submitted` si un advisory
+recibido llegó como reporte privado y no como borrador de un mantenedor, con
+`reporter` su autor. Un advisory se fecha cuando se publicó (también los
+retirados) o se cerró, y es una foto diaria mientras está en triage o en
+borrador, así que los días que esperó un reporte son filas. Todo valor que
+cambia, el estado y la severidad sobre todo, es un campo. `summary`, `cve`,
+`cwes`, `ecosystems` y `packages` describen el fallo, y de un advisory no
+publicado se dejan fuera, con `summary` escrito como `(not published)`, salvo
+con `advisories.unpublished_details` activado; la `url` se escribe siempre, una
+página que solo el autor y los mantenedores pueden abrir hasta que se publica.
+`summary`, `severity` y `credit` están en cada fila, `(none)` donde no hay nada
+que decir (un borrador sin valorar, un colaborador sin crédito), así que un
+almacén que solo tiene reportes bajo embargo sigue teniendo las columnas que
+nombran los paneles: el line protocol no puede llevar un texto vacío. `cvss` y `cvss_v4` siguen la regla de abajo: nunca se escriben como
+cero. Cada advisory es un punto, etiquetado con el repositorio que nombra su
+propia página, así que un repositorio transferido desde que se encontró no se
+escribe con los dos nombres.
 
 Las etiquetas de las dos medidas de ítem no cuestan nada: los dos listados ya
 las traían, y la serie siempre estuvo indexada por `number`, así que agrupan

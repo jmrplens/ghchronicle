@@ -225,6 +225,18 @@ var lokiEvents = map[string]lokiEvent{
 		return fmt.Sprintf("%s alert on %s in %s (%s), state %s", tagOf(p, "severity"),
 			tagOf(p, "package"), tagOf(p, "full_name"), tagOf(p, "ecosystem"), fieldOf(p, "alert_state"))
 	}},
+	// An advisory is an event when it is published or closed. The rows of
+	// one still in triage or a draft are a daily snapshot, the same row
+	// rewritten through the day, and a line for each would say every day
+	// that nothing happened.
+	"gh_repo_advisory": {kind: "advisory", message: func(p Point) string {
+		return fmt.Sprintf("%s advisory %s %s in %s", orUnknown(fieldOf(p, "severity")), tagOf(p, "ghsa"),
+			fieldOf(p, "advisory_state"), tagOf(p, "full_name"))
+	}, only: advisoryConcluded},
+	"gh_advisory_reported": {kind: "advisory_reported", message: func(p Point) string {
+		return fmt.Sprintf("%s's report %s %s in %s", tagOf(p, "user"), tagOf(p, "ghsa"),
+			fieldOf(p, "advisory_state"), tagOf(p, "full_name"))
+	}, only: advisoryConcluded},
 	"gh_code_scanning_analysis": {kind: "code_scanning", message: func(p Point) string {
 		return fmt.Sprintf("%s analyzed %s (%s): %s results", tagOf(p, "tool"),
 			tagOf(p, "full_name"), tagOf(p, "ref"), fieldOf(p, "results"))
@@ -312,6 +324,25 @@ var contributionPredicates = map[contributionState]string{
 func contributionClosed(p Point) bool {
 	state := tagOf(p, "state")
 	return state == "merged" || state == "closed"
+}
+
+// advisoryConcluded keeps the rows of an advisory that was published,
+// withdrawn or closed, each dated at that moment.
+func advisoryConcluded(p Point) bool {
+	switch fieldOf(p, "advisory_state") {
+	case "published", "withdrawn", "closed":
+		return true
+	}
+	return false
+}
+
+// orUnknown names a severity a draft has not been given, which the
+// collector writes as (none).
+func orUnknown(s string) string {
+	if s == "" || s == "(none)" {
+		return "unrated"
+	}
+	return s
 }
 
 // contributionMessage renders a sentence only where the state tag and the

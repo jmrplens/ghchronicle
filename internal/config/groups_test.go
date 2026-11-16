@@ -196,7 +196,7 @@ func TestEveryOutsideTheSelectionWarnsRatherThanFailing(t *testing.T) {
 }
 
 func TestASelectedGroupWithNothingEnabledWarns(t *testing.T) {
-	c := loadGroups(t, "groups: [security, collector]\nevery: {families: {security: 0, analyses: 0}}\n")
+	c := loadGroups(t, "groups: [security, collector]\nevery: {families: {security: 0, analyses: 0, advisories: 0, reported: 0}}\n")
 	got := c.Warnings()
 	if len(got) != 1 {
 		t.Fatalf("warnings = %v, want exactly one", got)

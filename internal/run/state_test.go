@@ -92,7 +92,7 @@ func stateStruct(t *testing.T) (string, *ast.StructType) {
 func TestAStateFileThatNullsItsMapsStillLoadsUsable(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "state.json")
-	nulled := `{"last_run":null,"first_saw":null,"history_read":null,"last_head":null,"last_full":null,"last_event":"42"}`
+	nulled := `{"last_run":null,"first_saw":null,"history_read":null,"last_head":null,"last_full":null,"last_event":"42","reported":{"repos":null}}`
 	if err := os.WriteFile(path, []byte(nulled), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -109,6 +109,7 @@ func TestAStateFileThatNullsItsMapsStillLoadsUsable(t *testing.T) {
 		t.Error("a repository recorded as walked still reads as never walked")
 	}
 	s.MarkHistory("o/n", now)
+	s.Reported.Remember([]string{"o/n"}, now)
 	if s.LastEvent != "42" {
 		t.Errorf("LastEvent = %q, want what the file said beside the nulls", s.LastEvent)
 	}
@@ -117,6 +118,33 @@ func TestAStateFileThatNullsItsMapsStillLoadsUsable(t *testing.T) {
 	}
 	if saved := LoadState(path); !saved.LastRun["traffic"].Equal(now) || saved.LastHead["o/n"] != "aaa" {
 		t.Errorf("the state written after the nulls = %+v", saved)
+	}
+}
+
+// TestTheReportedMemorySurvivesARestart: the repositories an inbox thread
+// named are kept after the thread is gone, and the two marks say where the
+// next read starts. A repository seen again keeps the day it was first seen.
+func TestTheReportedMemorySurvivesARestart(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "state.json")
+	first := time.Date(2026, 11, 16, 10, 0, 0, 0, time.UTC)
+	later := first.Add(24 * time.Hour)
+	s := LoadState(path)
+	s.Reported.Remember([]string{"b/two", "a/one"}, first)
+	s.Reported.Remember([]string{"a/one", "c/three"}, later)
+	s.Reported.Notified, s.Reported.Scanned = later, first
+	if err := s.Save(); err != nil {
+		t.Fatal(err)
+	}
+	got := LoadState(path).Reported
+	if known := got.Known(); strings.Join(known, " ") != "a/one b/two c/three" {
+		t.Errorf("known %v", known)
+	}
+	if !got.Repos["a/one"].Equal(first) || !got.Repos["c/three"].Equal(later) {
+		t.Errorf("first seen %v", got.Repos)
+	}
+	if !got.Notified.Equal(later) || !got.Scanned.Equal(first) {
+		t.Errorf("marks %v %v", got.Notified, got.Scanned)
 	}
 }
 

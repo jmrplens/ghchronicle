@@ -66,6 +66,8 @@ var lokiKinds = map[string]string{
 	"gh_deployment":             "deployment",
 	"gh_review_thread":          "review_thread",
 	"gh_ruleset_version":        "ruleset",
+	"gh_repo_advisory":          "advisory",
+	"gh_advisory_reported":      "advisory_reported",
 }
 
 func TestLokiKeepsTheNanosecondTheEventHappened(t *testing.T) {

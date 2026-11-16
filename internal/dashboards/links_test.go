@@ -220,6 +220,9 @@ var ownerOnlyURL = map[string]bool{
 	"gh_code_scanning_alert": true, "gh_code_scanning_alert_item": true,
 	"gh_ruleset": true, "gh_deployment": true, "gh_environment": true,
 	"gh_star": true, "gh_security_feature": true,
+	// Until it is published, an advisory's page opens for its author and the
+	// repository's maintainers alone.
+	"gh_repo_advisory": true, "gh_advisory_reported": true,
 }
 
 // TestOwnerOnlyPagesSaySo holds every link of the InfluxDB dashboard to the

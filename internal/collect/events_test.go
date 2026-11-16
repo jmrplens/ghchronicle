@@ -348,3 +348,30 @@ func TestNotificationsAskOnlySinceTheWindow(t *testing.T) {
 		t.Errorf("a full pass sent since=%q", calls[1].Query["since"])
 	}
 }
+
+// TestAnAdvisoryThreadKeepsItsTitleOnlyWhenAsked: the title of an advisory's
+// inbox thread is the advisory's summary, and a report under embargo must not
+// reach the stores through the inbox when advisories.unpublished_details is
+// off. Every other thread keeps its title.
+func TestAnAdvisoryThreadKeepsItsTitleOnlyWhenAsked(t *testing.T) {
+	t.Parallel()
+	for _, keep := range []bool{false, true} {
+		f := newFixtureServer(t)
+		f.file("/notifications", "reported_notifications.json")
+		points, err := (&Notifications{All: true, AdvisoryTitles: keep}).Collect(ctx(t), f.Client, testNow)
+		if err != nil {
+			t.Fatal(err)
+		}
+		advisory := find(t, points, "gh_notification", map[string]string{"full_name": "a/notified"})
+		want := advisoryThreadTitle
+		if keep {
+			want = "A report"
+		}
+		if got := advisory.Fields["title"]; got != want {
+			t.Errorf("titles kept %v: advisory thread titled %q, want %q", keep, got, want)
+		}
+		if got := find(t, points, "gh_notification", map[string]string{"full_name": "z/pulls-only"}).Fields["title"]; got != "Not an advisory" {
+			t.Errorf("titles kept %v: a pull request's thread titled %q", keep, got)
+		}
+	}
+}

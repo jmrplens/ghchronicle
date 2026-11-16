@@ -140,7 +140,7 @@ stored.
 
 - [You want alerts](https://docs.jmrp.io/ghchronicle/sinks/prometheus/): Prometheus serves the current value of everything that has one. Run it alongside a history store rather than instead of one.
 
-- [You want to read what happened](https://docs.jmrp.io/ghchronicle/sinks/loki/): Loki turns twenty-two of the measurements into log lines that read as sentences and carry every tag after them in logfmt.
+- [You want to read what happened](https://docs.jmrp.io/ghchronicle/sinks/loki/): Loki turns twenty-four of the measurements into log lines that read as sentences and carry every tag after them in logfmt.
 
 - [You already have a pipeline](https://docs.jmrp.io/ghchronicle/sinks/telegraf/): Telegraf and OpenTelemetry hand the points to something that already knows where they should go.
 
@@ -965,7 +965,7 @@ Nothing in the dashboard changes.
     SELECT time, "count" FROM gh_traffic WHERE kind = 'views' AND repo = $repo
     ```
 
-`dashboards/ghchronicle-postgres.json` has the same 154 panels as the InfluxDB
+`dashboards/ghchronicle-postgres.json` has the same 156 panels as the InfluxDB
 one, with every query translated to PostgreSQL against this schema.
 
 The translation compares text by its bytes, as InfluxDB does: every text
@@ -1082,7 +1082,7 @@ Everything time-shaped works normally, which is most of the dashboard.
 
 ### The dashboard
 
-`dashboards/ghchronicle-graphite.json` has the same 154 panels as the InfluxDB
+`dashboards/ghchronicle-graphite.json` has the same 156 panels as the InfluxDB
 one, written against these paths with the default prefix. It needs **Graphite
 1.1 or later** for the functions it uses, and any panel a series cannot carry
 says so in its description.
@@ -1261,7 +1261,7 @@ before it asks whose rows an index holds, so a template that maps strings as
 
 ### The dashboard
 
-`dashboards/ghchronicle-elasticsearch.json` has the same 154 panels as the
+`dashboards/ghchronicle-elasticsearch.json` has the same 156 panels as the
 InfluxDB one, as Lucene filters and aggregations over **one** datasource
 pointing at `<prefix>-*`, because each target names its own index in its query.
 
@@ -1334,7 +1334,7 @@ pattern without that filter does read it, for the day it is kept.
 
 ## Loki
 
-The twenty-two measurements that are events rather than numbers, and the age horizon that keeps a push from being refused.
+The twenty-four measurements that are events rather than numbers, and the age horizon that keeps a push from being refused.
 
 Source: <https://docs.jmrp.io/ghchronicle/sinks/loki/>
 
@@ -1359,12 +1359,13 @@ release was published, that workflow failed on main, this alert was raised" are
 events: each happened once, at a known moment, and what you want later is to
 read them in order and search them, not to average them.
 
-**Twenty-two measurements have an event rendering**: stars in both directions,
+**Twenty-four measurements have an event rendering**: stars in both directions,
 forks, releases, published package versions, pull requests, reviews, review
 threads, issues, commits, workflow runs, job logs, repository activity,
 Dependabot alerts, code scanning analyses, the event feed, notifications,
-discussions, webhook deliveries, deployments, ruleset versions and external
-contributions. Everything else is a gauge in disguise and is not sent.
+discussions, webhook deliveries, deployments, ruleset versions, external
+contributions, and security advisories both received and reported, once each is
+published or closed. Everything else is a gauge in disguise and is not sent.
 
 A measurement with no rendering is dropped in silence, which is right for a
 gauge and wrong for an event nobody has got round to: deployments and review

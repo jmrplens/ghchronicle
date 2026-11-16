@@ -1,0 +1,4 @@
+[
+  {"ghsa_id": "GHSA-e2e0-cccc-0001", "type": "reviewed", "updated_at": "@DAYS_AGO_1@T00:00:00Z", "repository_advisory_url": "https://api.github.com/repos/someone/credited/security-advisories/GHSA-e2e0-cccc-0001", "source_code_location": "https://github.com/someone/credited", "credits": [{"user": {"login": "octocat"}, "type": "finder"}]},
+  {"ghsa_id": "GHSA-e2e0-cccc-0002", "type": "reviewed", "updated_at": "@DAYS_AGO_2@T00:00:00Z", "repository_advisory_url": null, "source_code_location": "https://github.com/someone/unrelated", "credits": []}
+]

@@ -228,6 +228,12 @@ var promRules = map[string]rule{
 	// serves a series per release, so how many there are is a count of
 	// those.
 	"gh_release_published": {mode: skip},
+	// An advisory's rows are dated when it was published or closed, or are
+	// a daily snapshot while it waits, and whether the store already holds
+	// one is a question about the past: the exporter cannot answer it, and
+	// a count of reports is not a rate anyone watches.
+	"gh_repo_advisory":     {mode: skip},
+	"gh_advisory_reported": {mode: skip},
 
 	// Text, not a number. It goes to a log store.
 	"gh_job_log": {mode: skip},

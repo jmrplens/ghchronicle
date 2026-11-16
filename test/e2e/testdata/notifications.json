@@ -16,5 +16,14 @@
     "last_read_at": "@DAYS_AGO_6@T09:00:00Z",
     "subject": {"title": "Add retry to the influx sink", "url": "https://api.github.com/repos/octocat/hello-world/pulls/43", "type": "PullRequest"},
     "repository": {"id": 1296269, "full_name": "octocat/hello-world", "private": true}
+  },
+  {
+    "id": "3",
+    "unread": false,
+    "reason": "state_change",
+    "updated_at": "@DAYS_AGO_5@T10:05:00Z",
+    "last_read_at": "@DAYS_AGO_5@T11:00:00Z",
+    "subject": {"title": "A path parameter reaches another endpoint", "url": null, "type": "RepositoryAdvisory"},
+    "repository": {"id": 2000001, "full_name": "someone/elsewhere", "private": false}
   }
 ]

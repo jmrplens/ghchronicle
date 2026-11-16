@@ -174,7 +174,17 @@ type Notifications struct {
 	// Newest is set by Collect to the latest updated_at it saw, which is
 	// where the next sweep's window starts from.
 	Newest time.Time
+	// AdvisoryTitles keeps the title of a security advisory's thread. The
+	// title is the advisory's summary, and the thread does not say whether
+	// the advisory has been published, so without it every such title is
+	// written as advisoryThreadTitle: a report under embargo reached the
+	// stores through the inbox whatever advisories.unpublished_details said.
+	AdvisoryTitles bool
 }
+
+// advisoryThreadTitle stands for the title of a security advisory's thread
+// when advisories.unpublished_details is off.
+const advisoryThreadTitle = "(security advisory)"
 
 func (n *Notifications) Collect(ctx context.Context, c *ghapi.Client, _ time.Time) ([]sink.Point, error) {
 	pages := n.Pages
@@ -223,7 +233,11 @@ func (n *Notifications) Collect(ctx context.Context, c *ghapi.Client, _ time.Tim
 			if it.UpdatedAt.After(n.Newest) {
 				n.Newest = it.UpdatedAt
 			}
-			fields := notificationFields(it.Subject.Title,
+			title := it.Subject.Title
+			if it.Subject.Type == "RepositoryAdvisory" && !n.AdvisoryTitles {
+				title = advisoryThreadTitle
+			}
+			fields := notificationFields(title,
 				notificationURL(it.Subject.URL, it.Subject.LatestCommentURL,
 					it.Subject.Type, it.Repository.FullName))
 			// Whether it is still unread is a field, not a tag: the row is

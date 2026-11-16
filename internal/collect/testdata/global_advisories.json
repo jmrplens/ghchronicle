@@ -1,0 +1,4 @@
+[
+  {"ghsa_id": "GHSA-glob-aaaa-0001", "updated_at": "2026-09-07T00:00:00Z", "repository_advisory_url": "https://api.github.com/repos/d/credited/security-advisories/GHSA-glob-aaaa-0001", "source_code_location": "https://github.com/d/credited", "credits": [{"user": {"login": "octocat"}, "type": "finder"}]},
+  {"ghsa_id": "GHSA-glob-aaaa-0002", "updated_at": "2026-09-06T00:00:00Z", "repository_advisory_url": null, "source_code_location": "https://github.com/e/someone-elses", "credits": [{"user": {"login": "someone"}, "type": "reporter"}]}
+]

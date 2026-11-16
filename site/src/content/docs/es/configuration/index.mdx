@@ -33,6 +33,7 @@ heartbeat: # cada cuánto despierta el bucle, para una prueba
 log: # nivel, formato y un fichero rotatorio opcional
 state_file: # lo que recuerda un reinicio
 backfill: # el límite, al ejecutar con -backfill
+advisories: # cuánto se escribe de un advisory de seguridad no publicado
 migrate: # lo que hace un arranque con lo que una actualización dejó en los almacenes
 grafana: # dónde se publica el dashboard, cuando se pide
 ```
@@ -127,7 +128,7 @@ La reserva se escala por cubo; ver [límites de la API](/ghchronicle/es/api/).
 state_file: /var/lib/ghchronicle/state.json
 ```
 
-Nueve cosas, y borrar el fichero cuesta una distinta por cada una:
+Diez cosas, y borrar el fichero cuesta una distinta por cada una:
 
 - `last_run`, cuándo corrió cada familia por última vez. Sin él todas las
   familias vencen a la vez, así que la pasada siguiente es completa, salvo que
@@ -166,6 +167,13 @@ Nueve cosas, y borrar el fichero cuesta una distinta por cada una:
   513 KB en cada pasada horaria que registró el proxy de producción contra la
   misma cuenta el 2026-09-27, un tamaño que crece a lo largo del día con lo que
   se fusiona.
+- `reported`, cada repositorio ajeno a la cuenta donde la familia `reported`
+  encontró un advisory que la nombra, o que nombró el buzón o la base global de
+  advisories, y hasta dónde se leyeron por última vez el buzón y la base. Sin él
+  la pasada siguiente lee los últimos treinta días de los dos, y un repositorio
+  que solo nombraba un hilo del buzón ya desaparecido se vuelve a encontrar solo
+  cuando se mueve alguno de sus advisories o con un backfill, que lee los dos
+  enteros.
 - `stores`, para cada almacén en el que escribe una ejecución, adónde apunta,
   la versión que escribió en él primero, la que lo hizo por última vez, las
   [migraciones](/ghchronicle/es/install/upgrading/#migraciones) que se le han
@@ -340,6 +348,27 @@ cueste un repositorio y no el recorrido entero. No hay nada que configurar:
 aparece cuando arranca un relleno, se borra cuando el recorrido llega al final,
 y una pasada normal ni lo escribe ni lo lee. Ver [pararlo, y
 retomarlo](/ghchronicle/es/how/backfill/#pararlo-y-retomarlo).
+
+## `advisories`
+
+```yaml
+advisories:
+  unpublished_details: false
+```
+
+Lo que las familias `advisories` y `reported` escriben de un advisory de
+seguridad que no se ha publicado: un reporte en triage, un borrador, o uno
+cerrado sin publicarse. Un advisory así describe una vulnerabilidad bajo
+embargo. Desactivado, que es el valor por defecto, su fila guarda el GHSA, el
+estado, la severidad, las puntuaciones, las fechas y la url, una página que solo
+pueden abrir su autor y los mantenedores del repositorio, y deja fuera
+`summary`, `cve`, `cwes`, `ecosystems` y `packages`. Lo mismo vale para el título
+del hilo de un advisory en el buzón, que es su resumen: la familia `notifs` lo
+escribe como `(security advisory)` salvo con esto activado, porque un hilo no
+dice si el advisory se ha publicado. Activado, los escribe como
+los de un advisory publicado. Actívalo solo donde cada almacén, dashboard y log
+en el que escribe el colector sea tan privado como el propio advisory. Ver las
+[medidas](/ghchronicle/es/collectors/measurements/#seguridad).
 
 ## `migrate`
 

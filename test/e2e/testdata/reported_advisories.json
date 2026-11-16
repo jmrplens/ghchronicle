@@ -1,0 +1,28 @@
+[
+  {
+    "ghsa_id": "GHSA-e2e0-bbbb-0001", "cve_id": null,
+    "html_url": "https://github.com/someone/elsewhere/security/advisories/GHSA-e2e0-bbbb-0001",
+    "summary": "A path parameter reaches another endpoint", "severity": "high", "state": "published",
+    "author": {"login": "octocat"},
+    "created_at": "@DAYS_AGO_8@T10:00:00Z", "updated_at": "@DAYS_AGO_5@T10:00:00Z",
+    "published_at": "@DAYS_AGO_5@T10:00:00Z", "closed_at": null, "withdrawn_at": null,
+    "submission": {"accepted": true},
+    "vulnerabilities": [{"package": {"ecosystem": "npm", "name": "elsewhere"}}],
+    "cvss_severities": {"cvss_v3": {"vector_string": "CVSS:3.1/AV:N", "score": 8.1}, "cvss_v4": {"vector_string": null, "score": null}},
+    "cwe_ids": ["CWE-22"],
+    "credits_detailed": [{"user": {"login": "octocat"}, "type": "reporter", "state": "accepted"}],
+    "collaborating_users": [{"login": "octocat"}], "comments": 1
+  },
+  {
+    "ghsa_id": "GHSA-e2e0-bbbb-0002", "cve_id": null,
+    "html_url": "https://github.com/someone/elsewhere/security/advisories/GHSA-e2e0-bbbb-0002",
+    "summary": "Somebody else's report", "severity": "low", "state": "published",
+    "author": null,
+    "created_at": "@DAYS_AGO_8@T10:00:00Z", "updated_at": "@DAYS_AGO_5@T10:00:00Z",
+    "published_at": "@DAYS_AGO_5@T10:00:00Z", "closed_at": null, "withdrawn_at": null,
+    "submission": null, "vulnerabilities": [],
+    "cvss_severities": {"cvss_v3": {"vector_string": null, "score": null}, "cvss_v4": {"vector_string": null, "score": null}},
+    "cwe_ids": [], "credits_detailed": [{"user": {"login": "someone"}, "type": "reporter", "state": "accepted"}],
+    "collaborating_users": [], "comments": 0
+  }
+]

@@ -1,0 +1,52 @@
+[
+  {
+    "ghsa_id": "GHSA-mine-aaaa-0001", "cve_id": null,
+    "html_url": "https://github.com/x/y/security/advisories/GHSA-mine-aaaa-0001",
+    "summary": "Authored and still in triage", "severity": "high", "state": "triage",
+    "author": {"login": "OctoCat"},
+    "created_at": "2026-09-01T00:00:00Z", "updated_at": "2026-09-02T00:00:00Z",
+    "published_at": null, "closed_at": null, "withdrawn_at": null,
+    "submission": {"accepted": false}, "vulnerabilities": [],
+    "cvss_severities": {"cvss_v3": {"score": 8.1}, "cvss_v4": {"score": null}},
+    "cwe_ids": ["CWE-22"],
+    "credits_detailed": [{"user": {"login": "octocat"}, "type": "reporter", "state": "accepted"}],
+    "collaborating_users": [], "comments": 2
+  },
+  {
+    "ghsa_id": "GHSA-mine-aaaa-0002", "cve_id": "CVE-2026-0002",
+    "html_url": "https://github.com/x/y/security/advisories/GHSA-mine-aaaa-0002",
+    "summary": "Credited by a maintainer", "severity": "low", "state": "published",
+    "author": null,
+    "created_at": "2026-08-01T00:00:00Z", "updated_at": "2026-08-10T00:00:00Z",
+    "published_at": "2026-08-10T00:00:00Z", "closed_at": null, "withdrawn_at": null,
+    "submission": null, "vulnerabilities": [{"package": {"ecosystem": "pip", "name": "y"}}],
+    "cvss_severities": {"cvss_v3": {"score": 3.1}, "cvss_v4": {"score": null}},
+    "cwe_ids": ["CWE-307"],
+    "credits_detailed": [{"user": {"login": "maintainer"}, "type": "remediation_developer", "state": "accepted"}, {"user": {"login": "octocat"}, "type": "finder", "state": "accepted"}, {"user": {"login": "octocat"}, "type": "analyst", "state": "accepted"}],
+    "collaborating_users": [], "comments": 0
+  },
+  {
+    "ghsa_id": "GHSA-mine-aaaa-0003", "cve_id": null,
+    "html_url": "https://github.com/x/y/security/advisories/GHSA-mine-aaaa-0003",
+    "summary": "A collaborator on the private fork", "severity": null, "state": "draft",
+    "author": {"login": "maintainer"},
+    "created_at": "2026-09-05T00:00:00Z", "updated_at": "2026-09-05T00:00:00Z",
+    "published_at": null, "closed_at": null, "withdrawn_at": null,
+    "submission": null, "vulnerabilities": [],
+    "cvss_severities": {"cvss_v3": {"score": null}, "cvss_v4": {"score": null}},
+    "cwe_ids": [], "credits_detailed": [],
+    "collaborating_users": [{"login": "octocat"}], "comments": 0
+  },
+  {
+    "ghsa_id": "GHSA-othr-aaaa-0004", "cve_id": null,
+    "html_url": "https://github.com/x/y/security/advisories/GHSA-othr-aaaa-0004",
+    "summary": "Someone else's", "severity": "critical", "state": "published",
+    "author": null,
+    "created_at": "2026-06-01T00:00:00Z", "updated_at": "2026-06-10T00:00:00Z",
+    "published_at": "2026-06-10T00:00:00Z", "closed_at": null, "withdrawn_at": null,
+    "submission": null, "vulnerabilities": [],
+    "cvss_severities": {"cvss_v3": {"score": 9.8}, "cvss_v4": {"score": null}},
+    "cwe_ids": [], "credits_detailed": [{"user": {"login": "someone"}, "type": "reporter", "state": "accepted"}],
+    "collaborating_users": [], "comments": 0
+  }
+]

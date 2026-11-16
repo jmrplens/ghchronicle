@@ -82,7 +82,7 @@ behind another one, which the log names under `waiting` in
 **`github.token is empty and GITHUB_TOKEN is unset`.** Exactly what it says.
 
 **`every.families.<name>: unknown collector`.** The name is not a family. The
-message lists the thirty-four that exist, in one parenthesis after the colon.
+message lists the thirty-six that exist, in one parenthesis after the colon.
 
 **`groups: is empty`.** `groups: []` would collect nothing at all. Omit the key
 to collect everything, which is what it means when it is absent.

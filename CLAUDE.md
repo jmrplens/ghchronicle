@@ -286,7 +286,7 @@ summed into their row, an answer both comment walks read is rendered once, and
 the two reads of the day's pull requests and issues go through
 `sink.Distinct`.
 
-**A `url` field is absolute or it is absent.** 66 of the 95 measurements
+**A `url` field is absolute or it is absent.** 68 of the 97 measurements
 carry one (the measurements page says which), and a table listing the rows of
 one selects it as a column called Link. The column itself is
 hidden: the row's link hangs on the table's first column, `linkOn()`, reading
@@ -455,6 +455,24 @@ Verified, so nobody spends an afternoon on it again:
   production proxy log from 2026-09-12 to 2026-09-27. The billing month in
   progress answered 200 to all 56 conditional reads there, and the month
   before it 304 to all 56.
+- A list of the security advisories an account reported. Checked on 2026-11-16
+  against the whole GraphQL schema and REST's OpenAPI description 1.1.4:
+  GraphQL has no repository advisories and its `SecurityAdvisory` no credits,
+  REST lists advisories per repository, per organization and in the global
+  database only, and `/advisories?credit=` is ignored (it answers the newest
+  hundred). What works is a repository's own `security-advisories`, which shows
+  its author every report in every state, triage and closed included, and
+  answers 304 to `If-None-Match`; `author` is null to anyone else. So
+  `reported` finds the repositories to ask: inbox threads of subject type
+  `RepositoryAdvisory`, which arrive on a state change or a comment and never on
+  submission (a report in triage had none), and which `all=true` keeps listing
+  after they are marked done; `involves:` and
+  `repositoriesContributedTo`, which each held all three repositories with a
+  report; and the reviewed global database by update, about 130 a day of which
+  half carry credits, while 360 unreviewed ones carried none. That database
+  pages by cursor and ignores `page=`, and none of the five published
+  repository advisories looked up there (three received, two reported) was in
+  it.
 
 ## Working here
 

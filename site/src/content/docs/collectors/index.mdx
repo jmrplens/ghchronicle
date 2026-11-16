@@ -1,12 +1,12 @@
 ---
 title: What is collected
-description: The thirty-four families of GitHub metrics ghchronicle collects, what each one asks the API for, and the reason each exists.
+description: The thirty-six families of GitHub metrics ghchronicle collects, what each one asks the API for, and the reason each exists.
 searchTitle: What ghchronicle collects from GitHub
 ---
 
 import { Aside } from "@astrojs/starlight/components";
 
-Thirty-four families, ninety-five measurements. This page is what each family
+Thirty-six families, ninety-seven measurements. This page is what each family
 is _for_; the [measurements reference](/ghchronicle/collectors/measurements/)
 is every tag and field.
 
@@ -223,6 +223,24 @@ alerts. An alert says what is wrong now. An analysis says the scan ran, when,
 on which commit, with which version of the tool, and how many results it found,
 which is what answers "did the scan actually run on that release". GitHub
 prunes them, so they have to be captured while they are there.
+
+**`advisories`** reads each repository's security advisories: the reports
+others sent through private vulnerability reporting, whatever became of them,
+and the maintainers' own drafts and publications. A report closed without
+publication is visible nowhere else.
+
+**`reported`** is the other direction: the advisories this account reported,
+is credited in or collaborates on in other people's repositories. No endpoint,
+REST or GraphQL, lists them, but a repository's own list shows its author every
+report in every state. So it asks the repositories four sources name, with no
+list in the configuration: the inbox's advisory threads, which arrive when a
+report moves; the issues and pull requests that involve the account elsewhere
+and the repositories GitHub says it contributed to, which hold a report still
+in triage that has notified nothing yet; and the reviewed global advisory
+database, read by update, which names the repository of an advisory crediting
+the account even when it did nothing else there. Every repository that named
+one is kept in the state file. What an advisory not yet published says about
+the flaw is written only when `advisories.unpublished_details` is on.
 
 ## Account
 
