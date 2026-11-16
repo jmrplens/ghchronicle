@@ -33,6 +33,7 @@ heartbeat: # how often the sweep loop wakes, for a test run
 log: # level, format, and an optional rotating file
 state_file: # what a restart remembers
 backfill: # the bound, when run with -backfill
+advisories: # how much of an unpublished security advisory is written
 migrate: # what a start does about what an upgrade left in the stores
 grafana: # where the dashboard is published, when asked
 ```
@@ -124,7 +125,7 @@ The reserve is scaled per bucket; see [rate limits](/ghchronicle/api/).
 state_file: /var/lib/ghchronicle/state.json
 ```
 
-Nine things, and deleting the file costs a different one for each:
+Ten things, and deleting the file costs a different one for each:
 
 - `last_run`, when each family last ran. Without it every family is due at once,
   so the next sweep is a full one, except that the service starts the families
@@ -160,6 +161,12 @@ Nine things, and deleting the file costs a different one for each:
   the counts query and one page of the walk, two points, and 468 to 513 KB for
   each hourly pass the production proxy logged against the same account on
   2026-09-27, a size that grows through the day with what is merged.
+- `reported`, every repository outside the account's own where the `reported`
+  family found an advisory naming it, or that the inbox or the global advisory
+  database named, and when the inbox and the database were last read whole.
+  Without it the next pass reads the whole inbox and walks the reviewed global
+  database once, and a repository only an inbox thread since gone had named is
+  found again only when one of its advisories moves.
 - `stores`, for each store a run writes to, where it points, the release that
   first wrote it, the release that last did, the
   [migrations](/ghchronicle/install/upgrading/#migrations) applied to it, the
@@ -325,6 +332,23 @@ repository rather than the walk. There is nothing to configure: it appears when
 a backfill starts, it is removed when the walk reaches the end, and a sweep
 neither writes nor reads it. See [stopping one, and picking it up
 again](/ghchronicle/how/backfill/#stopping-one-and-picking-it-up-again).
+
+## `advisories`
+
+```yaml
+advisories:
+  unpublished_details: false
+```
+
+What the `advisories` and `reported` families write about a security advisory
+that has not been published: a report in triage, a draft, or one closed
+without publication. Such an advisory describes a vulnerability under embargo.
+Off, the default, its row keeps the GHSA, the state, the severity, the scores,
+the dates and the url, a page only its author and the repository's maintainers
+can open, and leaves out `summary`, `cve`, `cwes`, `ecosystems` and `packages`.
+On, it writes them as it does for a published advisory. Turn it on only where
+every store, dashboard and log the collector writes to is as private as the
+advisory itself. See the [measurements](/ghchronicle/collectors/measurements/#security).
 
 ## `migrate`
 

@@ -108,7 +108,7 @@ each one draws and how to put one in a profile README.
 The full documentation is at
 **<https://docs.jmrp.io/ghchronicle/>**, in English and Spanish:
 [quickstart](https://docs.jmrp.io/ghchronicle/start/quickstart/),
-[the 95 measurements](https://docs.jmrp.io/ghchronicle/collectors/measurements/),
+[the 97 measurements](https://docs.jmrp.io/ghchronicle/collectors/measurements/),
 [choosing a store](https://docs.jmrp.io/ghchronicle/sinks/),
 [the cost of a sweep](https://docs.jmrp.io/ghchronicle/api/cost/) and
 [troubleshooting](https://docs.jmrp.io/ghchronicle/reference/troubleshooting/).
@@ -121,24 +121,24 @@ left unproven; the notes on each tag say what landed.
 
 ## What it collects
 
-Ninety-five measurements across thirty-four families, covering every surface
+Ninety-seven measurements across thirty-six families, covering every surface
 a personal or organisation account exposes.
 
-| Area          | What is kept                                                                                                                                                                                                                           |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Traffic       | Views, unique visitors and clones per day, referrers and paths. GitHub's window is 14 days; this rewrites it whole on every sweep, so a collector that was down for a day repairs itself on the next run                               |
-| Stars         | Stars per day for every repository, from GitHub's daily star history, back to the first. Where the token may read the stargazer list (since July 2026: admins, collaborators), one point per star as well, naming who gave it and when |
-| Repositories  | Stars, forks, watchers, open issues, size, age, idle days, licence, visibility, languages by bytes, topics, community profile score                                                                                                    |
-| Releases      | Downloads per release and per asset, asset sizes, draft and prerelease state, and the moment each release was published                                                                                                                |
-| Pull requests | Per item: time to first review, time to merge, lines added and deleted, files changed, review rounds, comments, commits                                                                                                                |
-| Issues        | Per item: time to close, comments, reactions, label count                                                                                                                                                                              |
-| Actions       | Runs with duration and queue time, jobs, individual steps, workflows and their state, artifacts and their expiry, cache usage                                                                                                          |
-| Security      | Dependabot and code scanning alerts by severity, plus an explicit record of which features are switched on, so no data is distinguishable from no alerts                                                                               |
-| Contributions | The whole profile calendar, one point per day at that day's date, plus totals and the per-repository commit breakdown                                                                                                                  |
-| Activity      | The event feed, which GitHub caps at three hundred events and thirty days, and the notification inbox, which it keeps for three months unless saved                                                                                    |
-| Billing       | Usage per day, product, SKU and repository, with gross, discount and net                                                                                                                                                               |
-| Account       | Followers, following, packages, gists, social accounts, sponsors                                                                                                                                                                       |
-| Elsewhere     | Pull requests and issues in other people's repositories, with their size and what became of them, the comments and accepted answers left there, and the stars of each repository they went to                                          |
+| Area          | What is kept                                                                                                                                                                                                                                                          |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Traffic       | Views, unique visitors and clones per day, referrers and paths. GitHub's window is 14 days; this rewrites it whole on every sweep, so a collector that was down for a day repairs itself on the next run                                                              |
+| Stars         | Stars per day for every repository, from GitHub's daily star history, back to the first. Where the token may read the stargazer list (since July 2026: admins, collaborators), one point per star as well, naming who gave it and when                                |
+| Repositories  | Stars, forks, watchers, open issues, size, age, idle days, licence, visibility, languages by bytes, topics, community profile score                                                                                                                                   |
+| Releases      | Downloads per release and per asset, asset sizes, draft and prerelease state, and the moment each release was published                                                                                                                                               |
+| Pull requests | Per item: time to first review, time to merge, lines added and deleted, files changed, review rounds, comments, commits                                                                                                                                               |
+| Issues        | Per item: time to close, comments, reactions, label count                                                                                                                                                                                                             |
+| Actions       | Runs with duration and queue time, jobs, individual steps, workflows and their state, artifacts and their expiry, cache usage                                                                                                                                         |
+| Security      | Dependabot and code scanning alerts by severity, plus an explicit record of which features are switched on, so no data is distinguishable from no alerts; and the security advisories, the reports sent to these repositories and the ones the account sent elsewhere |
+| Contributions | The whole profile calendar, one point per day at that day's date, plus totals and the per-repository commit breakdown                                                                                                                                                 |
+| Activity      | The event feed, which GitHub caps at three hundred events and thirty days, and the notification inbox, which it keeps for three months unless saved                                                                                                                   |
+| Billing       | Usage per day, product, SKU and repository, with gross, discount and net                                                                                                                                                                                              |
+| Account       | Followers, following, packages, gists, social accounts, sponsors                                                                                                                                                                                                      |
+| Elsewhere     | Pull requests and issues in other people's repositories, with their size and what became of them, the comments and accepted answers left there, and the stars of each repository they went to                                                                         |
 
 ## Where it writes
 

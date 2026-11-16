@@ -1,13 +1,13 @@
 ---
 title: What they show
-description: The seventeen sections and their one hundred and fifty four panels, one capture each, and what changes when the store cannot answer.
+description: The seventeen sections and their one hundred and fifty six panels, one capture each, and what changes when the store cannot answer.
 searchTitle: What the GitHub metrics dashboards show
 ---
 
 import { Aside } from "@astrojs/starlight/components";
 
 One dashboard, rendered once per store. Seventeen sections, one hundred and
-fifty four panels, in the same places with the same titles whichever database
+fifty six panels, in the same places with the same titles whichever database
 you chose. One capture per section below, in the order the dashboard puts them.
 
 Every section but the Overview opens collapsed. Open, the first seven were
@@ -561,7 +561,9 @@ Open Dependabot and code scanning alerts, the breakdowns by severity and by
 ecosystem, open alerts over time, the feature table, and the time taken to
 resolve an alert by severity. Under those, the oldest open alerts, the security
 settings, the default code scanning setup, the workflow token permissions and
-the secrets with when each was last rotated.
+the secrets with when each was last rotated. At the foot, the security
+advisories in both directions: the ones of these repositories, reports received
+and the maintainers' own, and the ones this account reported in other people's.
 
 ![The Security section: the open alerts tile reading 25 from Dependabot and 29 from code scanning, alerts by severity and by ecosystem, open alerts per severity over time, the security feature table with on and off per repository, code scanning runs per day by tool, the time to resolve table with each advisory and its CVSS, the resolved scanning alerts, scan results by tool, the oldest open alerts, the security settings and default code scanning setup tables, workflow token permissions, and the secret rotation table](../../../assets/dashboards/security.png)
 
@@ -604,10 +606,20 @@ ones, raised before the collector started, is counted and not listed, and an
 alert fixed while it sat behind the newest hundred stays listed as open, until a
 backfill reads the whole list.
 
+"Security advisories" and "Advisories reported" list each advisory once, its
+newest row inside the range: one still in triage or a draft is a row a day, and
+the row says the day it was last seen so, while a published or closed one is
+dated when that happened. Its Summary is empty while it is not published unless
+`advisories.unpublished_details` is on, and its link, on the GHSA, opens for its
+author and the repository's maintainers alone until then. Prometheus and
+Graphite cannot list them, an advisory being its state, severity and summary,
+all of them strings, and say so in the panel.
+
 Reads `gh_dependabot_alert`, `gh_dependabot_alert_item`,
 `gh_code_scanning_alert`, `gh_code_scanning_alert_item`,
 `gh_code_scanning_analysis`, `gh_security_feature`, `gh_security_setting`,
-`gh_code_scanning_setup`, `gh_actions_policy` and `gh_secret`.
+`gh_code_scanning_setup`, `gh_actions_policy`, `gh_secret`, `gh_repo_advisory`
+and `gh_advisory_reported`.
 
 ## Cost
 

@@ -1,12 +1,12 @@
 ---
 title: Qué se recoge
-description: Las treinta y cuatro familias de métricas de GitHub que recoge ghchronicle, qué le pide cada una a la API y por qué existe cada una.
+description: Las treinta y seis familias de métricas de GitHub que recoge ghchronicle, qué le pide cada una a la API y por qué existe cada una.
 searchTitle: Qué recoge ghchronicle de GitHub
 ---
 
 import { Aside } from "@astrojs/starlight/components";
 
-Treinta y cuatro familias, noventa y cinco medidas. Esta página es para qué sirve
+Treinta y seis familias, noventa y siete medidas. Esta página es para qué sirve
 cada familia; la [referencia de medidas](/ghchronicle/es/collectors/measurements/)
 es cada etiqueta y cada campo.
 
@@ -233,6 +233,25 @@ Una alerta dice qué está mal ahora. Un análisis dice que el escaneo corrió,
 cuándo, sobre qué commit, con qué versión de la herramienta y cuántos resultados
 encontró, que es lo que responde "¿corrió de verdad el escaneo en esa release?".
 GitHub los poda, así que hay que capturarlos mientras están.
+
+**`advisories`** lee los advisories de seguridad de cada repositorio: los
+reportes que otros enviaron por el reporte privado de vulnerabilidades, acabaran
+como acabaran, y los borradores y publicaciones de los propios mantenedores. Un
+reporte cerrado sin publicarse no se ve en ningún otro sitio.
+
+**`reported`** es la otra dirección: los advisories que esta cuenta reportó, en
+los que se la acredita o en los que colabora, en repositorios ajenos. Ningún
+endpoint, ni REST ni GraphQL, los lista, pero la lista de un repositorio le
+enseña a su autor cada reporte en cualquier estado. Así que pregunta a los
+repositorios que nombran cuatro fuentes, sin ninguna lista en la configuración:
+los hilos de advisory del buzón, que llegan cuando un reporte se mueve; los
+issues y pull requests ajenos en los que participa la cuenta y los repositorios
+a los que GitHub dice que contribuyó, que contienen un reporte aún en triage
+que todavía no ha notificado nada; y la base global de advisories revisados,
+leída por actualización, que nombra el repositorio de un advisory que acredita
+a la cuenta aunque no hiciera nada más allí. Cada repositorio que nombró alguno
+se guarda en el fichero de estado. Lo que un advisory aún no publicado dice del
+fallo solo se escribe con `advisories.unpublished_details` activado.
 
 ## Cuenta
 

@@ -8,7 +8,7 @@ compactTables:
 
 import { Aside } from "@astrojs/starlight/components";
 
-Ninety-five measurements. Each row says how a point is dated, because that is
+Ninety-seven measurements. Each row says how a point is dated, because that is
 the thing that decides which questions it can answer.
 
 ## How to read the tables
@@ -216,13 +216,14 @@ panel, which is the place to copy from.
 
 ### Every measurement, alphabetically
 
-Ninety-five, each link landing on the table it is in.
+Ninety-seven, each link landing on the table it is in.
 
 [`gh_account`](#account) · [`gh_account_total`](#account) ·
 [`gh_achievement`](#account) · [`gh_achievement_progress`](#account) ·
 [`gh_actions_cache`](#continuous-integration) ·
 [`gh_actions_cache_entry`](#continuous-integration) ·
-[`gh_actions_policy`](#security) · [`gh_artifact`](#continuous-integration) ·
+[`gh_actions_policy`](#security) · [`gh_advisory_reported`](#security) ·
+[`gh_artifact`](#continuous-integration) ·
 [`gh_artifact_total`](#continuous-integration) · [`gh_billing_usage`](#cost) ·
 [`gh_branch`](#configuration-and-delivery) ·
 [`gh_branch_protection`](#configuration-and-delivery) ·
@@ -258,6 +259,7 @@ Ninety-five, each link landing on the table it is in.
 [`gh_release_asset`](#repositories) ·
 [`gh_release_published`](#repositories) · [`gh_repo`](#repositories) ·
 [`gh_repo_activity`](#continuous-integration) ·
+[`gh_repo_advisory`](#security) ·
 [`gh_repo_archived`](#repositories) · [`gh_repo_community`](#repositories) ·
 [`gh_repo_created`](#account) · [`gh_repo_language`](#repositories) ·
 [`gh_repo_policy`](#configuration-and-delivery) ·
@@ -731,6 +733,30 @@ listing, is written either way.
 | `gh_code_scanning_setup` | daily | `state`, `query_suite`, `schedule` | `setups`, `languages`, `days_since_change` |
 | `gh_secret` | daily | `kind` (actions, dependabot), `secret` | `secrets`, `age_days`, `days_since_rotation` |
 | `gh_actions_policy` | daily | `permissions` | `policies`, `can_approve_pr` |
+| `gh_repo_advisory` | dated, when published or closed; daily while open | `ghsa` | `advisory_state`, `severity`, `cvss`, `cvss_v4`, `comments`, `credits`, `submitted`, `reporter`, `seconds_open`, `seconds_to_publish`, `seconds_to_close`, `summary`, `cve`, `cwes`, `ecosystems`, `packages`, `url` |
+| `gh_advisory_reported` | dated, when published or closed; daily while open | `ghsa`, `user` | `advisory_state`, `severity`, `cvss`, `cvss_v4`, `comments`, `credits`, `authored`, `credit`, `credit_state`, `seconds_open`, `seconds_to_publish`, `seconds_to_close`, `summary`, `cve`, `cwes`, `ecosystems`, `packages`, `url` |
+
+`gh_repo_advisory` is every security advisory of a collected repository: the
+reports others sent it through private vulnerability reporting, in triage,
+accepted, published or closed, and the drafts and publications of its
+maintainers. `gh_advisory_reported` is every advisory the account reported, is
+credited in or collaborates on in a repository it does not own or collect. No
+endpoint lists those, so the `reported` family finds the repositories to ask
+from the inbox's advisory threads, the issues and pull requests that involve
+the account elsewhere, the repositories GitHub says it contributed to, and the
+reviewed global advisory database read by update, and remembers in the state
+file every repository that named one. `credit` is what the advisory credits the
+account as, `authored` whether it wrote the report, and `submitted` whether a
+received advisory came in as a private report rather than as a maintainer's own
+draft, with `reporter` its author. An advisory is dated when it was published
+(withdrawn ones too) or closed, and is a daily snapshot while it is in triage or
+a draft, so the days a report waited are rows. Every value that changes, the
+state and the severity above all, is a field. `summary`, `cve`, `cwes`,
+`ecosystems` and `packages` describe the flaw, and for an advisory that is not
+published they are written only when `advisories.unpublished_details` is on; the
+`url` is always written, a page only the author and the maintainers can open
+until it is published. `severity` is absent on a draft nobody has rated, and
+`cvss` and `cvss_v4` follow the rule below: never written as zero.
 
 The tags on the two item measurements cost nothing: both listings were already
 carrying them, and the series was always keyed by `number`, so they group rows

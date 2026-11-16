@@ -1,13 +1,13 @@
 ---
 title: Qué muestran
-description: Las diecisiete secciones y sus ciento cincuenta y cuatro paneles, una captura de cada una, y qué cambia cuando el almacén no puede responder.
+description: Las diecisiete secciones y sus ciento cincuenta y seis paneles, una captura de cada una, y qué cambia cuando el almacén no puede responder.
 searchTitle: Qué muestran los dashboards de métricas de GitHub
 ---
 
 import { Aside } from "@astrojs/starlight/components";
 
 Un dashboard, renderizado una vez por almacén. Diecisiete secciones, ciento
-cincuenta y cuatro paneles, en los mismos sitios y con los mismos títulos sea cual
+cincuenta y seis paneles, en los mismos sitios y con los mismos títulos sea cual
 sea la base de datos elegida. Abajo hay una captura por sección, en el orden en
 que el dashboard las coloca.
 
@@ -605,7 +605,10 @@ por ecosistema, las alertas abiertas en el tiempo, la tabla de funciones y el
 tiempo que se tarda en resolver una alerta según su severidad. Debajo, las
 alertas abiertas más antiguas, los ajustes de seguridad, la configuración por
 defecto de code scanning, los permisos del token de los workflows y los
-secretos con cuándo se rotó cada uno por última vez.
+secretos con cuándo se rotó cada uno por última vez. Al pie, los advisories de
+seguridad en las dos direcciones: los de estos repositorios, reportes recibidos
+y los de los propios mantenedores, y los que esta cuenta reportó en repositorios
+ajenos.
 
 ![La sección Security: la tarjeta de alertas abiertas con 25 de Dependabot y 29 de code scanning, alertas por severidad y por ecosistema, alertas abiertas por severidad en el tiempo, la tabla de funciones de seguridad con on y off por repositorio, ejecuciones de code scanning por día y herramienta, la tabla de tiempo hasta resolver con cada aviso y su CVSS, las alertas de escaneo resueltas, los resultados por herramienta, las alertas abiertas más antiguas, las tablas de ajustes de seguridad y de configuración por defecto de code scanning, los permisos del token de los workflows y la tabla de rotación de secretos](../../../../assets/dashboards/security.png)
 
@@ -652,10 +655,20 @@ colector, se cuenta y no se lista, y una alerta arreglada mientras estaba
 detrás de las cien más recientes sigue listada como abierta, hasta que un
 relleno histórico lee la lista entera.
 
+"Security advisories" y "Advisories reported" listan cada advisory una vez, su
+fila más reciente dentro del rango: uno aún en triage o en borrador es una fila
+al día, y la fila dice el último día en que se vio así, mientras que uno
+publicado o cerrado se fecha cuando ocurrió. Su Summary está vacío mientras no
+se publica salvo con `advisories.unpublished_details` activado, y su enlace, en
+el GHSA, solo lo abren su autor y los mantenedores del repositorio hasta
+entonces. Prometheus y Graphite no pueden listarlos, porque un advisory es su
+estado, su severidad y su resumen, todos texto, y lo dicen en el panel.
+
 Lee `gh_dependabot_alert`, `gh_dependabot_alert_item`,
 `gh_code_scanning_alert`, `gh_code_scanning_alert_item`,
 `gh_code_scanning_analysis`, `gh_security_feature`, `gh_security_setting`,
-`gh_code_scanning_setup`, `gh_actions_policy` y `gh_secret`.
+`gh_code_scanning_setup`, `gh_actions_policy`, `gh_secret`, `gh_repo_advisory`
+y `gh_advisory_reported`.
 
 ## Cost
 

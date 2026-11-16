@@ -30,6 +30,7 @@ heartbeat: # how often the sweep loop wakes, for a test run
 log: # level, format, and an optional rotating file
 state_file: # what a restart remembers
 backfill: # the bound, when run with -backfill
+advisories: # how much of an unpublished security advisory is written
 migrate: # what a start does about what an upgrade left in the stores
 grafana: # where the dashboard is published, when asked
 ```
@@ -117,7 +118,7 @@ The reserve is scaled per bucket; see [rate limits](https://docs.jmrp.io/ghchron
 state_file: /var/lib/ghchronicle/state.json
 ```
 
-Nine things, and deleting the file costs a different one for each:
+Ten things, and deleting the file costs a different one for each:
 
 - `last_run`, when each family last ran. Without it every family is due at once,
   so the next sweep is a full one, except that the service starts the families
@@ -153,6 +154,12 @@ Nine things, and deleting the file costs a different one for each:
   the counts query and one page of the walk, two points, and 468 to 513 KB for
   each hourly pass the production proxy logged against the same account on
   2026-09-27, a size that grows through the day with what is merged.
+- `reported`, every repository outside the account's own where the `reported`
+  family found an advisory naming it, or that the inbox or the global advisory
+  database named, and when the inbox and the database were last read whole.
+  Without it the next pass reads the whole inbox and walks the reviewed global
+  database once, and a repository only an inbox thread since gone had named is
+  found again only when one of its advisories moves.
 - `stores`, for each store a run writes to, where it points, the release that
   first wrote it, the release that last did, the
   [migrations](https://docs.jmrp.io/ghchronicle/install/upgrading/#migrations) applied to it, the
@@ -318,6 +325,23 @@ repository rather than the walk. There is nothing to configure: it appears when
 a backfill starts, it is removed when the walk reaches the end, and a sweep
 neither writes nor reads it. See [stopping one, and picking it up
 again](https://docs.jmrp.io/ghchronicle/how/backfill/#stopping-one-and-picking-it-up-again).
+
+### `advisories`
+
+```yaml
+advisories:
+  unpublished_details: false
+```
+
+What the `advisories` and `reported` families write about a security advisory
+that has not been published: a report in triage, a draft, or one closed
+without publication. Such an advisory describes a vulnerability under embargo.
+Off, the default, its row keeps the GHSA, the state, the severity, the scores,
+the dates and the url, a page only its author and the repository's maintainers
+can open, and leaves out `summary`, `cve`, `cwes`, `ecosystems` and `packages`.
+On, it writes them as it does for a published advisory. Turn it on only where
+every store, dashboard and log the collector writes to is as private as the
+advisory itself. See the [measurements](https://docs.jmrp.io/ghchronicle/collectors/measurements/#security).
 
 ### `migrate`
 
@@ -553,6 +577,8 @@ This page is a form that writes a configuration. What follows is the inventory i
   - `state_file`: string, defaults to `ghchronicle-state.json`, like `/var/lib/ghchronicle/state.json`
   - `backfill`: a block of settings
   - `backfill.since`: string, like `2y`
+  - `advisories`: a block of settings
+  - `advisories.unpublished_details`: bool, defaults to `false`, like `false`
   - `migrate`: string, defaults to `auto`, one of `auto`, `warn`
   - `grafana`: a block of settings
   - `grafana.url`: string, like `http://localhost:3000`
@@ -836,7 +862,7 @@ the same membership.
 
 | Group       | Family         | Default | Why that value                                                                                                                                                                                                                                                                                                                                             |
 | ----------- | -------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `account`   | `account`      | `1h`    | the contribution calendar moves with every contribution and the profile's counts with every follow and star, and a pass is one GraphQL point and seven REST requests, of which only the profile is charged: GitHub all but never answered it with a 304, once in 48 conditional reads, and the six package listings answer one until a package changes                                           |
+| `account`   | `account`      | `1h`    | the contribution calendar moves with every contribution and the profile's counts with every follow and star, and a pass is one GraphQL point and seven REST requests, of which only the profile is charged: GitHub all but never answered it with a 304, once in 48 conditional reads, and the six package listings answer one until a package changes     |
 | `account`   | `achievements` | `1h`    | the badges on the public profile page, which no API lists, and how far each tiered one is from its next tier; a pass transfers the page, 36 KB and off the budget, and the pull requests merged since the day before for two GraphQL points, so a tier reached in the afternoon shows in the afternoon, and the whole history is walked once a week, 24 MB |
 | `account`   | `billing`      | `1h`    | the month in progress moves while continuous integration runs: it had changed at every one of 46 six-hourly reads measured, and a pass is two requests, that month and the one before, of which only the first is charged                                                                                                                                  |
 | `account`   | `history`      | `0`     | off until asked for by name: it walks every past year and the year so far, and the rows are idempotent                                                                                                                                                                                                                                                     |
@@ -862,8 +888,10 @@ the same membership.
 | `repos`     | `repo`         | `1h`    | stars, forks, languages and topics move slowly, and a pass is three REST requests per repository, most of them a free 304, and two GraphQL points per ten repositories                                                                                                                                                                                     |
 | `repos`     | `rulesets`     | `24h`   | a ruleset is edited a few times a year and every version keeps its own date; both requests answer a free 304 until somebody edits one, the first pass after a restart included, since the ETag cache is kept beside the state file                                                                                                                         |
 | `repos`     | `settings`     | `6h`    | webhooks, rulesets, environments and deploy keys change only when somebody changes them                                                                                                                                                                                                                                                                    |
+| `security`  | `advisories`   | `1h`    | a report waiting in triage is something to act on today, and a list that has not moved answers 304 at no cost                                                                                                                                                                                                                                              |
 | `security`  | `analyses`     | `1h`    | GitHub prunes code scanning analyses and every scanned push adds some, and a pass is one conditional request per repository with code scanning, three of them charged in the median pass measured, the refusals of the rest remembered for a day                                                                                                           |
 | `security`  | `security`     | `1h`    | an alert is something to act on today, and the list of open ones is short                                                                                                                                                                                                                                                                                  |
+| `security`  | `reported`     | `1h`    | a maintainer's answer moves a report, and every repository whose list has not moved answers 304 at no cost                                                                                                                                                                                                                                                 |
 | `work`      | `commits`      | `1h`    | one GraphQL point per repository whose default branch has a commit from the last two cadences, which 38 of 999 answers measured had, and one per twenty-five repositories, shared with issues and issueevents, to ask which, so the hour is how soon a push is charted                                                                                     |
 | `work`      | `discussions`  | `1h`    | a discussion is answered over hours or days and few repositories have a forum, and a pass is two GraphQL points for each that does and nothing for the rest                                                                                                                                                                                                |
 | `work`      | `issueevents`  | `1h`    | the timeline of what moved in two cadences, one GraphQL point for each repository where an issue or a pull request moved and nothing for the rest, so the hour is how soon a transition is worth seeing                                                                                                                                                    |
@@ -930,7 +958,7 @@ which is:
 | `repos`     | `branches`, `deps`, `inventory`, `policyfiles`, `repo`, `rulesets`, `settings`           |
 | `work`      | `commits`, `discussions`, `issueevents`, `issues`, `planning`, `stats`                   |
 | `ci`        | `actions`, `artifacts`, `deployments`, `joblogs`                                         |
-| `security`  | `analyses`, `security`                                                                   |
+| `security`  | `advisories`, `analyses`, `reported`, `security`                                         |
 | `feeds`     | `activity`, `events`, `notifs`                                                           |
 | `collector` | `ratelimit`                                                                              |
 
@@ -1107,9 +1135,9 @@ level=INFO msg="slow families due together take turns" starting=planning
 
 One a sweep holds while it can keep every cadence, and a configuration with a
 longer tick can have more slow families than that. `every.default: 6h` ticks
-hourly, because nothing in it runs more often, with thirty-one families at six
-hours, and one a sweep would start each of them every thirty-one hours. A sweep
-there starts the fewest that fit, six, and no family waits as long as its
+hourly, because nothing in it runs more often, with thirty-three families at
+six hours, and one a sweep would start each of them every thirty-three hours. A
+sweep there starts the fewest that fit, six, and no family waits as long as its
 cadence.
 
 Only the service takes turns. `-once` runs every family that is due, because it
