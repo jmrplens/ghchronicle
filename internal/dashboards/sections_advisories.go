@@ -11,8 +11,8 @@ package dashboards
 // among the many open ones stamped at the same midnight.
 //
 // The summary of an advisory that is not published is written only when
-// advisories.unpublished_details is on, so a row of one may have an empty
-// Summary on purpose. Its page opens for its author and the repository's
+// advisories.unpublished_details is on, so a row of one may read
+// "(not published)" on purpose. Its page opens for its author and the repository's
 // maintainers alone until it is published.
 func advisories(b *builder) []Panel {
 	return []Panel{
@@ -66,7 +66,7 @@ func advisoryTable(b *builder, title, m string, y int, received bool) Panel {
 		"their maintainers. No other endpoint lists a report, and the ones closed " +
 		"without publication are seen nowhere else. When is the row's own date: when it " +
 		"was published or closed, or for one still in triage or a draft the day it was " +
-		"last seen so. The Summary of one not yet published is empty unless " +
+		"last seen so. The Summary of one not yet published reads (not published) unless " +
 		"advisories.unpublished_details is on."
 	if !received {
 		desc = "The advisories this account reported, is credited in or collaborates on in " +
@@ -74,7 +74,7 @@ func advisoryTable(b *builder, title, m string, y int, received bool) Panel {
 			"pull requests it took part in, the repositories it contributed to and the " +
 			"reviewed global database each name repositories to ask. Credit is what the " +
 			"advisory credits the account as. When is the row's own date, as in the table " +
-			"above, and the Summary of one not yet published is empty unless " +
+			"above, and the Summary of one not yet published reads (not published) unless " +
 			"advisories.unpublished_details is on."
 	}
 	return panel("table", title, box{W: 24, H: 9, X: 0, Y: y}, []Target{sqlT(query)}, &P{

@@ -28,9 +28,21 @@ func reportedServer(t *testing.T, candidates ...string) *fixtureServer {
 		}
 	})
 	for _, c := range candidates {
-		f.file("/repos/"+c+"/security-advisories", "reported_repo_advisories.json")
+		serveAdvisoriesOf(t, f, c, c)
 	}
 	return f
+}
+
+// serveAdvisoriesOf answers asked's advisory list with the synthetic
+// fixture, its pages on home and its GHSA ids made home's own, so two
+// repositories never share an advisory unless a test means them to.
+func serveAdvisoriesOf(t *testing.T, f *fixtureServer, asked, home string) {
+	t.Helper()
+	body := strings.ReplaceAll(string(fixture(t, "reported_repo_advisories.json")), "x/y", home)
+	body = strings.ReplaceAll(body, "-aaaa-", "-"+strings.Repeat(home[:1], 4)+"-")
+	f.handle("/repos/"+asked+"/security-advisories", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(body))
+	})
 }
 
 func reportedOf() Reported {
@@ -98,14 +110,14 @@ func TestReportedMatchesTheLoginInAnyRole(t *testing.T) {
 		tags["ghsa"] = ghsa
 		return find(t, run.Points, "gh_advisory_reported", tags)
 	}
-	authored, credited, collaborating := get("GHSA-mine-aaaa-0001"), get("GHSA-mine-aaaa-0002"), get("GHSA-mine-aaaa-0003")
+	authored, credited, collaborating := get("GHSA-mine-bbbb-0001"), get("GHSA-mine-bbbb-0002"), get("GHSA-mine-bbbb-0003")
 	if authored.Fields["authored"] != 1 || authored.Fields["credit"] != "reporter" || authored.Fields["credit_state"] != "accepted" {
 		t.Errorf("authored row: %v", authored.Fields)
 	}
 	if credited.Fields["authored"] != 0 || credited.Fields["credit"] != "analyst,finder" {
 		t.Errorf("credited row: %v", credited.Fields)
 	}
-	if _, ok := collaborating.Fields["credit"]; ok || collaborating.Fields["authored"] != 0 {
+	if collaborating.Fields["credit"] != noneTag || collaborating.Fields["authored"] != 0 {
 		t.Errorf("collaborator row: %v", collaborating.Fields)
 	}
 	if credited.Tags["user"] != "octocat" || credited.Tags["owner"] != "b" || credited.Tags["repo"] != "searched" {
@@ -209,14 +221,72 @@ func TestReportedHidesUnpublishedDetailsByDefault(t *testing.T) {
 	t.Parallel()
 	f := reportedServer(t, "a/notified", "b/searched", "c/contributed", "d/credited")
 	run := runReported(t, f, reportedOf())
-	tags := map[string]string{"full_name": "b/searched", "ghsa": "GHSA-mine-aaaa-0001"}
-	if v, ok := find(t, run.Points, "gh_advisory_reported", tags).Fields["summary"]; ok {
+	tags := map[string]string{"full_name": "b/searched", "ghsa": "GHSA-mine-bbbb-0001"}
+	if v := find(t, run.Points, "gh_advisory_reported", tags).Fields["summary"]; v != withheldSummary {
 		t.Errorf("a report in triage carries its summary %q without being asked", v)
 	}
 	r := reportedOf()
 	r.Details = true
 	run = runReported(t, reportedServer(t, "a/notified", "b/searched", "c/contributed", "d/credited"), r)
-	if _, ok := find(t, run.Points, "gh_advisory_reported", tags).Fields["summary"]; !ok {
+	if v := find(t, run.Points, "gh_advisory_reported", tags).Fields["summary"]; v == withheldSummary {
 		t.Error("asked for every detail, a report in triage still lacks its summary")
+	}
+}
+
+// TestReportedWritesAMovedRepositoryOnce: a repository remembered under the
+// name it had and found again under the one it has now answers both, the old
+// one through GitHub's redirect, and each advisory is one point named by its
+// own page, whichever name came first.
+func TestReportedWritesAMovedRepositoryOnce(t *testing.T) {
+	t.Parallel()
+	f := reportedServer(t, "a/notified", "c/contributed", "d/credited")
+	serveAdvisoriesOf(t, f, "b/searched", "b/searched")
+	serveAdvisoriesOf(t, f, "b/old-name", "b/searched")
+	r := reportedOf()
+	r.Known = []string{"b/old-name"}
+	run := runReported(t, f, r)
+	n := 0
+	for _, p := range run.Points {
+		if strings.HasPrefix(p.Tags["ghsa"], "GHSA-mine-bbbb-") {
+			n++
+			if p.Tags["full_name"] != "b/searched" {
+				t.Errorf("%s tagged %s, want the name its page carries", p.Tags["ghsa"], p.Tags["full_name"])
+			}
+		}
+	}
+	if n != 3 {
+		t.Errorf("%d points for the moved repository's three advisories", n)
+	}
+	if !slices.Contains(run.Remember, "b/searched") {
+		t.Errorf("remember %v lacks the repository's current name", run.Remember)
+	}
+}
+
+// TestReportedLeavesTheCollectedRepositories: a repository of another owner
+// named in targets.repos is read by the advisories family, so a report there
+// is received, not reported.
+func TestReportedLeavesTheCollectedRepositories(t *testing.T) {
+	t.Parallel()
+	f := reportedServer(t, "a/notified", "b/searched", "c/contributed", "d/credited")
+	r := reportedOf()
+	r.Collected = []string{"B/Searched"}
+	run := runReported(t, f, r)
+	if n := len(f.calls("/repos/b/searched/security-advisories")); n != 0 {
+		t.Errorf("a collected repository asked %d times", n)
+	}
+	if got := reposOf(run.Points); slices.Contains(got, "b/searched") {
+		t.Errorf("found in %v", got)
+	}
+}
+
+// TestReportedReadsNoGlobalDatabaseAsNothingThere: a server without one, as
+// GitHub Enterprise Server may be, is not a failure every hour.
+func TestReportedReadsNoGlobalDatabaseAsNothingThere(t *testing.T) {
+	t.Parallel()
+	f := reportedServer(t, "a/notified", "b/searched", "c/contributed")
+	f.status("/advisories", http.StatusNotFound, "Not Found")
+	run := runReported(t, f, reportedOf())
+	if !run.Scanned {
+		t.Error("an absent database is not marked read")
 	}
 }

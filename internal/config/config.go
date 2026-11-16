@@ -92,7 +92,9 @@ type Advisories struct {
 	// affected packages of a report still in triage, a draft or a closed
 	// report, which are a vulnerability under embargo. Off, the default, such
 	// a row keeps the GHSA, the state, the severity, the scores, the dates
-	// and the page, which only the author and the maintainers can open.
+	// and the page, which only the author and the maintainers can open, and
+	// the notifs family writes the title of an advisory's inbox thread, which
+	// is its summary, as a placeholder.
 	UnpublishedDetails bool `yaml:"unpublished_details" ghc:"example=false"`
 }
 

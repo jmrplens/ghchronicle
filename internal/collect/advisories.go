@@ -77,6 +77,10 @@ type repoAdvisory struct {
 	Comments      int              `json:"comments"`
 }
 
+// withheldSummary is the summary of an advisory not yet published when
+// advisories.unpublished_details is off.
+const withheldSummary = "(not published)"
+
 // advisoryUser is a person an advisory names.
 type advisoryUser struct {
 	Login string `json:"login"`
@@ -161,13 +165,22 @@ func advisoryStamp(a *repoAdvisory, now time.Time) time.Time {
 // operator asked for it.
 func advisoryFields(a *repoAdvisory, details bool, now time.Time) map[string]any {
 	stamp := advisoryStamp(a, now)
+	// summary and severity are written on every row, as withheldSummary and
+	// noneTag where there is nothing to say: a column InfluxDB 3 or
+	// PostgreSQL has never seen refuses the whole of a panel that names it,
+	// an account whose reports are all still under embargo, or all unrated
+	// drafts, would otherwise never create either, and an empty string is
+	// not a value line protocol can carry. A row of the day an advisory was
+	// created is stamped at the start of that day, before it existed, so
+	// how long it has been open starts at zero rather than below it.
 	f := withURL(map[string]any{
 		"advisory_state": a.State,
 		"comments":       a.Comments,
 		"credits":        len(a.Credits),
-		"seconds_open":   int(stamp.Sub(a.CreatedAt).Seconds()),
+		"seconds_open":   max(0, int(stamp.Sub(a.CreatedAt).Seconds())),
+		"severity":       orNone(a.Severity),
+		"summary":        withheldSummary,
 	}, a.HTMLURL)
-	setNonEmpty(f, "severity", a.Severity)
 	if v := a.CVSSSeverities.V3.Score; v != nil && *v > 0 {
 		f["cvss"] = *v
 	}
@@ -183,7 +196,7 @@ func advisoryFields(a *repoAdvisory, details bool, now time.Time) map[string]any
 	if !details && !a.public() {
 		return f
 	}
-	setNonEmpty(f, "summary", a.Summary)
+	f["summary"] = orNone(a.Summary)
 	setNonEmpty(f, "cve", a.CVEID)
 	cwes := slices.Clone(a.CWEIDs)
 	sort.Strings(cwes)

@@ -393,7 +393,7 @@ func DiscoveryFilter(cfg *config.Config, backfill bool) *collect.Filter {
 //
 // They need a login to ask about, so a configuration that names repositories
 // alone has nothing to hand GraphQL and they are all skipped. r.family does
-// that check; the line below says so once instead of eleven times.
+// that check; the line below says so once instead of once per family.
 func (r *Runner) accountFamilies(ctx context.Context, now time.Time) {
 	user := r.Cfg.Targets.User
 	if user == "" {
@@ -449,15 +449,15 @@ func (r *Runner) accountFamilies(ctx context.Context, now time.Time) {
 	r.family(ctx, "profile", now, func() ([]sink.Point, error) {
 		return collect.Profile{Login: user, Walk: r.walk()}.Collect(ctx, r.API, now)
 	})
-	// A search whose pages run out before its count does has met GitHub's
-	// cap of a thousand results, and the rows past it are missing with nothing
-	// failing. Said once per count: the open states are read whole on every
-	// sweep, and an account past the cap stays past it.
 	// The advisories the account reported in other people's repositories,
 	// found without a list: see collect.Reported and Runner.reported.
 	r.family(ctx, "reported", now, func() ([]sink.Point, error) {
 		return r.reported(ctx, now)
 	})
+	// A search whose pages run out before its count does has met GitHub's
+	// cap of a thousand results, and the rows past it are missing with nothing
+	// failing. Said once per count: the open states are read whole on every
+	// sweep, and an account past the cap stays past it.
 	r.family(ctx, "outbound", now, func() ([]sink.Point, error) {
 		return collect.Outbound{
 			Login: user, Walk: r.walk(), Moved: r.outboundMoved(now), Warn: r.warnOnce,

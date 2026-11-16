@@ -40,10 +40,13 @@ import (
 // since the notification goes and the search may not find it again.
 type Reported struct {
 	Login string
-	// Own is the owners the advisories family already reads, the account and
-	// the organizations configured: their advisories are received, not
-	// reported, and reading them here would write them twice.
-	Own []string
+	// Own is the owners whose repositories are the account's, itself and the
+	// organizations configured, and Collected the repositories the
+	// advisories family reads, named ones of other owners included. The
+	// advisories of either are received, not reported, and reading them here
+	// would write a report the account sent to a repository it collects twice.
+	Own       []string
+	Collected []string
 	// Known is the repositories an earlier run remembered.
 	Known []string
 	// Notified reads the inbox since then; zero reads all of it.
@@ -97,9 +100,10 @@ type reportedPageInfo struct {
 // candidates is the set of repositories to ask, keyed without case as GitHub
 // matches names, keeping the first spelling met.
 type candidates struct {
-	own      []string
-	names    map[string]string
-	remember map[string]bool
+	own       []string
+	collected map[string]bool
+	names     map[string]string
+	remember  map[string]bool
 }
 
 func (c *candidates) add(fullName string, remember bool) {
@@ -107,10 +111,10 @@ func (c *candidates) add(fullName string, remember bool) {
 	if !ok || owner == "" || name == "" || strings.Contains(name, "/") {
 		return
 	}
-	if slices.ContainsFunc(c.own, func(o string) bool { return strings.EqualFold(o, owner) }) {
+	key := strings.ToLower(fullName)
+	if c.collected[key] || slices.ContainsFunc(c.own, func(o string) bool { return strings.EqualFold(o, owner) }) {
 		return
 	}
-	key := strings.ToLower(fullName)
 	if _, seen := c.names[key]; !seen {
 		c.names[key] = fullName
 	}
@@ -123,7 +127,10 @@ func (c *candidates) add(fullName string, remember bool) {
 // that name the account. A source that fails is reported with everything the
 // others found, so one bad answer costs that source and not the run.
 func (r Reported) Collect(ctx context.Context, c *ghapi.Client, now time.Time) (ReportedRun, error) {
-	set := &candidates{own: r.Own, names: map[string]string{}, remember: map[string]bool{}}
+	set := &candidates{own: r.Own, collected: map[string]bool{}, names: map[string]string{}, remember: map[string]bool{}}
+	for _, full := range r.Collected {
+		set.collected[strings.ToLower(full)] = true
+	}
 	var errs []error
 	inboxErr := r.inbox(ctx, c, set)
 	if inboxErr != nil {
@@ -149,24 +156,55 @@ func (r Reported) Collect(ctx context.Context, c *ghapi.Client, now time.Time) (
 		keys = append(keys, k)
 	}
 	slices.Sort(keys)
+	// A GHSA id is unique across GitHub, and one repository can be asked
+	// under two names: a transferred one answers its old name through the
+	// redirect, and a name typed by hand in the global database may differ
+	// in case from the one a search returns. Each advisory is one point, its
+	// tags taken from the page GitHub gives it rather than from the name it
+	// was asked by.
+	seen := map[string]bool{}
+	kept := map[string]bool{}
+	keep := func(full string) {
+		if k := strings.ToLower(full); !kept[k] {
+			kept[k] = true
+			out.Remember = append(out.Remember, full)
+		}
+	}
 	for _, k := range keys {
 		full := set.names[k]
 		rows, readErr := advisoryPages(ctx, c, r.Refusals, r.Walk, full)
 		if readErr != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", full, readErr))
 		}
-		found := false
 		for i := range rows {
-			if p, ok := r.point(&rows[i], full, now); ok {
-				out.Points = append(out.Points, p)
-				found = true
+			p, ok := r.point(&rows[i], full, now)
+			if !ok || seen[rows[i].GHSAID] {
+				continue
 			}
+			seen[rows[i].GHSAID] = true
+			out.Points = append(out.Points, p)
+			keep(p.Tags["full_name"])
 		}
-		if found || set.remember[k] {
-			out.Remember = append(out.Remember, full)
+		if set.remember[k] {
+			keep(full)
 		}
 	}
 	return out, errors.Join(errs...)
+}
+
+// advisoryHome is the repository an advisory's own page belongs to, which
+// is its current name whatever it was asked by, or fallback when the page is
+// not a repository advisory's.
+func advisoryHome(htmlURL, fallback string) string {
+	rest, ok := strings.CutPrefix(htmlURL, "https://github.com/")
+	if !ok {
+		return fallback
+	}
+	parts := strings.Split(rest, "/")
+	if len(parts) < 4 || parts[0] == "" || parts[1] == "" || parts[2] != "security" || parts[3] != "advisories" {
+		return fallback
+	}
+	return parts[0] + "/" + parts[1]
 }
 
 // inbox reads the notifications for the repositories of advisory threads.
@@ -294,7 +332,9 @@ func (r Reported) credited(ctx context.Context, c *ghapi.Client, set *candidates
 		var batch []globalAdvisory
 		link, _, getErr := c.GetJSON(ctx, next, &batch, "")
 		if getErr != nil {
-			if isPaginationLimit(getErr) {
+			// A server with no global database, as a GitHub Enterprise
+			// Server may be, has nothing here to read: it is not a failure.
+			if isPaginationLimit(getErr) || isSkippable(getErr) {
 				return true, nil
 			}
 			return false, getErr
@@ -355,11 +395,14 @@ func (r Reported) point(a *repoAdvisory, fullName string, now time.Time) (sink.P
 	fields := advisoryFields(a, r.Details, now)
 	fields["authored"] = boolInt(authored)
 	slices.Sort(types)
-	setNonEmpty(fields, "credit", strings.Join(types, ","))
+	// Written for a collaborator the advisory does not credit too, so the
+	// column exists for the panel that names it whatever the account's
+	// advisories are.
+	fields["credit"] = orNone(strings.Join(types, ","))
 	setNonEmpty(fields, "credit_state", state)
 	return sink.Point{
 		Measurement: "gh_advisory_reported",
-		Tags: merge(fullNameTags(fullName), map[string]string{
+		Tags: merge(fullNameTags(advisoryHome(a.HTMLURL, fullName)), map[string]string{
 			"ghsa": a.GHSAID, "user": r.Login,
 		}),
 		Fields: fields,

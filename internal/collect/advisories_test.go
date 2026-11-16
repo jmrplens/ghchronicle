@@ -86,10 +86,21 @@ func TestAdvisoriesRowPerAdvisory(t *testing.T) {
 func TestAdvisoryDraftOmitsWhatItHasNot(t *testing.T) {
 	t.Parallel()
 	draft := advisoryRow(t, collectAdvisories(t, true), "GHSA-gggg-hhhh-iiii")
-	for _, k := range []string{"severity", "cvss", "cvss_v4", "seconds_to_publish", "seconds_to_close", "cve", "cwes", "ecosystems", "packages"} {
+	for _, k := range []string{"cvss", "cvss_v4", "seconds_to_publish", "seconds_to_close", "cve", "cwes", "ecosystems", "packages"} {
 		if v, ok := draft.Fields[k]; ok {
 			t.Errorf("a draft carries %s = %v, which it does not have", k, v)
 		}
+	}
+	// The severity column exists on every row, (none) for one nobody
+	// rated, so a store holding only drafts still has it for the panels.
+	if v := draft.Fields["severity"]; v != noneTag {
+		t.Errorf("a draft's severity is %v, want %q", v, noneTag)
+	}
+	// A row of the day the advisory was created is stamped before it
+	// existed, and is open no time at all rather than a negative one.
+	fresh := &repoAdvisory{GHSAID: "GHSA-new0-0000-0000", State: "triage", CreatedAt: testNow.Add(-time.Hour)}
+	if got := advisoryFields(fresh, false, testNow)["seconds_open"]; got != 0 {
+		t.Errorf("an advisory created today is open %v seconds, want 0", got)
 	}
 }
 
@@ -100,10 +111,15 @@ func TestAdvisoriesHideUnpublishedDetailsByDefault(t *testing.T) {
 	t.Parallel()
 	points := collectAdvisories(t, false)
 	triage := advisoryRow(t, points, "GHSA-dddd-eeee-ffff")
-	for _, k := range advisoryDetails {
+	for _, k := range advisoryDetails[1:] {
 		if v, ok := triage.Fields[k]; ok {
 			t.Errorf("an unpublished report carries %s = %v without being asked", k, v)
 		}
+	}
+	// The summary column is there, so a panel naming it is not refused,
+	// and says why it says nothing.
+	if v := triage.Fields["summary"]; v != withheldSummary {
+		t.Errorf("an unpublished report's summary is %q, want %q", v, withheldSummary)
 	}
 	for _, k := range []string{"url", "severity", "advisory_state", "cvss"} {
 		if _, ok := triage.Fields[k]; !ok {
@@ -161,5 +177,22 @@ func TestAdvisoriesFollowTheCursor(t *testing.T) {
 	}
 	if calls := f.calls(advisoriesPath); len(calls) != 2 || calls[1].Query["after"] != "Y3Vyc29y" {
 		t.Fatalf("calls %+v, want the second page by its cursor", calls)
+	}
+}
+
+// TestAWithheldAdvisoryStillCreatesItsColumns: line protocol drops an empty
+// string, so a store holding only reports under embargo, or only unrated
+// drafts, would never have the summary or severity column the panels name,
+// and InfluxDB refuses a panel naming a column it has never seen.
+func TestAWithheldAdvisoryStillCreatesItsColumns(t *testing.T) {
+	t.Parallel()
+	points := collectAdvisories(t, false)
+	for _, ghsa := range []string{"GHSA-dddd-eeee-ffff", "GHSA-gggg-hhhh-iiii"} {
+		line := sink.LineProtocol(advisoryRow(t, points, ghsa))
+		for _, col := range []string{"summary=", "severity="} {
+			if !strings.Contains(line, col) {
+				t.Errorf("%s reaches InfluxDB without %s: %s", ghsa, strings.TrimSuffix(col, "="), line)
+			}
+		}
 	}
 }

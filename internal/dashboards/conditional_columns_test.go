@@ -57,7 +57,6 @@ var conditionalColumns = []conditionalColumn{
 	{"amount_cents", "gh_sponsorship", "account.go", "the sponsorship names a tier"},
 	{"author_association", "gh_pull_request", "pulls.go", "GitHub sent one"},
 	{"commits", "gh_contribution_repo", "account.go", "the contribution kind is commits"},
-	{"credit", "gh_advisory_reported", "reported.go", "the advisory credits the account, and not only names it a collaborator"},
 	{"cvss", "gh_dependabot_alert_item", "security.go", "the advisory carries a v3 score, a zero not being a score the scale gives out"},
 	{"cvss_v4", "gh_dependabot_alert_item", "security.go", "the advisory carries a v4 score"},
 	{"days_since_add", "gh_star_list", "account.go", "something has been added to the list"},
@@ -98,8 +97,6 @@ var conditionalColumns = []conditionalColumn{
 	// link column of a rendered dashboard to the rule that the column comes
 	// back and holds nothing but absolute urls and empty cells.
 	{"url", "gh_achievement_progress", "achievement_progress.go", "the badge has a page"},
-	{"severity", "gh_repo_advisory", "advisories.go", "the advisory has been rated, which a draft may not have been"},
-	{"summary", "gh_repo_advisory", "advisories.go", "the advisory is published, or advisories.unpublished_details is on"},
 	{"url", "gh_deployment", "deployments.go", "the repository has a deployments page to point at"},
 	{"url", "gh_notification", "events.go", "the notification's subject has a page"},
 	{"url", "gh_policy_file", "policyfiles.go", "the policy file is present"},

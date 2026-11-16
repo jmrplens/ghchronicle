@@ -93,7 +93,7 @@ type State struct {
 	Coauthored collect.CoauthoredTally `json:"coauthored,omitzero"`
 	// Reported is what the reported family found that no single source
 	// would find again. Zero, which is what an older state file reads as,
-	// reads the whole inbox and the whole global database once.
+	// reads the last month of the inbox and of the global database.
 	Reported ReportedMemory `json:"reported,omitzero"`
 	// Stores is what this file remembers about each store it has written,
 	// keyed by the sink's name in the configuration. Absent in a state file
@@ -112,9 +112,11 @@ type ReportedMemory struct {
 	// seen. Nothing is removed: a repository is one request, a 304 when its
 	// list has not moved, and a report there can move years later.
 	Repos map[string]time.Time `json:"repos,omitempty"`
-	// Notified is when the last complete read of the inbox started.
+	// Notified is a little before the last complete read of the inbox
+	// started.
 	Notified time.Time `json:"notified,omitzero"`
-	// Scanned is when the last complete walk of the global database started.
+	// Scanned is a little before the last complete walk of the global
+	// database started.
 	Scanned time.Time `json:"scanned,omitzero"`
 }
 

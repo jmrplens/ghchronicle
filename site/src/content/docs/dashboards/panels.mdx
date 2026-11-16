@@ -609,8 +609,8 @@ backfill reads the whole list.
 "Security advisories" and "Advisories reported" list each advisory once, its
 newest row inside the range: one still in triage or a draft is a row a day, and
 the row says the day it was last seen so, while a published or closed one is
-dated when that happened. Its Summary is empty while it is not published unless
-`advisories.unpublished_details` is on, and its link, on the GHSA, opens for its
+dated when that happened. Its Summary reads `(not published)` until it is
+published, unless `advisories.unpublished_details` is on, and its link, on the GHSA, opens for its
 author and the repository's maintainers alone until then. Prometheus and
 Graphite cannot list them, an advisory being its state, severity and summary,
 all of them strings, and say so in the panel.

@@ -169,10 +169,11 @@ Diez cosas, y borrar el fichero cuesta una distinta por cada una:
   se fusiona.
 - `reported`, cada repositorio ajeno a la cuenta donde la familia `reported`
   encontró un advisory que la nombra, o que nombró el buzón o la base global de
-  advisories, y cuándo se leyeron enteros por última vez el buzón y la base. Sin
-  él la pasada siguiente lee el buzón entero y recorre una vez la base global de
-  revisados, y un repositorio que solo nombraba un hilo del buzón ya desaparecido
-  se vuelve a encontrar solo cuando se mueve alguno de sus advisories.
+  advisories, y hasta dónde se leyeron por última vez el buzón y la base. Sin él
+  la pasada siguiente lee los últimos treinta días de los dos, y un repositorio
+  que solo nombraba un hilo del buzón ya desaparecido se vuelve a encontrar solo
+  cuando se mueve alguno de sus advisories o con un backfill, que lee los dos
+  enteros.
 - `stores`, para cada almacén en el que escribe una ejecución, adónde apunta,
   la versión que escribió en él primero, la que lo hizo por última vez, las
   [migraciones](/ghchronicle/es/install/upgrading/#migraciones) que se le han
@@ -361,7 +362,10 @@ cerrado sin publicarse. Un advisory así describe una vulnerabilidad bajo
 embargo. Desactivado, que es el valor por defecto, su fila guarda el GHSA, el
 estado, la severidad, las puntuaciones, las fechas y la url, una página que solo
 pueden abrir su autor y los mantenedores del repositorio, y deja fuera
-`summary`, `cve`, `cwes`, `ecosystems` y `packages`. Activado, los escribe como
+`summary`, `cve`, `cwes`, `ecosystems` y `packages`. Lo mismo vale para el título
+del hilo de un advisory en el buzón, que es su resumen: la familia `notifs` lo
+escribe como `(security advisory)` salvo con esto activado, porque un hilo no
+dice si el advisory se ha publicado. Activado, los escribe como
 los de un advisory publicado. Actívalo solo donde cada almacén, dashboard y log
 en el que escribe el colector sea tan privado como el propio advisory. Ver las
 [medidas](/ghchronicle/es/collectors/measurements/#seguridad).

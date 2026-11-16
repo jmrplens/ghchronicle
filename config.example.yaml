@@ -357,7 +357,9 @@ every:
 # vulnerability under embargo, so by default its row keeps the GHSA, the
 # state, the severity, the scores, the dates and the page, which only its
 # author and the repository's maintainers can open, and leaves out the
-# summary, the CVE, the CWEs and the affected packages. true writes them too.
+# summary, the CVE, the CWEs and the affected packages; the notifs family
+# writes the title of an advisory's inbox thread, which is its summary, as
+# "(security advisory)". true writes them too.
 #
 # advisories:
 #   unpublished_details: false

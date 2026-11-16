@@ -12876,7 +12876,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Every security advisory of these repositories: the reports others sent through private vulnerability reporting, and the drafts and publications of their maintainers. No other endpoint lists a report, and the ones closed without publication are seen nowhere else. When is the row's own date: when it was published or closed, or for one still in triage or a draft the day it was last seen so. The Summary of one not yet published is empty unless advisories.unpublished_details is on.",
+          "description": "Every security advisory of these repositories: the reports others sent through private vulnerability reporting, and the drafts and publications of their maintainers. No other endpoint lists a report, and the ones closed without publication are seen nowhere else. When is the row's own date: when it was published or closed, or for one still in triage or a draft the day it was last seen so. The Summary of one not yet published reads (not published) unless advisories.unpublished_details is on.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -13020,7 +13020,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "The advisories this account reported, is credited in or collaborates on in other people's repositories, found without a list: the inbox, the issues and pull requests it took part in, the repositories it contributed to and the reviewed global database each name repositories to ask. Credit is what the advisory credits the account as. When is the row's own date, as in the table above, and the Summary of one not yet published is empty unless advisories.unpublished_details is on.",
+          "description": "The advisories this account reported, is credited in or collaborates on in other people's repositories, found without a list: the inbox, the issues and pull requests it took part in, the repositories it contributed to and the reviewed global database each name repositories to ask. Credit is what the advisory credits the account as. When is the row's own date, as in the table above, and the Summary of one not yet published reads (not published) unless advisories.unpublished_details is on.",
           "fieldConfig": {
             "defaults": {
               "custom": {

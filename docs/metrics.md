@@ -1071,7 +1071,8 @@ listing, is written either way.
 reports others sent it through private vulnerability reporting, in triage,
 accepted, published or closed, and the drafts and publications of its
 maintainers. `gh_advisory_reported` is every advisory the account reported, is
-credited in or collaborates on in a repository it does not own or collect. No
+credited in or collaborates on in a repository that is neither the account's,
+nor a configured organization's, nor collected. No
 endpoint lists those, so the `reported` family finds the repositories to ask
 from the inbox's advisory threads, the issues and pull requests that involve
 the account elsewhere, the repositories GitHub says it contributed to, and the
@@ -1084,10 +1085,16 @@ draft, with `reporter` its author. An advisory is dated when it was published
 a draft, so the days a report waited are rows. Every value that changes, the
 state and the severity above all, is a field. `summary`, `cve`, `cwes`,
 `ecosystems` and `packages` describe the flaw, and for an advisory that is not
-published they are written only when `advisories.unpublished_details` is on; the
-`url` is always written, a page only the author and the maintainers can open
-until it is published. `severity` is absent on a draft nobody has rated, and
-`cvss` and `cvss_v4` follow the rule below: never written as zero.
+published they are left out, `summary` written as `(not published)`, unless
+`advisories.unpublished_details` is on; the `url` is always written, a page only
+the author and the maintainers can open until it is published. `summary`,
+`severity` and `credit` are on every row, `(none)` where there is nothing to say
+(an unrated draft, a collaborator not credited), so a store holding only reports
+under embargo still has the columns the panels name: line protocol cannot carry
+an empty string. `cvss` and `cvss_v4` follow
+the rule below: never written as zero. Each advisory is one point, tagged with
+the repository its own page names, so a repository transferred since it was
+first found is not written under both names.
 
 The tags on the two item measurements cost nothing: both listings were already
 carrying them, and the series was always keyed by `number`, so they group rows

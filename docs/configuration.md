@@ -156,10 +156,10 @@ Ten things, and deleting the file costs a different one for each:
   2026-09-27, a size that grows through the day with what is merged.
 - `reported`, every repository outside the account's own where the `reported`
   family found an advisory naming it, or that the inbox or the global advisory
-  database named, and when the inbox and the database were last read whole.
-  Without it the next pass reads the whole inbox and walks the reviewed global
-  database once, and a repository only an inbox thread since gone had named is
-  found again only when one of its advisories moves.
+  database named, and how far the inbox and the database were last read.
+  Without it the next pass reads the last thirty days of both, and a repository
+  only an inbox thread since gone had named is found again only when one of its
+  advisories moves or by a backfill, which reads both whole.
 - `stores`, for each store a run writes to, where it points, the release that
   first wrote it, the release that last did, the
   [migrations](https://docs.jmrp.io/ghchronicle/install/upgrading/#migrations) applied to it, the
@@ -339,7 +339,10 @@ without publication. Such an advisory describes a vulnerability under embargo.
 Off, the default, its row keeps the GHSA, the state, the severity, the scores,
 the dates and the url, a page only its author and the repository's maintainers
 can open, and leaves out `summary`, `cve`, `cwes`, `ecosystems` and `packages`.
-On, it writes them as it does for a published advisory. Turn it on only where
+The same holds for the title of an advisory's inbox thread, which is its
+summary: the `notifs` family writes it as `(security advisory)` unless this is
+on, since a thread does not say whether the advisory has been published. On, it
+writes them as it does for a published advisory. Turn it on only where
 every store, dashboard and log the collector writes to is as private as the
 advisory itself. See the [measurements](https://docs.jmrp.io/ghchronicle/collectors/measurements/#security).
 

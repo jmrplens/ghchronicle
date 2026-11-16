@@ -777,7 +777,7 @@ los reportes que otros le enviaron por el reporte privado de vulnerabilidades,
 en triage, aceptados, publicados o cerrados, y los borradores y publicaciones
 de sus mantenedores. `gh_advisory_reported` es cada advisory que la cuenta
 reportó, en el que se la acredita o en el que colabora, en un repositorio que no
-es suyo ni se recoge. Ningún endpoint los lista, así que la familia `reported`
+es de la cuenta, ni de una organización configurada, ni se recoge. Ningún endpoint los lista, así que la familia `reported`
 encuentra los repositorios a los que preguntar en los hilos de advisory del
 buzón, los issues y pull requests ajenos en los que participa la cuenta, los
 repositorios a los que GitHub dice que contribuyó y la base global de
@@ -790,11 +790,16 @@ retirados) o se cerró, y es una foto diaria mientras está en triage o en
 borrador, así que los días que esperó un reporte son filas. Todo valor que
 cambia, el estado y la severidad sobre todo, es un campo. `summary`, `cve`,
 `cwes`, `ecosystems` y `packages` describen el fallo, y de un advisory no
-publicado solo se escriben con `advisories.unpublished_details` activado; la
-`url` se escribe siempre, una página que solo el autor y los mantenedores pueden
-abrir hasta que se publica. `severity` falta en un borrador que nadie ha
-valorado, y `cvss` y `cvss_v4` siguen la regla de abajo: nunca se escriben como
-cero.
+publicado se dejan fuera, con `summary` escrito como `(not published)`, salvo
+con `advisories.unpublished_details` activado; la `url` se escribe siempre, una
+página que solo el autor y los mantenedores pueden abrir hasta que se publica.
+`summary`, `severity` y `credit` están en cada fila, `(none)` donde no hay nada
+que decir (un borrador sin valorar, un colaborador sin crédito), así que un
+almacén que solo tiene reportes bajo embargo sigue teniendo las columnas que
+nombran los paneles: el line protocol no puede llevar un texto vacío. `cvss` y `cvss_v4` siguen la regla de abajo: nunca se escriben como
+cero. Cada advisory es un punto, etiquetado con el repositorio que nombra su
+propia página, así que un repositorio transferido desde que se encontró no se
+escribe con los dos nombres.
 
 Las etiquetas de las dos medidas de ítem no cuestan nada: los dos listados ya
 las traían, y la serie siempre estuvo indexada por `number`, así que agrupan

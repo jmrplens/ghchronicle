@@ -336,9 +336,10 @@ func advisoryConcluded(p Point) bool {
 	return false
 }
 
-// orUnknown names a severity a draft has not been given.
+// orUnknown names a severity a draft has not been given, which the
+// collector writes as (none).
 func orUnknown(s string) string {
-	if s == "" {
+	if s == "" || s == "(none)" {
 		return "unrated"
 	}
 	return s
