@@ -196,12 +196,15 @@ function sidebarSection(html) {
 	const end = html.indexOf("</sl-sidebar-pane>", start);
 	if (start === -1 || end === -1) return undefined;
 	// Each group is a <details> whose <summary> holds its label; a link outside
-	// every group has no section.
+	// every group has no section. The label's span may carry more attributes
+	// after its class, as it does under Astro's "attribute" style scoping,
+	// which Starlight follows from 0.43 when astro.config.mjs names it: the
+	// label then read as undefined on every page.
 	const groups = [];
 	for (const [token, label] of html
 		.slice(start, end)
 		.matchAll(
-			/<details\b|<\/details>|<span class="large[^"]*">([^<]*)<\/span>|<a\s[^>]*aria-current="page"/g,
+			/<details\b|<\/details>|<span class="large[^"]*"[^>]*>([^<]*)<\/span>|<a\s[^>]*aria-current="page"/g,
 		)) {
 		if (token.startsWith("<details")) groups.push(undefined);
 		else if (token === "</details>") groups.pop();
