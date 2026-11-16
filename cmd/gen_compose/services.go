@@ -10,7 +10,7 @@ import "strings"
 // account in it.
 const grafanaService = `
   grafana:
-    image: grafana/grafana:13.2
+    image: grafana/grafana:13.3
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-ghchronicle}
     ports:
