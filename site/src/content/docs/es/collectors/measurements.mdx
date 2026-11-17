@@ -1179,6 +1179,18 @@ separarlos.
   misma fila, o cada relectura escribe una segunda copia del año.
 </Aside>
 
+La rama por defecto de un fork es el historial de su repositorio original,
+sincronizado, y nada de eso es trabajo de la cuenta. Así que en un fork
+`gh_commit` guarda solo los commits de la cuenta, que GitHub filtra por el id de
+la cuenta antes de responder, y por eso cuesta una página por largo que sea el
+original; `gh_commits_week` escribe los commits del propietario como `commits`
+además de como `owner_commits`; y no hay `gh_commit_punchcard`, que GitHub no
+separa por autor. Medido el 2026-11-17, los forks de `targets.repos` habían
+metido de seis a siete mil commits a la semana de otras personas en "Commits
+per week", y la rama por defecto de uno de ellos tenía 27.158 commits, ninguno
+de la cuenta. Un almacén conserva lo que escribió allí una versión anterior; ver
+las notas de la 2.7.2 para limpiarlo.
+
 ## Actividad
 
 | Medida            | Fechado                       | Etiquetas                                               | Campos                          |

@@ -224,10 +224,13 @@ large (`TooLargeError`), which the same query would only time out on again, so
 `Pulls`, `Commits`, the co-authored walk and every other paged walk (through
 `collect.smallerPage`, since 2.7.1) halve their page on the same cursor while
 it is larger than ten (fifty is asked again at 25, 12 and 6), and an aliased
-batch (`aliasBatch`, and `Branches`' own) halves the batch down to one. A new
-paged walk asks it too. What still times out at the smallest, and every
-single query that pages nothing (the account's, the history's, planning's,
-the totals' counts), hands `TooLargeError` up with what it read: a failure the
+batch (`aliasBatch`, `Branches`' own and the co-authored commits) halves the
+batch down to one. A query that pages nothing and is made of parts that answer
+on their own (`collect.partedQuery`: the account's, a year of history, the
+achievement counts) asks each half of its parts on its own, down to a part a
+query, decoding every answer into one value; the totals' counts are asked one
+by one. A new query takes one of these shapes. What still times out at the
+smallest hands `TooLargeError` up with what it read: a failure the
 runner writes, reports as `query too large` and keeps out of a backfill's
 checkpoint. Up to 2.6.3 `collect.isSkippableGraphQL` read it as "nothing
 here", and twelve commit walks in production ended at it as though the history
@@ -321,6 +324,13 @@ which is what lets a Prometheus dashboard say "per day" through `increase()`.
 **Tags Prometheus reserves.** A tag called `job` (or `instance`) collides with
 the scrape labels and the OTLP receiver overwrites it with the service name.
 Workflow jobs are tagged `job_name`.
+
+**A fork's default branch is somebody else's history.** It is its upstream's,
+synced in, and none of it is the account's work, so a fork writes the
+account's part alone: `gh_commit` asks `history(author: {id})` with the
+account's node id (`Runner.accountID`), `gh_commits_week` writes the owner's
+commits as `commits`, and there is no punch card, which GitHub does not split
+by author. A new per-repository measurement of commits does the same.
 
 **Weekly rows are anchored to the week, not to today.** `gh_commits_week` is
 stamped at the Sunday that starts each week. A sweep on Tuesday and one on

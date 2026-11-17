@@ -13,6 +13,45 @@ day the tag was pushed, with two exceptions: 2.5.2 has a section and no tag,
 and its changes shipped in 2.6.0; 2.6.2 has a tag and no release, since its
 release stopped at the containerised suite, and its changes shipped in 2.6.3.
 
+## 2.7.2 - 2026-11-17
+
+A fork's commits are the account's commits, and every GraphQL query has a
+smaller one to ask when GitHub gives up on it.
+
+- **A fork counts the account's work and not its upstream's.** A fork's
+  default branch is its upstream's history, synced in. The forks under
+  `targets.repos` had put six to seven thousand commits a week by other people
+  into "Commits per week", and their authors into "Commits by author". In a
+  fork, `gh_commit` now holds the account's commits alone: GitHub filters the
+  history by the account's node id before it answers, so a fork costs a page
+  however long its upstream is (jmrplens/renovate's default branch held
+  27,158 commits on 2026-11-17, none by the account). `gh_commits_week`
+  writes the owner's commits as `commits`, and a fork writes no
+  `gh_commit_punchcard`, which GitHub does not split by author.
+
+  A store keeps what an earlier release wrote. The weekly rows rewrite
+  themselves within a year, since each week is one row. The upstream commits
+  in `gh_commit` and `gh_commit_check`, and a fork's last punch card, stay
+  until they are removed. PostgreSQL can delete a fork's rows by `full_name`.
+  InfluxDB 3 deletes whole tables only, so its way is to drop `gh_commit`,
+  `gh_commit_check` and `gh_commit_punchcard` and backfill the `commits` and
+  `stats` families, which GitHub serves whole.
+
+- **A query that pages nothing is asked in parts when GitHub gives up on it.**
+  The account query, a year of contribution history and the achievement counts
+  are each made of parts that answer on their own. When GitHub's gateway gives
+  up on the whole, each half of the parts is asked on its own, down to a part
+  a query, and the answers are read into one. The account query took more than
+  six seconds 114 times and met the gateway's 502 three times in the
+  production proxy's log to 2026-11-16. The commits past the first hundred
+  of several pull requests, read for the Pair Extraordinaire count, are asked
+  in halves of the batch the same way.
+- **Planning pages its labels and milestones.** It asked one page of sixty
+  labels and thirty milestones, which met the gateway's timeout twice in
+  11,247 asks. It now pages both and asks a page GitHub could not finish
+  again at half the size. It reads every label, where it read the first sixty,
+  and the thirty milestones updated last, as before.
+
 ## 2.7.1 - 2026-11-17
 
 A look at every section of the dashboard against the account's own store after

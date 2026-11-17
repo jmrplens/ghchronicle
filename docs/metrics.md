@@ -1454,6 +1454,17 @@ the two can be told apart.
 > sweep. A sweep on Tuesday and one on Friday have to land on the same row, or
 > every re-read writes a second copy of the year.
 
+A fork's default branch is its upstream's history, synced in, and none of it is
+the account's work. So in a fork `gh_commit` holds the account's commits alone,
+which GitHub filters by the account's node id before it answers, and so costs
+a page however long the upstream is; `gh_commits_week` writes the owner's
+commits as `commits` as well as `owner_commits`; and there is no
+`gh_commit_punchcard`, which GitHub does not split by author. Measured on
+2026-11-17, the forks under `targets.repos` had put six to seven thousand
+commits a week by other people into "Commits per week", and the default branch
+of one of them held 27,158 commits, none by the account. A store keeps what an
+earlier release wrote there; see the 2.7.2 notes for clearing it.
+
 ### Activity
 
 | Measurement       | Dated              | Tags                                                    | Fields                          |
