@@ -171,14 +171,17 @@ func advisoryFields(a *repoAdvisory, details bool, now time.Time) map[string]any
 	// PostgreSQL has never seen refuses the whole of a panel that names it,
 	// an account whose reports are all still under embargo, or all unrated
 	// drafts, would otherwise never create either, and an empty string is
-	// not a value line protocol can carry. A row of the day an advisory was
-	// created is stamped at the start of that day, before it existed, so
-	// how long it has been open starts at zero rather than below it.
+	// not a value line protocol can carry. seconds_open is the row's time
+	// less the moment the advisory was opened, so the panels read Opened as
+	// the one less the other, to the second, as gh_external_contribution's
+	// are read. A row of the day an advisory was opened is stamped at the
+	// start of that day, before it existed, so there it is negative, on
+	// purpose: clamped to zero, every report of that day read 00:00.
 	f := withURL(map[string]any{
 		"advisory_state": a.State,
 		"comments":       a.Comments,
 		"credits":        len(a.Credits),
-		"seconds_open":   max(0, int(stamp.Sub(a.CreatedAt).Seconds())),
+		"seconds_open":   int(stamp.Sub(a.CreatedAt).Seconds()),
 		"severity":       orNone(a.Severity),
 		"summary":        withheldSummary,
 	}, a.HTMLURL)
