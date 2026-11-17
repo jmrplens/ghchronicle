@@ -227,11 +227,17 @@ func contributionTotals(b *builder) []Panel {
 			PromDesc: "Named in full here, for the reason Graphite gives: the label summed " +
 				"by is the label shown.",
 		}),
+		// A past year is one row, rewritten in place; the year in progress
+		// is a row a day, stamped at the start of each UTC day and marked
+		// partial, so each year is read as its newest row. Drawn as written,
+		// 2026 was sixty rows in production on 2026-11-17, one per day the
+		// history family had run.
 		panel("table", "Contributions by year", box{W: 24, H: 8, X: 0, Y: 26}, []Target{sqlT(
 			`SELECT year AS "Year", contributions AS "Contributions",` +
 				` commits AS "Commits", pull_requests AS "Pull requests",` +
-				` reviews AS "Reviews", issues AS "Issues", repositories AS "New repos"` +
-				" FROM gh_contribution_year WHERE " + wholeHistory +
+				` reviews AS "Reviews", issues AS "Issues", repositories AS "New repos" FROM (` +
+				"SELECT *, ROW_NUMBER() OVER (PARTITION BY year ORDER BY time DESC) AS rn" +
+				" FROM gh_contribution_year WHERE " + wholeHistory + ") x WHERE rn = 1" +
 				" ORDER BY year DESC",
 		)}, &P{
 			Prom:      promYears,

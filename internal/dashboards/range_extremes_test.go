@@ -205,6 +205,10 @@ func TestTheSnapshotTablesReadTheirNewestRowInSQL(t *testing.T) {
 		"Repository settings":       "full_name",
 		"Cache against the ceiling": "full_name",
 		"Environments":              "full_name, environment",
+		// The year in progress is a row a day, stamped at the start of each
+		// UTC day and marked partial: drawn as written, 2026 was sixty rows
+		// in production on 2026-11-17.
+		"Contributions by year": "year",
 	} {
 		newest := regexp.MustCompile(`ROW_NUMBER\(\) OVER \(PARTITION BY ` + regexp.QuoteMeta(partition) +
 			` ORDER BY time DESC\) AS rn .*\) x WHERE rn = 1\b`)
