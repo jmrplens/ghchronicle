@@ -221,11 +221,13 @@ collector must not add a retry of its own. In GraphQL only a 502 or 504 that
 took GitHub's documented ten seconds (`ghapi.GraphQLTimeoutWindow`; all 51 in
 the production proxy's log came after 10.45 to 11.23 s) is the query being too
 large (`TooLargeError`), which the same query would only time out on again, so
-`Pulls`, `Commits` and the co-authored walk halve their page on the same
-cursor while it is larger than ten (fifty is asked again at 25, 12 and 6), and
-an aliased batch (`aliasBatch`, and `Branches`' own) halves the batch down to
-one. What still times out at the smallest, and every other walk or single
-query, hands `TooLargeError` up with what it read: a failure the
+`Pulls`, `Commits`, the co-authored walk and every other paged walk (through
+`collect.smallerPage`, since 2.7.1) halve their page on the same cursor while
+it is larger than ten (fifty is asked again at 25, 12 and 6), and an aliased
+batch (`aliasBatch`, and `Branches`' own) halves the batch down to one. A new
+paged walk asks it too. What still times out at the smallest, and every
+single query that pages nothing (the account's, the history's, planning's,
+the totals' counts), hands `TooLargeError` up with what it read: a failure the
 runner writes, reports as `query too large` and keeps out of a backfill's
 checkpoint. Up to 2.6.3 `collect.isSkippableGraphQL` read it as "nothing
 here", and twelve commit walks in production ended at it as though the history

@@ -341,3 +341,120 @@ func TestBranchesHandUpARepositoryTheGatewayGivesUpOnAlone(t *testing.T) {
 		t.Errorf("%d queries, want the batch of two and then each repository alone", n)
 	}
 }
+
+// pageSizesAsked records, for every paged query, the page sizes it was asked
+// at, in order, keyed by the start of the query's text.
+type pageSizesAsked struct {
+	mu    sync.Mutex
+	sizes map[string][]int
+}
+
+// timeOutEachFirstPage answers with GitHub's timeout the first time each
+// query is asked at the page size it starts at, larger than ten, and hands every other ask to
+// the handler the fixture server had: what a page that has grown past the
+// gateway's ten seconds looks like, once.
+func timeOutEachFirstPage(f *fixtureServer) *pageSizesAsked {
+	inner := f.graphql
+	asked := &pageSizesAsked{sizes: map[string][]int{}}
+	f.graphQL(func(w http.ResponseWriter, r *http.Request, query string, vars map[string]any) {
+		size, paged := vars["first"].(float64)
+		if !paged {
+			size, paged = vars["last"].(float64)
+		}
+		// A page of ten or fewer is not asked smaller, the issue timeline's
+		// ten among them, so it is not timed out here.
+		if paged && size > 10 {
+			key := strings.Join(strings.Fields(query), " ")
+			key = key[:min(len(key), 120)]
+			asked.mu.Lock()
+			seen := asked.sizes[key]
+			asked.sizes[key] = append(seen, int(size))
+			asked.mu.Unlock()
+			if len(seen) == 0 {
+				gatewayGaveUp(w)
+				return
+			}
+		}
+		inner(w, r, query, vars)
+	})
+	return asked
+}
+
+// wantEachHalved fails unless every paged query was asked again at half the
+// size it timed out at.
+func (a *pageSizesAsked) wantEachHalved(t *testing.T, queries int) {
+	t.Helper()
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if len(a.sizes) < queries {
+		t.Errorf("%d paged queries asked, want %d: %v", len(a.sizes), queries, a.sizes)
+	}
+	for key, sizes := range a.sizes {
+		if len(sizes) < 2 || sizes[1] != sizes[0]/2 {
+			t.Errorf("asked at %v, want the timed-out page again at half: %s", sizes, key)
+		}
+	}
+}
+
+// TestEveryPagedWalkHalvesAPageGitHubCouldNotFinish: each walk that pages a
+// GraphQL connection asks a page the gateway gave up on again at half the
+// size, on the same cursor, rather than ending the pass as a failure.
+func TestEveryPagedWalkHalvesAPageGitHubCouldNotFinish(t *testing.T) {
+	t.Parallel()
+	t.Run("the outbound walks", func(t *testing.T) {
+		t.Parallel()
+		f := newFixtureServer(t)
+		f.graphQL(func(w http.ResponseWriter, _ *http.Request, query string, _ map[string]any) {
+			switch {
+			case strings.Contains(query, "starredRepositories(first:"):
+				f.write(w, "graphql_starred.json")
+			case strings.Contains(query, "search(type: ISSUE"):
+				f.write(w, "graphql_search_issues.json")
+			case strings.Contains(query, "repositoryDiscussionComments"):
+				f.write(w, "viewer_discussion_comments.json")
+			default:
+				f.write(w, "viewer_issue_comments.json")
+			}
+		})
+		asked := timeOutEachFirstPage(f)
+		if _, err := (Outbound{Login: "octocat"}).Collect(ctx(t), f.Client, testNow); err != nil {
+			t.Fatalf("a page asked again smaller failed the family: %v", err)
+		}
+		// The stars, the five searches as one query text, the issue
+		// comments, the discussion comments and the accepted answers.
+		asked.wantEachHalved(t, 4)
+	})
+	t.Run("the issue timeline", func(t *testing.T) {
+		t.Parallel()
+		f := newFixtureServer(t)
+		timelineFixtures(t, f)
+		asked := timeOutEachFirstPage(f)
+		// A backfill lists the items at fifty a page before it reads their
+		// timelines at ten.
+		if _, err := (IssueEvents{Walk: Unbounded}).Collect(ctx(t), f.Client, testRepo, testNow); err != nil {
+			t.Fatal(err)
+		}
+		asked.wantEachHalved(t, 1)
+	})
+	t.Run("the repository's discussions", func(t *testing.T) {
+		t.Parallel()
+		f := newFixtureServer(t)
+		f.graphQL(func(w http.ResponseWriter, _ *http.Request, _ string, _ map[string]any) {
+			f.write(w, "graphql_discussions.json")
+		})
+		asked := timeOutEachFirstPage(f)
+		if _, err := (Discussions{First: 25}).Collect(ctx(t), f.Client, testRepo, testNow); err != nil {
+			t.Fatal(err)
+		}
+		asked.wantEachHalved(t, 1)
+	})
+	t.Run("the reported family's two sources", func(t *testing.T) {
+		t.Parallel()
+		f := reportedServer(t, "b/searched", "c/contributed")
+		asked := timeOutEachFirstPage(f)
+		if _, err := reportedOf().Collect(ctx(t), f.Client, testNow); err != nil {
+			t.Fatal(err)
+		}
+		asked.wantEachHalved(t, 2)
+	})
+}

@@ -192,7 +192,7 @@ var graphQL = []struct{ marker, fixture string }{
 	// names, which is what tells them from every other search.
 	{"... on Issue { repository { nameWithOwner } }", "graphql_reported_search.json"},
 	{"repositoriesContributedTo(", "graphql_contributed.json"},
-	{"search(type: ISSUE, first: 100", outboundSearchFixture},
+	{"search(type: ISSUE, first: $first", outboundSearchFixture},
 	{"search(type: REPOSITORY", "graphql_search_counts.json"},
 	{"fragment totals on Repository", "graphql_repo_totals.json"},
 	{"fragment detail on Repository", "graphql_repo_detail.json"},

@@ -526,6 +526,11 @@ func (ie IssueEvents) listItems(ctx context.Context, c *ghapi.Client, repo Repo,
 	most := ie.Walk.limit(100)
 	for page := 1; page <= most && (vars["withIssues"] == true || vars["withPRs"] == true); page++ {
 		if err := c.GraphQL(ctx, issueTimelineQuery, vars, &res); err != nil {
+			if n := smallerPage(err, pageSize(vars)); n > 0 {
+				vars["first"] = n
+				page--
+				continue
+			}
 			if isSkippableGraphQL(err) {
 				return nil
 			}

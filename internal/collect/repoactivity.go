@@ -326,6 +326,11 @@ func (d Discussions) Collect(ctx context.Context, c *ghapi.Client, repo Repo, _ 
 		}
 		res.Repository.Discussions.Nodes = nil
 		if err := c.GraphQL(ctx, discussionsQuery, vars, &res); err != nil {
+			if n := smallerPage(err, first); n > 0 {
+				first = n
+				page--
+				continue
+			}
 			// Discussions can be switched off, which is not a failure. A
 			// spent budget answers the same call and is.
 			if isSkippableGraphQL(err) {

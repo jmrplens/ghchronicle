@@ -270,8 +270,8 @@ const upstreamSelection = `repository {
 // fields a contribution row is made of, and what it takes to read the next:
 // the cursor, and the count the walk is held against when the pages run out.
 const outboundSearchQuery = `
-query($query: String!, $after: String) {
-  search(type: ISSUE, first: 100, after: $after, query: $query) {
+query($query: String!, $after: String, $first: Int!) {
+  search(type: ISSUE, first: $first, after: $after, query: $query) {
     issueCount
     pageInfo { hasNextPage endCursor }
     nodes {
@@ -695,18 +695,23 @@ func (o Outbound) discussionComments(ctx context.Context, c *ghapi.Client, _ tim
 // comments back from its newest page, handing each comment to visit, until
 // the pages run out, most have been read, or a page begins past walk's bound.
 func viewerDiscussionComments(ctx context.Context, c *ghapi.Client, query string, most int, walk Walk, visit func(*discussionCommentNode)) error {
-	before := ""
+	before, last := "", 100
 	for page := 1; page <= most; page++ {
 		var res struct {
 			Viewer struct {
 				Comments discussionCommentConnection `json:"repositoryDiscussionComments"`
 			} `json:"viewer"`
 		}
-		vars := map[string]any{"last": 100}
+		vars := map[string]any{"last": last}
 		if before != "" {
 			vars["before"] = before
 		}
 		if err := c.GraphQL(ctx, query, vars, &res); err != nil {
+			if n := smallerPage(err, last); n > 0 {
+				last = n
+				page--
+				continue
+			}
 			return err
 		}
 		cs := res.Viewer.Comments
@@ -789,7 +794,7 @@ type commentedRepository struct {
 // left this morning.
 func (o Outbound) issueComments(ctx context.Context, c *ghapi.Client, _ time.Time) ([]sink.Point, error) {
 	var points []sink.Point
-	before := ""
+	before, last := "", 100
 	most := o.Walk.limit(1)
 	for page := 1; page <= most; page++ {
 		var res struct {
@@ -797,11 +802,16 @@ func (o Outbound) issueComments(ctx context.Context, c *ghapi.Client, _ time.Tim
 				Comments issueCommentConnection `json:"issueComments"`
 			} `json:"viewer"`
 		}
-		vars := map[string]any{"last": 100}
+		vars := map[string]any{"last": last}
 		if before != "" {
 			vars["before"] = before
 		}
 		if err := c.GraphQL(ctx, issueCommentsQuery, vars, &res); err != nil {
+			if n := smallerPage(err, last); n > 0 {
+				last = n
+				page--
+				continue
+			}
 			return points, err
 		}
 		cs := res.Viewer.Comments
@@ -871,7 +881,7 @@ type starredRepository struct {
 // as far as the walk allows: five pages on a sweep, everything on a backfill.
 func (o Outbound) starred(ctx context.Context, c *ghapi.Client) ([]sink.Point, error) {
 	var points []sink.Point
-	after := ""
+	after, first := "", 100
 	most := o.Walk.limit(5)
 	for page := 1; page <= most; page++ {
 		var res struct {
@@ -879,11 +889,16 @@ func (o Outbound) starred(ctx context.Context, c *ghapi.Client) ([]sink.Point, e
 				Starred starredConnection `json:"starredRepositories"`
 			} `json:"viewer"`
 		}
-		vars := map[string]any{"first": 100}
+		vars := map[string]any{"first": first}
 		if after != "" {
 			vars["after"] = after
 		}
 		if err := c.GraphQL(ctx, starredQuery, vars, &res); err != nil {
+			if n := smallerPage(err, first); n > 0 {
+				first = n
+				page--
+				continue
+			}
 			if isSkippableGraphQL(err) {
 				break
 			}
@@ -969,20 +984,24 @@ func (o Outbound) search(ctx context.Context, c *ghapi.Client, s outboundSearch,
 	if s.open {
 		order, most = "sort:created-desc", Unbounded.limit(0)
 	}
-	vars := map[string]any{"query": fmt.Sprintf("%s author:%s -user:%s %s", s.filter, o.Login, o.Login, order)}
+	vars := map[string]any{
+		"query": fmt.Sprintf("%s author:%s -user:%s %s", s.filter, o.Login, o.Login, order),
+		"first": 100,
+	}
 	var points []sink.Point
 	read := 0
 	for page := 1; page <= most; page++ {
 		var res outboundSearchPage
 		if err := c.GraphQL(ctx, outboundSearchQuery, vars, &res); err != nil {
-			// GitHub's timeout too, and not asked again smaller: this page is not
-			// near the gateway's limit. From 2026-09-11 to 2026-09-29 the
-			// production proxy logged 117 asks of the merged search, 116 answered
-			// in at most 5.3 s and one with the 502 after 10.9 s, and the other
-			// four searches answered all 468 of theirs in at most 3.5 s. The next
-			// sweep reads back to a cadence before this one and the sweep before
-			// it read the cadence before that, so an item that moved inside this
-			// sweep's window is read either way.
+			// The page carries each item's repository, and from 2026-10-17
+			// to 2026-11-16 the production proxy logged fifteen of these
+			// searches answered with GitHub's timeout after 10.6 to 10.8 s,
+			// each ending the family's pass as a failure.
+			if n := smallerPage(err, pageSize(vars)); n > 0 {
+				vars["first"] = n
+				page--
+				continue
+			}
 			return points, err
 		}
 		found := &res.Search
