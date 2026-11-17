@@ -1125,8 +1125,9 @@ the two can be told apart.
 
 A fork's default branch is its upstream's history, synced in, and none of it is
 the account's work. So in a fork `gh_commit` holds the account's commits alone,
-which GitHub filters by the account's node id before it answers, and so costs
-a page however long the upstream is; `gh_commits_week` writes the owner's
+which GitHub filters by the account's node id before it answers, read from when
+the account forked it, since GitHub walks the history to filter it and a whole
+upstream history does not finish; `gh_commits_week` writes the owner's
 commits as `commits` as well as `owner_commits`; and there is no
 `gh_commit_punchcard`, which GitHub does not split by author. Measured on
 2026-11-17, the forks under `targets.repos` had put six to seven thousand

@@ -1182,8 +1182,9 @@ separarlos.
 La rama por defecto de un fork es el historial de su repositorio original,
 sincronizado, y nada de eso es trabajo de la cuenta. Así que en un fork
 `gh_commit` guarda solo los commits de la cuenta, que GitHub filtra por el id de
-la cuenta antes de responder, y por eso cuesta una página por largo que sea el
-original; `gh_commits_week` escribe los commits del propietario como `commits`
+la cuenta antes de responder, leídos desde que la cuenta hizo el fork, porque
+GitHub recorre el historial para filtrarlo y un historial original entero no
+termina; `gh_commits_week` escribe los commits del propietario como `commits`
 además de como `owner_commits`; y no hay `gh_commit_punchcard`, que GitHub no
 separa por autor. Medido el 2026-11-17, los forks de `targets.repos` habían
 metido de seis a siete mil commits a la semana de otras personas en "Commits

@@ -13,6 +13,23 @@ day the tag was pushed, with two exceptions: 2.5.2 has a section and no tag,
 and its changes shipped in 2.6.0; 2.6.2 has a tag and no release, since its
 release stopped at the containerised suite, and its changes shipped in 2.6.3.
 
+## 2.7.3 - 2026-11-17
+
+- **A fork's history is read from when the account forked it.** 2.7.2 asks
+  GitHub for a fork's commits filtered by the account, and GitHub filters by
+  walking the history, so a fork's whole history is a walk of its upstream's.
+  The backfill that refilled this account's commits after 2.7.2 met the
+  gateway's timeout on jmrplens/winget-pkgs at the smallest page: its first
+  six commits took 9.3 seconds unbounded, where bounded by the fork's creation
+  the same page took 3.0 seconds and held the same eleven commits. Nothing in
+  a fork from before it was created is the account's work there, so a history
+  filtered by author now starts at the repository's creation, which the
+  listing that finds it already carries.
+- **A line chart writes its counts out, as a bar chart does since 2.7.1.** The
+  same rounding of `short` with no decimals gave "Commits per week" an axis of
+  2K 2K 2K 1K 1K once the forks no longer filled it with their upstreams'
+  commits and its counts fell to the low thousands.
+
 ## 2.7.2 - 2026-11-17
 
 A fork's commits are the account's commits, and every GraphQL query has a
