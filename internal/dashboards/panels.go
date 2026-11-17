@@ -197,8 +197,12 @@ func timeseries(a panelArgs, o Opts) map[string]any {
 	}
 	// `short` here is a count: stars, pull requests, runs. An axis reading
 	// 0.25 and a legend saying "Mean: 0.750" of them is arithmetic nobody
-	// asked for.
+	// asked for. And the count is written out rather than scaled, as a bar's
+	// is: `short` with no decimals rounds every tick between two thousands
+	// to the same label, and "Commits per week" read 2K 2K 2K 1K 1K up its
+	// axis in production on 2026-11-17.
 	if unit == "short" {
+		defaults["unit"] = "none"
 		defaults["decimals"] = 0
 	}
 	display := optString(o, "display", "")

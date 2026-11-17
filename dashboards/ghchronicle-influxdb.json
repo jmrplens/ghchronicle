@@ -1373,7 +1373,7 @@
               },
               "decimals": 0,
               "displayName": "${__field.labels.series}",
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -1433,7 +1433,7 @@
               },
               "decimals": 0,
               "displayName": "${__field.labels.series}",
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -1493,7 +1493,7 @@
               },
               "decimals": 0,
               "displayName": "${__field.labels.series}",
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -2008,7 +2008,7 @@
               },
               "decimals": 0,
               "displayName": "${__field.labels.series}",
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -2067,7 +2067,7 @@
                 }
               },
               "decimals": 0,
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -2279,7 +2279,7 @@
                 }
               },
               "decimals": 0,
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -2355,7 +2355,7 @@
                 }
               },
               "decimals": 0,
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -2679,7 +2679,7 @@
                 }
               },
               "decimals": 0,
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -3152,7 +3152,7 @@
               },
               "decimals": 0,
               "displayName": "${__field.labels.series}",
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -3505,7 +3505,7 @@
               },
               "decimals": 0,
               "displayName": "${__field.labels.series}",
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": [
               {
@@ -3687,7 +3687,7 @@
               },
               "decimals": 0,
               "displayName": "${__field.labels.series}",
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": [
               {
@@ -3807,7 +3807,7 @@
                 }
               },
               "decimals": 0,
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -4382,7 +4382,7 @@
               },
               "decimals": 0,
               "displayName": "${__field.labels.series}",
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -4762,7 +4762,7 @@
               },
               "decimals": 0,
               "displayName": "${__field.labels.series}",
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -5294,7 +5294,7 @@
               },
               "decimals": 0,
               "displayName": "${__field.labels.series}",
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": [
               {
@@ -6828,7 +6828,7 @@
               },
               "decimals": 0,
               "displayName": "${__field.labels.series}",
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": [
               {
@@ -6920,7 +6920,7 @@
               },
               "decimals": 0,
               "displayName": "${__field.labels.series}",
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -7231,7 +7231,7 @@
               },
               "decimals": 0,
               "displayName": "${__field.labels.series}",
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": [
               {
@@ -7981,7 +7981,7 @@
               },
               "decimals": 0,
               "displayName": "${__field.labels.series}",
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -8524,7 +8524,7 @@
               },
               "decimals": 0,
               "displayName": "${__field.labels.series}",
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -9030,7 +9030,7 @@
               },
               "decimals": 0,
               "displayName": "${__field.labels.series}",
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -10346,7 +10346,7 @@
               },
               "decimals": 0,
               "displayName": "${__field.labels.series}",
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -11492,7 +11492,7 @@
               },
               "decimals": 0,
               "displayName": "${__field.labels.series}",
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": [
               {
@@ -11752,7 +11752,7 @@
               },
               "decimals": 0,
               "displayName": "${__field.labels.series}",
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -13479,7 +13479,7 @@
               },
               "decimals": 0,
               "displayName": "${__field.labels.series}",
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -13947,7 +13947,7 @@
               },
               "decimals": 0,
               "displayName": "${__field.labels.series}",
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -14233,7 +14233,7 @@
               },
               "decimals": 0,
               "displayName": "${__field.labels.series}",
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -17007,7 +17007,7 @@
               },
               "decimals": 0,
               "displayName": "${__field.labels.series}",
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": [
               {
