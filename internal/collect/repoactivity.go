@@ -57,7 +57,16 @@ func weeklyCommitPoints(ctx context.Context, c *ghapi.Client, repo Repo, base ma
 	points := make([]sink.Point, 0, n)
 	for i := range n {
 		week := sunday.AddDate(0, 0, -7*(n-1-i))
-		f := map[string]any{"commits": part.All[i]}
+		// A fork's "all" is its upstream's history, synced in, and none of it
+		// the account's work: measured on 2026-11-17, the forks under
+		// targets.repos put six to seven thousand commits a week into
+		// "Commits per week" where the account's own were one or two. In a
+		// fork the account's commits are the owner's.
+		commits := part.All[i]
+		if repo.Fork && i < len(part.Owner) {
+			commits = part.Owner[i]
+		}
+		f := map[string]any{"commits": commits}
 		if i < len(part.Owner) {
 			f["owner_commits"] = part.Owner[i]
 		}
@@ -71,7 +80,14 @@ func weeklyCommitPoints(ctx context.Context, c *ghapi.Client, repo Repo, base ma
 // punchCardPoints reads the punch card, which is a distribution, not a
 // history: 168 buckets of day-of-week and hour. It is stamped now because it
 // describes the whole life of the repository as of this moment.
+//
+// A fork has none: its punch card is its upstream's whole history, which
+// GitHub does not split by author, and it put tens of thousands of commits by
+// other people into "Commits by hour of day".
 func punchCardPoints(ctx context.Context, c *ghapi.Client, repo Repo, base map[string]string, now time.Time) ([]sink.Point, error) {
+	if repo.Fork {
+		return nil, nil
+	}
 	var punch [][3]int
 	if _, _, err := c.GetJSON(ctx, repoPathPrefix+repo.FullName+"/stats/punch_card", &punch, ""); err != nil {
 		return nil, err

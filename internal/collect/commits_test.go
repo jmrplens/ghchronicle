@@ -2,6 +2,7 @@ package collect
 
 import (
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -17,7 +18,7 @@ func commitsServer(t *testing.T, f *fixtureServer, record *[]map[string]any) {
 		if record != nil {
 			*record = append(*record, vars)
 		}
-		if !strings.Contains(query, "history(first: $first, since: $since, after: $after)") {
+		if !strings.Contains(query, "history(first: $first, since: $since, after: $after, author: $author)") {
 			t.Errorf("query does not page the history by cursor:\n%s", query)
 		}
 		if vars["after"] != nil {
@@ -264,5 +265,31 @@ func TestCommitsWalkOnPastAQuickRefusal(t *testing.T) {
 				t.Errorf("got %d commits, want %d", got, tc.commits)
 			}
 		})
+	}
+}
+
+// TestAForksHistoryIsTheAccountsCommitsAlone: a fork's default branch is its
+// upstream's history, synced in, so its commits are asked of GitHub filtered
+// by the account's node id; a repository of the account's own is asked
+// unfiltered.
+func TestAForksHistoryIsTheAccountsCommitsAlone(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name   string
+		author string
+		want   any
+	}{
+		{"a fork", "U_kgDOAAAAAQ", map[string]any{"id": "U_kgDOAAAAAQ"}},
+		{"its own", "", nil},
+	} {
+		f := newFixtureServer(t)
+		var calls []map[string]any
+		commitsServer(t, f, &calls)
+		if _, err := (Commits{Author: tc.author}).Collect(ctx(t), f.Client, testRepo, testNow); err != nil {
+			t.Fatal(err)
+		}
+		if got := calls[0]["author"]; !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("%s: history asked with author %v, want %v", tc.name, got, tc.want)
+		}
 	}
 }

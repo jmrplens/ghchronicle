@@ -228,9 +228,11 @@ type Runner struct {
 	// movedAsked whether it has been asked; unmoved counts, per family, the
 	// repositories this sweep left unread on its answer. All three are per
 	// sweep: see stayedPut.
-	moved      map[string]collect.Movement
-	movedAsked bool
-	unmoved    map[string]int
+	moved map[string]collect.Movement
+	// accountNodeID is the account's GraphQL id, read once (see accountID).
+	accountNodeID string
+	movedAsked    bool
+	unmoved       map[string]int
 }
 
 // walk is the pagination bound for the current sweep: the collector's own
@@ -1009,6 +1011,13 @@ func (r *Runner) sinceWindow(ctx context.Context, family string, repo collect.Re
 		since, read = events.From(now), events
 	default:
 		commits := r.commits(now)
+		if repo.Fork {
+			id, err := r.accountID(ctx)
+			if err != nil {
+				return nil, err
+			}
+			commits.Author = id
+		}
 		since, read = commits.Since, commits
 	}
 	var (
@@ -1315,6 +1324,32 @@ func (r *Runner) actions(now time.Time) collect.Actions {
 		PerPage: perPage, Walk: collect.Walk{Pages: pages},
 	}
 }
+
+// accountID is the account's GraphQL node id, which a fork's commit history
+// is filtered by, asked once a process. Empty without a targets.user, which
+// leaves a fork's history unfiltered: there is no account to attribute it to.
+func (r *Runner) accountID(ctx context.Context) (string, error) {
+	user := r.Cfg.Targets.User
+	if user == "" || r.accountNodeID != "" {
+		return r.accountNodeID, nil
+	}
+	var res struct {
+		User *struct {
+			ID string `json:"id"`
+		} `json:"user"`
+	}
+	if err := r.API.GraphQL(ctx, accountIDQuery, map[string]any{"login": user}, &res); err != nil {
+		return "", fmt.Errorf("account id: %w", err)
+	}
+	if res.User == nil || res.User.ID == "" {
+		return "", fmt.Errorf("account id: no user %q", user)
+	}
+	r.accountNodeID = res.User.ID
+	return r.accountNodeID, nil
+}
+
+// accountIDQuery asks for the account's node id and nothing else.
+const accountIDQuery = `query($login: String!) { user(login: $login) { id } }`
 
 // commits is the commit collector for this run.
 func (r *Runner) commits(now time.Time) collect.Commits {
