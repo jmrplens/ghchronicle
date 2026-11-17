@@ -511,6 +511,20 @@
               {
                 "id": "unit",
                 "value": "d"
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "0": {
+                        "index": 0,
+                        "text": "today"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
               }
             ]
           },
@@ -1187,6 +1201,20 @@
                   {
                     "id": "custom.width",
                     "value": 130
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "0": {
+                            "index": 0,
+                            "text": "today"
+                          }
+                        },
+                        "type": "value"
+                      }
+                    ]
                   }
                 ]
               },
@@ -1268,7 +1296,7 @@
                 "lineWidth": 1
               },
               "decimals": 0,
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -2094,7 +2122,7 @@
                 "lineWidth": 1
               },
               "decimals": 0,
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -2778,7 +2806,7 @@
                 "lineWidth": 1
               },
               "decimals": 0,
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -2833,7 +2861,7 @@
                 "lineWidth": 1
               },
               "decimals": 0,
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -3094,7 +3122,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT year AS \"Year\", contributions AS \"Contributions\", commits AS \"Commits\", pull_requests AS \"Pull requests\", reviews AS \"Reviews\", issues AS \"Issues\", repositories AS \"New repos\" FROM gh_contribution_year WHERE time \u003e now() - INTERVAL '30 years' ORDER BY year DESC",
+              "rawSql": "SELECT year AS \"Year\", contributions AS \"Contributions\", commits AS \"Commits\", pull_requests AS \"Pull requests\", reviews AS \"Reviews\", issues AS \"Issues\", repositories AS \"New repos\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY year ORDER BY time DESC) AS rn FROM gh_contribution_year WHERE time \u003e now() - INTERVAL '30 years') x WHERE rn = 1 ORDER BY year DESC",
               "refId": "A"
             }
           ],
@@ -3176,7 +3204,7 @@
                 "lineWidth": 1
               },
               "decimals": 0,
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -4061,7 +4089,7 @@
                 "lineWidth": 1
               },
               "decimals": 0,
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -7074,7 +7102,7 @@
                 "lineWidth": 1
               },
               "decimals": 0,
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -9237,6 +9265,20 @@
                   {
                     "id": "custom.width",
                     "value": 130
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "0": {
+                            "index": 0,
+                            "text": "today"
+                          }
+                        },
+                        "type": "value"
+                      }
+                    ]
                   }
                 ]
               },
@@ -9344,6 +9386,20 @@
                   {
                     "id": "custom.width",
                     "value": 120
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "0": {
+                            "index": 0,
+                            "text": "today"
+                          }
+                        },
+                        "type": "value"
+                      }
+                    ]
                   }
                 ]
               }
@@ -9520,6 +9576,20 @@
                   {
                     "id": "custom.width",
                     "value": 100
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "0": {
+                            "index": 0,
+                            "text": "today"
+                          }
+                        },
+                        "type": "value"
+                      }
+                    ]
                   }
                 ]
               },
@@ -9668,6 +9738,20 @@
                   {
                     "id": "custom.width",
                     "value": 100
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "0": {
+                            "index": 0,
+                            "text": "today"
+                          }
+                        },
+                        "type": "value"
+                      }
+                    ]
                   }
                 ]
               }
@@ -10648,7 +10732,7 @@
                 "lineWidth": 1
               },
               "decimals": 0,
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": [
               {
@@ -11290,7 +11374,7 @@
                 "lineWidth": 1
               },
               "decimals": 0,
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -11345,7 +11429,7 @@
                 "lineWidth": 1
               },
               "decimals": 0,
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -12495,6 +12579,20 @@
                   {
                     "id": "custom.width",
                     "value": 130
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "0": {
+                            "index": 0,
+                            "text": "today"
+                          }
+                        },
+                        "type": "value"
+                      }
+                    ]
                   }
                 ]
               }
@@ -12693,6 +12791,20 @@
                   {
                     "id": "custom.width",
                     "value": 100
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "0": {
+                            "index": 0,
+                            "text": "today"
+                          }
+                        },
+                        "type": "value"
+                      }
+                    ]
                   }
                 ]
               },
@@ -12709,6 +12821,20 @@
                   {
                     "id": "custom.width",
                     "value": 120
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "0": {
+                            "index": 0,
+                            "text": "today"
+                          }
+                        },
+                        "type": "value"
+                      }
+                    ]
                   }
                 ]
               }
@@ -12752,7 +12878,7 @@
         },
         {
           "datasource": "${DS_INFLUXDB}",
-          "description": "Every security advisory of these repositories: the reports others sent through private vulnerability reporting, and the drafts and publications of their maintainers. No other endpoint lists a report, and the ones closed without publication are seen nowhere else. When is the row's own date: when it was published or closed, or for one still in triage or a draft the day it was last seen so. The Summary of one not yet published reads (not published) unless advisories.unpublished_details is on.",
+          "description": "Every security advisory of these repositories: the reports others sent through private vulnerability reporting, and the drafts and publications of their maintainers. No other endpoint lists a report, and the ones closed without publication are seen nowhere else. Opened is when it was reported or drafted, and Published or closed when it was published, withdrawn or closed, empty while it is in triage or a draft. The Summary of one not yet published reads (not published) unless advisories.unpublished_details is on.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -12793,7 +12919,7 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "When"
+                  "options": "Opened"
                 },
                 "properties": [
                   {
@@ -12803,6 +12929,22 @@
                   {
                     "id": "custom.width",
                     "value": 135
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Published or closed"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "time: YYYY-MM-DD HH:mm"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 165
                   }
                 ]
               },
@@ -12898,7 +13040,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT x.full_name AS \"Repository\", x.ghsa AS \"GHSA\", x.time AS \"When\", x.advisory_state AS \"State\", x.severity AS \"Severity\", x.summary AS \"Summary\", x.comments AS \"Comments\", x.url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, ghsa ORDER BY time DESC) AS rn FROM gh_repo_advisory WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE x.rn = 1 ORDER BY x.time DESC, x.full_name, x.ghsa LIMIT 40",
+              "rawSql": "SELECT x.full_name AS \"Repository\", x.ghsa AS \"GHSA\", x.time - arrow_cast(x.seconds_open * 1000000000, 'Duration(Nanosecond)') AS \"Opened\", CASE WHEN x.advisory_state IN ('published', 'withdrawn', 'closed') THEN x.time END AS \"Published or closed\", x.advisory_state AS \"State\", x.severity AS \"Severity\", x.summary AS \"Summary\", x.comments AS \"Comments\", x.url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, ghsa ORDER BY time DESC) AS rn FROM gh_repo_advisory WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE x.rn = 1 ORDER BY x.time DESC, x.full_name, x.ghsa LIMIT 40",
               "refId": "A"
             }
           ],
@@ -12907,7 +13049,7 @@
         },
         {
           "datasource": "${DS_INFLUXDB}",
-          "description": "The advisories this account reported, is credited in or collaborates on in other people's repositories, found without a list: the inbox, the issues and pull requests it took part in, the repositories it contributed to and the reviewed global database each name repositories to ask. Credit is what the advisory credits the account as. When is the row's own date, as in the table above, and the Summary of one not yet published reads (not published) unless advisories.unpublished_details is on.",
+          "description": "The advisories this account reported, is credited in or collaborates on in other people's repositories, found without a list: the inbox, the issues and pull requests it took part in, the repositories it contributed to and the reviewed global database each name repositories to ask. Credit is what the advisory credits the account as. Opened and Published or closed read as in the table above, and the Summary of one not yet published reads (not published) unless advisories.unpublished_details is on.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -12948,7 +13090,7 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "When"
+                  "options": "Opened"
                 },
                 "properties": [
                   {
@@ -12958,6 +13100,22 @@
                   {
                     "id": "custom.width",
                     "value": 135
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Published or closed"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "time: YYYY-MM-DD HH:mm"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 165
                   }
                 ]
               },
@@ -13053,7 +13211,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT x.full_name AS \"Repository\", x.ghsa AS \"GHSA\", x.time AS \"When\", x.advisory_state AS \"State\", x.severity AS \"Severity\", x.summary AS \"Summary\", x.credit AS \"Credit\", x.url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, ghsa ORDER BY time DESC) AS rn FROM gh_advisory_reported WHERE $__timeFilter(time)) x WHERE x.rn = 1 ORDER BY x.time DESC, x.full_name, x.ghsa LIMIT 40",
+              "rawSql": "SELECT x.full_name AS \"Repository\", x.ghsa AS \"GHSA\", x.time - arrow_cast(x.seconds_open * 1000000000, 'Duration(Nanosecond)') AS \"Opened\", CASE WHEN x.advisory_state IN ('published', 'withdrawn', 'closed') THEN x.time END AS \"Published or closed\", x.advisory_state AS \"State\", x.severity AS \"Severity\", x.summary AS \"Summary\", x.credit AS \"Credit\", x.url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, ghsa ORDER BY time DESC) AS rn FROM gh_advisory_reported WHERE $__timeFilter(time)) x WHERE x.rn = 1 ORDER BY x.time DESC, x.full_name, x.ghsa LIMIT 40",
               "refId": "A"
             }
           ],
@@ -13919,7 +14077,7 @@
                 "lineWidth": 1
               },
               "decimals": 0,
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -14457,7 +14615,7 @@
                 "lineWidth": 1
               },
               "decimals": 0,
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -15275,6 +15433,20 @@
                   {
                     "id": "custom.width",
                     "value": 100
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "0": {
+                            "index": 0,
+                            "text": "today"
+                          }
+                        },
+                        "type": "value"
+                      }
+                    ]
                   }
                 ]
               },
@@ -15291,6 +15463,20 @@
                   {
                     "id": "custom.width",
                     "value": 100
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "0": {
+                            "index": 0,
+                            "text": "today"
+                          }
+                        },
+                        "type": "value"
+                      }
+                    ]
                   }
                 ]
               },
@@ -15547,6 +15733,20 @@
                   {
                     "id": "custom.width",
                     "value": 100
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "0": {
+                            "index": 0,
+                            "text": "today"
+                          }
+                        },
+                        "type": "value"
+                      }
+                    ]
                   }
                 ]
               },
@@ -15711,6 +15911,20 @@
                   {
                     "id": "custom.width",
                     "value": 100
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "0": {
+                            "index": 0,
+                            "text": "today"
+                          }
+                        },
+                        "type": "value"
+                      }
+                    ]
                   }
                 ]
               },
@@ -16201,7 +16415,7 @@
                 "lineWidth": 1
               },
               "decimals": 0,
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -16730,7 +16944,7 @@
                 "lineWidth": 1
               },
               "decimals": 0,
-              "unit": "short"
+              "unit": "none"
             },
             "overrides": []
           },
@@ -17373,6 +17587,20 @@
                   {
                     "id": "custom.width",
                     "value": 100
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "0": {
+                            "index": 0,
+                            "text": "today"
+                          }
+                        },
+                        "type": "value"
+                      }
+                    ]
                   }
                 ]
               },
@@ -17509,6 +17737,20 @@
                   {
                     "id": "custom.width",
                     "value": 100
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "0": {
+                            "index": 0,
+                            "text": "today"
+                          }
+                        },
+                        "type": "value"
+                      }
+                    ]
                   }
                 ]
               },
@@ -17803,6 +18045,20 @@
                   {
                     "id": "custom.width",
                     "value": 100
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "0": {
+                            "index": 0,
+                            "text": "today"
+                          }
+                        },
+                        "type": "value"
+                      }
+                    ]
                   }
                 ]
               },
@@ -17819,6 +18075,20 @@
                   {
                     "id": "custom.width",
                     "value": 110
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "0": {
+                            "index": 0,
+                            "text": "today"
+                          }
+                        },
+                        "type": "value"
+                      }
+                    ]
                   }
                 ]
               },

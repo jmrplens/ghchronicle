@@ -96,11 +96,18 @@ func TestAdvisoryDraftOmitsWhatItHasNot(t *testing.T) {
 	if v := draft.Fields["severity"]; v != noneTag {
 		t.Errorf("a draft's severity is %v, want %q", v, noneTag)
 	}
-	// A row of the day the advisory was created is stamped before it
-	// existed, and is open no time at all rather than a negative one.
-	fresh := &repoAdvisory{GHSAID: "GHSA-new0-0000-0000", State: "triage", CreatedAt: testNow.Add(-time.Hour)}
-	if got := advisoryFields(fresh, false, testNow)["seconds_open"]; got != 0 {
-		t.Errorf("an advisory created today is open %v seconds, want 0", got)
+	// The row's time less seconds_open is the moment the advisory was
+	// opened, to the second, which is what the panels show as Opened: a row
+	// in triage is stamped at the start of the day, so on the day it was
+	// opened the difference is negative, and was clamped to zero once,
+	// which drew every report opened that day at 00:00.
+	for _, opened := range []time.Time{testNow.Add(-time.Hour), testNow.Add(-50 * time.Hour)} {
+		a := &repoAdvisory{GHSAID: "GHSA-new0-0000-0000", State: "triage", CreatedAt: opened}
+		stamp := advisoryStamp(a, testNow)
+		secs, _ := advisoryFields(a, false, testNow)["seconds_open"].(int)
+		if got := stamp.Add(-time.Duration(secs) * time.Second); !got.Equal(opened) {
+			t.Errorf("opened %v reads back as %v (row %v, seconds_open %d)", opened, got, stamp, secs)
+		}
 	}
 }
 

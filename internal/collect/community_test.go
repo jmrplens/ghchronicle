@@ -1207,3 +1207,43 @@ func TestAcceptingAnAnswerLeavesTheCommentItsIdentity(t *testing.T) {
 		}
 	}
 }
+
+// TestOutboundSearchHalvesAPageGitHubCouldNotFinish: the search of the
+// account's work elsewhere asks a hundred items a page, each with its
+// repository, and GitHub's gateway gave up on it after 10.8 s fifteen times in
+// the thirty days to 2026-11-16, in production, each time ending the family's
+// pass as a failure. A page GitHub could not finish is asked again on the same
+// cursor at half the size, as the pull request walk does, and the walk goes on.
+func TestOutboundSearchHalvesAPageGitHubCouldNotFinish(t *testing.T) {
+	t.Parallel()
+	var asked []float64
+	f := newFixtureServer(t)
+	f.graphQL(func(w http.ResponseWriter, _ *http.Request, query string, vars map[string]any) {
+		switch {
+		case strings.Contains(query, "starredRepositories(first:"):
+			f.write(w, "graphql_starred.json")
+		case strings.Contains(query, "search(type: ISSUE"):
+			first, _ := vars["first"].(float64)
+			asked = append(asked, first)
+			if first > 50 {
+				gatewayGaveUp(w)
+				return
+			}
+			f.write(w, "graphql_search_issues.json")
+		case strings.Contains(query, "repositoryDiscussionComments"):
+			f.write(w, "viewer_discussion_comments.json")
+		default:
+			f.write(w, "viewer_issue_comments.json")
+		}
+	})
+	points, err := Outbound{Login: "octocat"}.Collect(ctx(t), f.Client, testNow)
+	if err != nil {
+		t.Fatalf("a page asked again smaller failed the family: %v", err)
+	}
+	if len(asked) == 0 || asked[0] != 100 || !slices.Contains(asked, 50) {
+		t.Errorf("pages asked %v, want 100 and then 50 on the same cursor", asked)
+	}
+	if len(byMeasurement(points)["gh_external_contribution"]) == 0 {
+		t.Error("the searches read nothing once the page was halved")
+	}
+}

@@ -11,8 +11,8 @@ import (
 
 // searchPage is the one outbound search page the fake serves, as the
 // collector's query asks for it.
-const searchPage = `query($query: String!, $after: String) {
-  search(type: ISSUE, first: 100, after: $after, query: $query) { issueCount nodes { ... on Issue { number } } }
+const searchPage = `query($query: String!, $after: String, $first: Int!) {
+  search(type: ISSUE, first: $first, after: $after, query: $query) { issueCount nodes { ... on Issue { number } } }
 }`
 
 // searchFor asks the fake one outbound search and answers the numbers of the

@@ -87,8 +87,9 @@ func isPaginationLimit(err error) bool {
 // reported success. Twelve commit walks did in production between 2026-09-11
 // and 2026-09-18, and a backfill recorded each of those repositories as
 // walked, so nothing past the page was ever read. A caller with a smaller page
-// or batch to ask asks it (Pulls, Commits, the co-authored walk, aliasBatch,
-// Branches); every other one hands the timeout up with what it read.
+// or batch to ask asks it (every paged walk through smallerPage, Pulls,
+// Commits, the co-authored walk, aliasBatch, Branches); every other one hands
+// the timeout up with what it read.
 func isSkippableGraphQL(err error) bool {
 	if err == nil {
 		return false
@@ -113,6 +114,33 @@ type Walk struct {
 	// Since stops the walk once the API, which serves newest first, has gone
 	// past this moment. Zero means no bound.
 	Since time.Time
+}
+
+// smallerPage is the page size to ask a GraphQL page again at, on the same
+// cursor, when err is GitHub's timeout: half of size, while size is larger
+// than ten (fifty is asked again at 25, 12 and 6). It answers 0 for any other
+// error and for a page already that small, which the caller hands up.
+//
+// Every paged walk asks it. The timeout comes after GitHub's ten seconds
+// whatever the page costs in points, and a page that has finished in time for
+// months can stop finishing when what it carries grows: the outbound search,
+// a hundred items a page with their repositories, met it fifteen times in the
+// thirty days to 2026-11-16, and the issue timeline, the planning query and
+// the discussion comments had come within a second of it.
+func smallerPage(err error, size int) int {
+	if size <= 10 {
+		return 0
+	}
+	if _, tooLarge := errors.AsType[*ghapi.TooLargeError](err); !tooLarge {
+		return 0
+	}
+	return size / 2
+}
+
+// pageSize is the page a query's variables ask for, under "first".
+func pageSize(vars map[string]any) int {
+	n, _ := vars["first"].(int)
+	return n
 }
 
 // Unbounded is a walk that stops only when the API does.

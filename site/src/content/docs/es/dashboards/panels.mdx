@@ -657,8 +657,9 @@ relleno histórico lee la lista entera.
 
 "Security advisories" y "Advisories reported" listan cada advisory una vez, su
 fila más reciente dentro del rango: uno aún en triage o en borrador es una fila
-al día, y la fila dice el último día en que se vio así, mientras que uno
-publicado o cerrado se fecha cuando ocurrió. Su Summary dice `(not published)`
+al día, y uno publicado o cerrado se fecha cuando ocurrió. Opened es cuándo se
+reportó, al segundo, la fecha de la fila menos el tiempo que lleva abierto, y
+Published or closed está vacío mientras no es ninguna de las dos cosas. Su Summary dice `(not published)`
 hasta que se publica, salvo con `advisories.unpublished_details` activado, y su enlace, en
 el GHSA, solo lo abren su autor y los mantenedores del repositorio hasta
 entonces. Prometheus y Graphite no pueden listarlos, porque un advisory es su

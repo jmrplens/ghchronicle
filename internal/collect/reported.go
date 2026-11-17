@@ -72,8 +72,8 @@ type ReportedRun struct {
 	InboxRead bool
 }
 
-const reportedSearchQuery = `query($query: String!, $after: String) {
-  search(query: $query, type: ISSUE, first: 100, after: $after) {
+const reportedSearchQuery = `query($query: String!, $after: String, $first: Int!) {
+  search(query: $query, type: ISSUE, first: $first, after: $after) {
     pageInfo { hasNextPage endCursor }
     nodes {
       ... on Issue { repository { nameWithOwner } }
@@ -82,9 +82,9 @@ const reportedSearchQuery = `query($query: String!, $after: String) {
   }
 }`
 
-const reportedContributedQuery = `query($after: String) {
+const reportedContributedQuery = `query($after: String, $first: Int!) {
   viewer {
-    repositoriesContributedTo(first: 100, after: $after, includeUserRepositories: false,
+    repositoriesContributedTo(first: $first, after: $after, includeUserRepositories: false,
       contributionTypes: [COMMIT, ISSUE, PULL_REQUEST, PULL_REQUEST_REVIEW, REPOSITORY]) {
       pageInfo { hasNextPage endCursor }
       nodes { nameWithOwner }
@@ -263,7 +263,7 @@ func (r Reported) inbox(ctx context.Context, c *ghapi.Client, set *candidates) e
 // involved reads the repositories of every issue and pull request elsewhere
 // that involves the account: authored, commented, assigned or mentioned.
 func (r Reported) involved(ctx context.Context, c *ghapi.Client, set *candidates) error {
-	vars := map[string]any{"query": fmt.Sprintf("involves:%s -user:%s", r.Login, r.Login)}
+	vars := map[string]any{"query": fmt.Sprintf("involves:%s -user:%s", r.Login, r.Login), "first": 100}
 	// Search serves a thousand results of any query, ten pages of a hundred.
 	for page := 1; page <= 10; page++ {
 		var res struct {
@@ -275,6 +275,11 @@ func (r Reported) involved(ctx context.Context, c *ghapi.Client, set *candidates
 			} `json:"search"`
 		}
 		if err := c.GraphQL(ctx, reportedSearchQuery, vars, &res); err != nil {
+			if n := smallerPage(err, pageSize(vars)); n > 0 {
+				vars["first"] = n
+				page--
+				continue
+			}
 			return err
 		}
 		for _, n := range res.Search.Nodes {
@@ -291,7 +296,7 @@ func (r Reported) involved(ctx context.Context, c *ghapi.Client, set *candidates
 // contributed reads the repositories GitHub counts the viewer as having
 // contributed to, which it keeps for about a year.
 func (r Reported) contributed(ctx context.Context, c *ghapi.Client, set *candidates) error {
-	vars := map[string]any{}
+	vars := map[string]any{"first": 100}
 	for page := 1; page <= 20; page++ {
 		var res struct {
 			Viewer struct {
@@ -299,6 +304,11 @@ func (r Reported) contributed(ctx context.Context, c *ghapi.Client, set *candida
 			} `json:"viewer"`
 		}
 		if err := c.GraphQL(ctx, reportedContributedQuery, vars, &res); err != nil {
+			if n := smallerPage(err, pageSize(vars)); n > 0 {
+				vars["first"] = n
+				page--
+				continue
+			}
 			return err
 		}
 		for _, n := range res.Viewer.Repos.Nodes {

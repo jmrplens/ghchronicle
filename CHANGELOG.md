@@ -13,6 +13,60 @@ day the tag was pushed, with two exceptions: 2.5.2 has a section and no tag,
 and its changes shipped in 2.6.0; 2.6.2 has a tag and no release, since its
 release stopped at the containerised suite, and its changes shipped in 2.6.3.
 
+## 2.7.1 - 2026-11-17
+
+A look at every section of the dashboard against the account's own store after
+2.7.0 found two tables drawing rows that were stored correctly and read wrongly,
+two ways numbers were written that misread, and one search GitHub kept giving
+up on.
+
+- **Contributions by year lists each year once.** The history family writes
+  the year in progress as a row a day, stamped at the start of each UTC day and
+  marked partial, and a past year as one row. The InfluxDB and PostgreSQL
+  query listed every row it found, so the year in progress was a row for each
+  day the family had run: sixty rows of 2026 in production on 2026-11-17.
+  Each year is now read as its newest row, as Elasticsearch, Graphite and
+  Prometheus already read it.
+- **The advisory tables say when each advisory was opened.** "Security
+  advisories" and "Advisories reported" showed the row's own date as When, and
+  an advisory still in triage or a draft is a daily snapshot stamped at 00:00
+  UTC, so every open report read 00:00 of the same day. They now show Opened,
+  when it was reported, to the second, and Published or closed, empty while it
+  is neither. Opened is the row's date less `seconds_open`, which is negative
+  on the day an advisory is opened, since the row is stamped before it
+  existed. 2.7.0 clamped that to zero after its review, and so lost the hour
+  of every report opened that day; this release writes it as it is again.
+  Elasticsearch cannot subtract one field from another and has neither column,
+  which its description says.
+- **Every paged GraphQL walk asks a page GitHub could not finish again at half
+  the size.** The search for the account's pull requests and issues in other
+  people's repositories reads a hundred items a page, each with its
+  repository. From 2026-10-17 to 2026-11-16 the production proxy logged
+  fifteen of those pages answered with GitHub's 502 after 10.6 to 10.8
+  seconds, and each ended the family's pass as a failure. Such a page is now
+  asked again on the same cursor at half the size, down to six, as the pull
+  request and commit walks already did. The same goes for every other walk
+  that pages a connection and did not: the issue timeline's listing, which met
+  the timeout twice in 14,958 asks; the discussion comments and the issue
+  comments the account left elsewhere, which took up to 9.6 and 9.2 seconds;
+  the repository's discussions and the stars given; and the two sources of the
+  reported family. A query that pages nothing, the account's, the planning
+  one and the totals' counts among them, has no smaller page to ask and hands
+  the timeout up as before.
+- **A bar chart writes its counts out.** Every count in a bar chart is a whole
+  number, and `short` with no decimals rounded every tick between two
+  thousands to the same label: the axis of "Pull requests by author" read 1K
+  1K 1K 1K 2K, and its longest bar 2 K for 2,092. Counts on a bar are now
+  written as the number itself.
+- **Zero days reads "today".** Grafana writes a count of zero days as "0 day",
+  which is what every repository, package or ruleset touched that day showed
+  in Idle, Age or Last changed.
+
+Looked at and left as they are: "Open alerts over time" falls to one alert on
+2026-10-23 because one repository had an open alert that day, not because a
+sweep was missed; and "Covered by the plan" above "Gross" in Cost is GitHub's
+own figure, a discount 25 cents larger than the gross of one SKU.
+
 ## 2.7.0 - 2026-11-17
 
 GitHub's security advisories, in both directions: the reports sent to the
