@@ -259,7 +259,12 @@ func barchart(a panelArgs, o Opts) map[string]any {
 	// `short` on a bar is a count, as on a line: a bar of one open alert
 	// stood on an axis ticked every 0.05 up to 2, and three events on one
 	// ticked every 0.2. Whole numbers put the ticks on whole numbers too.
+	// And the count is written out rather than scaled: `short` with no
+	// decimals rounds every tick between two thousands to the same "1K", so
+	// an axis up to 2,100 read 1K 1K 1K 1K 2K in production (Pull requests
+	// by author, 2026-11-17), and a bar of 2,092 read "2 K".
 	if unit == "short" {
+		defaults["unit"] = "none"
 		defaults["decimals"] = 0
 	}
 	p["fieldConfig"] = map[string]any{"defaults": defaults, "overrides": overridesOf(o)}
@@ -618,6 +623,16 @@ func unitOf(name, unit string, w int) any {
 	props := []any{map[string]any{"id": "unit", "value": unit}}
 	if w > 0 {
 		props = append(props, map[string]any{"id": panelWidthField, "value": w})
+	}
+	if unit == "d" {
+		// Grafana writes a count of zero days as "0 day", which is what a
+		// repository pushed to today read as its idle time in production.
+		// The value stays the number underneath, so the column still sorts.
+		props = append(props, map[string]any{"id": "mappings", "value": []any{
+			map[string]any{"type": "value", "options": map[string]any{
+				"0": map[string]any{"text": "today", "index": 0},
+			}},
+		}})
 	}
 	return override(name, props)
 }

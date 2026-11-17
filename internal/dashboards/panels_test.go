@@ -205,10 +205,30 @@ func TestUnitOfWithoutAWidthLeavesTheWidthToTheTable(t *testing.T) {
 		t.Errorf("unitOf with no width = %v, want %v", got, want)
 	}
 	got = unitOf("Age", "d", 0)
-	want = override("Age", []any{map[string]any{"id": "unit", "value": "d"}})
+	want = override("Age", []any{
+		map[string]any{"id": "unit", "value": "d"},
+		map[string]any{"id": "mappings", "value": []any{
+			map[string]any{"type": "value", "options": map[string]any{
+				"0": map[string]any{"text": "today", "index": 0},
+			}},
+		}},
+	})
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("a day column with no width = %v, want %v", got, want)
 	}
+}
+
+// TestADayColumnSaysTodayForZero: Grafana writes zero days as "0 day", which
+// is how a repository pushed to that day read its idle time.
+func TestADayColumnSaysTodayForZero(t *testing.T) {
+	t.Parallel()
+	props, _ := unitOf("Idle", "d", 80).(map[string]any)["properties"].([]any)
+	for _, p := range props {
+		if m, _ := p.(map[string]any); m["id"] == "mappings" {
+			return
+		}
+	}
+	t.Errorf("a day column has no mapping for zero: %v", props)
 }
 
 // TestHideLinkedFromHidesAColumnOnce: the url column a row link reads is
