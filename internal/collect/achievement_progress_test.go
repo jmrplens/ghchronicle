@@ -719,3 +719,39 @@ func TestCoauthoredTallyKeepsItsFloor(t *testing.T) {
 		})
 	}
 }
+
+// TestCoauthoredWalkHalvesABatchGitHubCouldNotFinish: the commits past the
+// first hundred are read for several pull requests in one query, and a batch
+// GitHub gave up on is asked again in halves, down to one pull request a
+// query, with the same outcome as the batch would have had.
+func TestCoauthoredWalkHalvesABatchGitHubCouldNotFinish(t *testing.T) {
+	t.Parallel()
+	f, asked := pullCommitsServer(t, []string{
+		bigPull("PR_a", "2020-01-01T10:00:00Z", 150),
+		bigPull("PR_b", "2020-01-01T11:00:00Z", 250),
+	}, map[string]string{
+		"PR_a@MTAw": `{"pageInfo":{"hasNextPage":false,"endCursor":"MTUw"},"nodes":[{"commit":{"message":"work"}},` +
+			`{"commit":{"message":"pair\n\nCo-authored-by: A <a@example.com>"}}]}`,
+		"PR_b@MTAw": `{"pageInfo":{"hasNextPage":true,"endCursor":"MjAw"},"nodes":[{"commit":{"message":"work"}}]}`,
+		"PR_b@MjAw": `{"pageInfo":{"hasNextPage":false,"endCursor":"MjUw"},"nodes":[{"commit":{"message":"work"}}]}`,
+	})
+	inner := f.graphql
+	f.graphQL(func(w http.ResponseWriter, r *http.Request, query string, vars map[string]any) {
+		if strings.Contains(query, "query coauthoredCommits(") && strings.Contains(query, "p1:") {
+			gatewayGaveUp(w)
+			return
+		}
+		inner(w, r, query, vars)
+	})
+	day := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	w := coauthoredWalk{login: "o", today: day.AddDate(0, 0, 1)}
+	if err := w.walk(ctx(t), f.Client, day, day); err != nil {
+		t.Fatal(err)
+	}
+	if w.pulls != 1 || w.settled != 1 || w.truncated != 0 {
+		t.Errorf("pulls = %d, settled = %d, truncated = %d, want 1, 1 and 0, as one batch would have", w.pulls, w.settled, w.truncated)
+	}
+	if got := strings.Join(asked(), " "); got != "PR_a@MTAw PR_b@MTAw PR_b@MjAw" {
+		t.Errorf("asked for the commits of %s, want each pull request alone and the longer one on", got)
+	}
+}

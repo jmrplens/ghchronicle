@@ -24,10 +24,16 @@ type Account struct {
 	Login string
 }
 
-const accountQuery = `
-query($login: String!) {
-  user(login: $login) {
-    login createdAt
+// accountQuery is one query for everything the account family reads, in parts
+// that answer on their own: asked whole, as on every pass so far, and in parts
+// when GitHub gives up on the whole (see partedQuery). The contributions are
+// four parts, each its own contributionsCollection, which GraphQL merges into
+// one field when they are asked together.
+var accountQuery = partedQuery{
+	decls: map[string]string{"login": gqlString},
+	open:  "  user(login: $login) {", close: "  }", shared: []string{"login"},
+	parts: []queryPart{
+		{selection: `    login createdAt
     followers { totalCount }
     following { totalCount }
     starredRepositories { totalCount }
@@ -48,8 +54,8 @@ query($login: String!) {
         ... on Repository { nameWithOwner stargazerCount pushedAt }
         ... on Gist { name }
       }
-    }
-    hasSponsorsListing
+    }`},
+		{selection: `    hasSponsorsListing
     monthlyEstimatedSponsorsIncomeInCents
     estimatedNextSponsorsPayoutInCents
     totalSponsorshipAmountAsSponsorInCents
@@ -78,12 +84,12 @@ query($login: String!) {
         sponsorEntity { ... on User { login } ... on Organization { login } }
         tier { name monthlyPriceInCents }
       }
-    }
-    lists(first: 100) {
+    }`},
+		{selection: `    lists(first: 100) {
       totalCount
       nodes { name slug isPrivate createdAt lastAddedAt items { totalCount } }
-    }
-    contributionsCollection {
+    }`},
+		{selection: `    contributionsCollection {
       totalCommitContributions
       totalIssueContributions
       totalPullRequestContributions
@@ -98,6 +104,8 @@ query($login: String!) {
       totalRepositoriesWithContributedIssues
       totalRepositoriesWithContributedPullRequests
       totalRepositoriesWithContributedPullRequestReviews
+    }`},
+		{selection: `    contributionsCollection {
       commitContributionsByRepository(maxRepositories: 100) {
         repository { nameWithOwner isPrivate }
         contributions(first: 100) {
@@ -105,6 +113,8 @@ query($login: String!) {
           nodes { occurredAt commitCount }
         }
       }
+    }`},
+		{selection: `    contributionsCollection {
       issueContributionsByRepository(maxRepositories: 100) {
         repository { nameWithOwner }
         contributions { totalCount }
@@ -117,13 +127,15 @@ query($login: String!) {
         repository { nameWithOwner }
         contributions { totalCount }
       }
+    }`},
+		{selection: `    contributionsCollection {
       repositoryContributions(first: 100) {
         totalCount
         nodes { occurredAt repository { nameWithOwner isFork isPrivate } }
       }
-    }
-  }
-}`
+    }`},
+	},
+}
 
 // calendarSquare is one square of the contribution calendar, as both the
 // account query and the history query read it.
@@ -431,7 +443,7 @@ func (a Account) Collect(ctx context.Context, c *ghapi.Client, now time.Time) ([
 	var res struct {
 		User accountUser `json:"user"`
 	}
-	if err := c.GraphQL(ctx, accountQuery, map[string]any{"login": a.Login}, &res); err != nil {
+	if err := accountQuery.ask(ctx, c, map[string]any{"login": a.Login}, &res); err != nil {
 		return nil, err
 	}
 	u := &res.User
@@ -982,11 +994,16 @@ type History struct {
 	From int
 }
 
-const historyQuery = `
-query($login: String!, $from: DateTime!, $to: DateTime!) {
-  user(login: $login) {
-    contributionsCollection(from: $from, to: $to) {
-      totalCommitContributions
+// historyQuery is a year of contributions, in two parts that answer on their
+// own: the totals and the calendar, and the commits by repository, which is
+// the heavy one. Asked whole, and in parts when GitHub gives up on the whole
+// (see partedQuery).
+var historyQuery = partedQuery{
+	decls: map[string]string{"login": gqlString, "from": "DateTime!", "to": "DateTime!"},
+	open:  "  user(login: $login) {\n    contributionsCollection(from: $from, to: $to) {",
+	close: "    }\n  }", shared: []string{"login", "from", "to"},
+	parts: []queryPart{
+		{selection: `      totalCommitContributions
       totalIssueContributions
       totalPullRequestContributions
       totalPullRequestReviewContributions
@@ -999,17 +1016,16 @@ query($login: String!, $from: DateTime!, $to: DateTime!) {
       contributionCalendar {
         totalContributions
         weeks { contributionDays { date contributionCount contributionLevel } }
-      }
-      commitContributionsByRepository(maxRepositories: 100) {
+      }`},
+		{selection: `      commitContributionsByRepository(maxRepositories: 100) {
         repository { nameWithOwner isPrivate }
         contributions(first: 100) {
           totalCount
           nodes { occurredAt commitCount }
         }
-      }
-    }
-  }
-}`
+      }`},
+	},
+}
 
 // yearContributions is one past year of a contributionsCollection, the shape
 // historyQuery asks for: the totals, the calendar, and the per-repository
@@ -1077,7 +1093,7 @@ func (h History) Collect(ctx context.Context, c *ghapi.Client, now time.Time) ([
 			"login": h.Login,
 			"from":  from.Format(time.RFC3339), "to": to.Format(time.RFC3339),
 		}
-		if err := c.GraphQL(ctx, historyQuery, vars, &res); err != nil {
+		if err := historyQuery.ask(ctx, c, vars, &res); err != nil {
 			return points, err
 		}
 		cc := res.User.ContributionsCollection

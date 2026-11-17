@@ -31,16 +31,23 @@ type Commits struct {
 	// increment a sweep needs; a backfill walks it all, because without that
 	// the lines-changed series begins on install day.
 	Walk Walk
+	// Author is the account's GraphQL node id, set for a fork: its default
+	// branch is its upstream's history, synced in, and none of that is the
+	// account's work. GitHub filters the history by author itself, so a fork
+	// costs a page however long its upstream is: measured on 2026-11-17,
+	// jmrplens/renovate's default branch held 27,158 commits and none by the
+	// account. Empty reads every commit, which is a repository of its own.
+	Author string
 }
 
 const commitsQuery = `
-query($owner: String!, $name: String!, $first: Int!, $since: GitTimestamp, $after: String) {
+query($owner: String!, $name: String!, $first: Int!, $since: GitTimestamp, $after: String, $author: CommitAuthor) {
   repository(owner: $owner, name: $name) {
     defaultBranchRef {
       name
       target {
         ... on Commit {
-          history(first: $first, since: $since, after: $after) {
+          history(first: $first, since: $since, after: $after, author: $author) {
             totalCount
             pageInfo { hasNextPage endCursor }
             nodes {
@@ -169,6 +176,9 @@ func (cm Commits) Collect(ctx context.Context, c *ghapi.Client, repo Repo, _ tim
 	// asks one page, and at twenty-five that is two.
 	for left := w.limit(1) * first; left > 0; {
 		vars := map[string]any{"owner": repo.Owner, "name": repo.Name, "first": first}
+		if cm.Author != "" {
+			vars["author"] = map[string]any{"id": cm.Author}
+		}
 		if !cm.Since.IsZero() {
 			vars["since"] = cm.Since.UTC().Format(time.RFC3339)
 		}

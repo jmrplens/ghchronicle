@@ -393,3 +393,35 @@ func TestDiscussionsRateLimitIsReported(t *testing.T) {
 		t.Fatalf("err = %v, want the rate limit reported", err)
 	}
 }
+
+// TestAForksStatisticsAreTheAccountsAlone: a fork's weekly commits are the
+// owner's, the account's, since "all" is its upstream's history synced in,
+// and a fork writes no punch card, which GitHub does not split by author and
+// which is its upstream's whole life.
+func TestAForksStatisticsAreTheAccountsAlone(t *testing.T) {
+	t.Parallel()
+	f := newFixtureServer(t)
+	repoActivityRoutes(f)
+	fork := testRepo
+	fork.Fork = true
+	points, err := RepoActivity{}.Collect(ctx(t), f.Client, fork, testNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := len(byMeasurement(points)["gh_commit_punchcard"]); n != 0 {
+		t.Errorf("a fork wrote %d punch card cells", n)
+	}
+	if n := len(f.calls("/repos/octocat/hello-world/stats/punch_card")); n != 0 {
+		t.Errorf("a fork's punch card was asked for %d times", n)
+	}
+	weeks := only(t, points, "gh_commits_week")
+	differ := 0
+	for _, w := range weeks {
+		if w.Fields["commits"] != w.Fields["owner_commits"] {
+			differ++
+		}
+	}
+	if differ != 0 {
+		t.Errorf("%d of a fork's weeks count commits that are not the owner's", differ)
+	}
+}

@@ -448,6 +448,38 @@ func TestEveryPagedWalkHalvesAPageGitHubCouldNotFinish(t *testing.T) {
 		}
 		asked.wantEachHalved(t, 1)
 	})
+	t.Run("the labels and milestones", func(t *testing.T) {
+		t.Parallel()
+		f := newFixtureServer(t)
+		f.graphQL(func(w http.ResponseWriter, _ *http.Request, _ string, _ map[string]any) {
+			f.write(w, "graphql_planning.json")
+		})
+		inner := f.graphql
+		var sizes []float64
+		f.graphQL(func(w http.ResponseWriter, r *http.Request, query string, vars map[string]any) {
+			labels, _ := vars["labels"].(float64)
+			sizes = append(sizes, labels)
+			if len(sizes) == 1 {
+				gatewayGaveUp(w)
+				return
+			}
+			inner(w, r, query, vars)
+		})
+		whole, err := (Planning{}).Collect(ctx(t), newPlanningServer(t).Client, testRepo, testNow)
+		if err != nil {
+			t.Fatal(err)
+		}
+		points, err := (Planning{}).Collect(ctx(t), f.Client, testRepo, testNow)
+		if err != nil {
+			t.Fatalf("a page asked again smaller failed the family: %v", err)
+		}
+		if len(sizes) < 2 || sizes[0] != planningLabels || sizes[1] != planningLabels/2 {
+			t.Errorf("labels asked at %v, want %d and then half", sizes, planningLabels)
+		}
+		if len(points) != len(whole) {
+			t.Errorf("%d points from the smaller page, %d from the whole", len(points), len(whole))
+		}
+	})
 	t.Run("the reported family's two sources", func(t *testing.T) {
 		t.Parallel()
 		f := reportedServer(t, "b/searched", "c/contributed")
@@ -457,4 +489,14 @@ func TestEveryPagedWalkHalvesAPageGitHubCouldNotFinish(t *testing.T) {
 		}
 		asked.wantEachHalved(t, 2)
 	})
+}
+
+// newPlanningServer answers the planning query with its fixture.
+func newPlanningServer(t *testing.T) *fixtureServer {
+	t.Helper()
+	f := newFixtureServer(t)
+	f.graphQL(func(w http.ResponseWriter, _ *http.Request, _ string, _ map[string]any) {
+		f.write(w, "graphql_planning.json")
+	})
+	return f
 }
