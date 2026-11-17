@@ -93,7 +93,7 @@ func advisoryTable(b *builder, title, m string, y int, received bool) Panel {
 			"graphite"),
 		Desc: desc,
 		Overrides: []any{
-			fullNameColumn(), width("GHSA", 170), when("Opened"), when("Published or closed"),
+			fullNameColumn(), width("GHSA", 170), when("Opened"), unitOf("Published or closed", "time: YYYY-MM-DD HH:mm", 165),
 			width("State", 90),
 			width("Severity", 90), width(extraName, 110), ownerLinkOn("GHSA", "the advisory"),
 		},
