@@ -20,7 +20,7 @@ func TestQueriesSelectNothingNobodyDecodes(t *testing.T) {
 		{discussionCommentsQuery, "discussionCommentsQuery", "number title url"},
 		{issueCommentsQuery, "issueCommentsQuery", "issue { number url"},
 		{discussionsQuery, "discussionsQuery", "emoji"},
-		{historyQuery, "historyQuery", "createdAt\n"},
+		{historyQuery.text(historyQuery.parts), "historyQuery", "createdAt\n"},
 	}
 	for _, d := range dropped {
 		if strings.Contains(d.query, d.selection) {

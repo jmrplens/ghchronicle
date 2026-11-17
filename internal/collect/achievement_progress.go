@@ -111,17 +111,23 @@ type achievementCounts struct {
 // achievementCountsQuery is the three counts that search and one connection
 // answer in one query, for one point. The query is named so a fake can tell
 // it from the other searches.
-const achievementCountsQuery = `
-query achievementCounts($login: String!, $pulls: String!, $answers: String!) {
-  pulls: search(type: ISSUE, query: $pulls) { issueCount }
-  answers: search(type: DISCUSSION, query: $answers) { discussionCount }
-  user(login: $login) {
+// achievementCountsQuery is three counts that answer on their own, asked in
+// one query and in parts when GitHub gives up on it (see partedQuery). The
+// operation keeps its name, which is what the fake GitHub knows it by.
+var achievementCountsQuery = partedQuery{
+	name:  "achievementCounts",
+	decls: map[string]string{"login": "String!", "pulls": "String!", "answers": "String!"},
+	parts: []queryPart{
+		{selection: `  pulls: search(type: ISSUE, query: $pulls) { issueCount }`, vars: []string{"pulls"}},
+		{selection: `  answers: search(type: DISCUSSION, query: $answers) { discussionCount }`, vars: []string{"answers"}},
+		{selection: `  user(login: $login) {
     createdAt
     repositories(first: 1, ownerAffiliations: OWNER, isFork: false, orderBy: {field: STARGAZERS, direction: DESC}) {
       nodes { nameWithOwner stargazerCount }
     }
-  }
-}`
+  }`, vars: []string{"login"}},
+	},
+}
 
 // achievementUser is the account half of achievementCountsQuery: when it was
 // created, which bounds the walk, and the star counts the Starstruck tiers are
@@ -151,7 +157,7 @@ func (a Achievements) counts(ctx context.Context, c *ghapi.Client) (achievementC
 		"pulls":   "type:pr author:" + a.Login + " is:merged",
 		"answers": "answered-by:" + a.Login,
 	}
-	if err := c.GraphQL(ctx, achievementCountsQuery, vars, &res); err != nil {
+	if err := achievementCountsQuery.ask(ctx, c, vars, &res); err != nil {
 		return achievementCounts{}, err
 	}
 	if res.User == nil {
@@ -489,8 +495,31 @@ func (w *coauthoredWalk) follow(ctx context.Context, c *ghapi.Client, unread []u
 
 // commits asks for the next hundred commits of each pull request of the
 // batch, in one query, and hands back each page in the batch's order, nil
-// for a pull request the answer does not carry.
+// for a pull request the answer does not carry. A batch GitHub gave up on is
+// asked again in halves, down to one pull request a query, as aliasBatch
+// asks a batch of repositories.
 func (w *coauthoredWalk) commits(ctx context.Context, c *ghapi.Client, batch []unreadPull) ([]*coauthoredCommits, error) {
+	pages, err := w.commitsOnce(ctx, c, batch)
+	if err == nil || len(batch) < 2 {
+		return pages, err
+	}
+	if _, tooLarge := errors.AsType[*ghapi.TooLargeError](err); !tooLarge {
+		return pages, err
+	}
+	half := len(batch) / 2
+	first, err := w.commits(ctx, c, batch[:half])
+	if err != nil {
+		return nil, err
+	}
+	rest, err := w.commits(ctx, c, batch[half:])
+	if err != nil {
+		return nil, err
+	}
+	return append(first, rest...), nil
+}
+
+// commitsOnce is commits asked as one query, whatever its size.
+func (w *coauthoredWalk) commitsOnce(ctx context.Context, c *ghapi.Client, batch []unreadPull) ([]*coauthoredCommits, error) {
 	var params, fields strings.Builder
 	vars := map[string]any{}
 	for i, u := range batch {
