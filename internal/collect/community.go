@@ -103,12 +103,14 @@ func forkPoints(rows []forkRow, repo Repo) []sink.Point {
 type Planning struct{}
 
 const planningQuery = `
-query($owner: String!, $name: String!) {
+query($owner: String!, $name: String!, $labels: Int!, $labelsAfter: String, $withLabels: Boolean!, $milestones: Int!, $milestonesAfter: String, $withMilestones: Boolean!) {
   repository(owner: $owner, name: $name) {
-    labels(first: 60) {
+    labels(first: $labels, after: $labelsAfter) @include(if: $withLabels) {
+      pageInfo { hasNextPage endCursor }
       nodes { name url issues { totalCount } pullRequests { totalCount } }
     }
-    milestones(first: 30, orderBy: {field: UPDATED_AT, direction: DESC}) {
+    milestones(first: $milestones, after: $milestonesAfter, orderBy: {field: UPDATED_AT, direction: DESC}) @include(if: $withMilestones) {
+      pageInfo { hasNextPage endCursor }
       nodes {
         title state url createdAt dueOn closedAt progressPercentage
         issues { totalCount }
@@ -117,6 +119,17 @@ query($owner: String!, $name: String!) {
     }
   }
 }`
+
+// planningLabels and planningMilestones are the page sizes planningQuery
+// starts at, which were its one page before it paged: every label, sixty a
+// page, and the thirty milestones updated last, which is all the milestones
+// the family has ever written. A page GitHub gives up on is asked again at
+// half the size and the walk reads on to the same thirty, so a smaller page
+// costs a query and never a row.
+const (
+	planningLabels     = 60
+	planningMilestones = 30
+)
 
 // repoLabel is one label of a repository, with the counts that say whether
 // anybody classifies work with it.
@@ -145,32 +158,71 @@ type repoMilestone struct {
 // its work is classified, and what it is due under.
 type planningRepository struct {
 	Labels struct {
-		Nodes []repoLabel `json:"nodes"`
+		PageInfo reportedPageInfo `json:"pageInfo"`
+		Nodes    []repoLabel      `json:"nodes"`
 	} `json:"labels"`
 	Milestones struct {
-		Nodes []repoMilestone `json:"nodes"`
+		PageInfo reportedPageInfo `json:"pageInfo"`
+		Nodes    []repoMilestone  `json:"nodes"`
 	} `json:"milestones"`
 }
 
-func (Planning) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now time.Time) ([]sink.Point, error) {
-	var res struct {
-		Repository planningRepository `json:"repository"`
+// planningPages reads every label and the thirty milestones updated last, a
+// page of each per query while both have pages to read.
+func planningPages(ctx context.Context, c *ghapi.Client, repo Repo) (labels []repoLabel, milestones []repoMilestone, err error) {
+	vars := map[string]any{
+		"owner": repo.Owner, "name": repo.Name,
+		"labels": planningLabels, "withLabels": true,
+		"milestones": planningMilestones, "withMilestones": true,
 	}
-	vars := map[string]any{"owner": repo.Owner, "name": repo.Name}
-	if err := c.GraphQL(ctx, planningQuery, vars, &res); err != nil {
-		// A repository with no labels and no milestones answers NOT_FOUND on
-		// the fields rather than returning empty connections, and that is not
-		// a failure. Anything else is.
-		if isSkippableGraphQL(err) {
-			return nil, nil
+	// Twenty pages of labels is 1,200 at the starting size, a ceiling and
+	// not an estimate.
+	for page := 1; page <= 20 && (vars["withLabels"] == true || vars["withMilestones"] == true); page++ {
+		var res struct {
+			Repository planningRepository `json:"repository"`
 		}
-		return nil, err
+		if askErr := c.GraphQL(ctx, planningQuery, vars, &res); askErr != nil {
+			nl, _ := vars["labels"].(int)
+			nm, _ := vars["milestones"].(int)
+			if smaller := smallerPage(askErr, max(nl, nm)); smaller > 0 {
+				vars["labels"], vars["milestones"] = min(nl, smaller), min(nm, smaller)
+				page--
+				continue
+			}
+			// A repository with no labels and no milestones answers
+			// NOT_FOUND on the fields rather than returning empty
+			// connections, and that is not a failure. Anything else is.
+			if isSkippableGraphQL(askErr) && page == 1 {
+				return nil, nil, nil
+			}
+			return labels, milestones, askErr
+		}
+		r := &res.Repository
+		if vars["withLabels"] == true {
+			labels = append(labels, r.Labels.Nodes...)
+			vars["withLabels"] = r.Labels.PageInfo.HasNextPage && len(r.Labels.Nodes) > 0
+			vars["labelsAfter"] = r.Labels.PageInfo.EndCursor
+		}
+		if vars["withMilestones"] == true {
+			milestones = append(milestones, r.Milestones.Nodes...)
+			if len(milestones) >= planningMilestones {
+				milestones = milestones[:planningMilestones]
+			}
+			vars["withMilestones"] = r.Milestones.PageInfo.HasNextPage && len(r.Milestones.Nodes) > 0 &&
+				len(milestones) < planningMilestones
+			vars["milestonesAfter"] = r.Milestones.PageInfo.EndCursor
+		}
 	}
+	return labels, milestones, nil
+}
+
+func (Planning) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now time.Time) ([]sink.Point, error) {
+	labels, milestones, err := planningPages(ctx, c, repo)
 	base := repoTags(repo.Owner, repo.Name)
 	day := now.UTC().Truncate(24 * time.Hour)
 	var points []sink.Point
 
-	for _, l := range res.Repository.Labels.Nodes {
+	for _, l := range labels {
 		if l.Issues.TotalCount+l.PullRequests.TotalCount == 0 {
 			continue // a label nobody has used is noise, not a metric
 		}
@@ -184,7 +236,7 @@ func (Planning) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now tim
 			Time: day,
 		})
 	}
-	for _, m := range res.Repository.Milestones.Nodes {
+	for _, m := range milestones {
 		fields := map[string]any{
 			"progress": m.ProgressPercentage,
 			"issues":   m.Issues.TotalCount, "pull_requests": m.PullRequests.TotalCount,
@@ -205,7 +257,7 @@ func (Planning) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now tim
 			Time:        day,
 		})
 	}
-	return points, nil
+	return points, err
 }
 
 // Outbound collects the stars the account gave to other people's repositories,
