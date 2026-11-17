@@ -9,6 +9,10 @@ import (
 	"github.com/jmrplens/ghchronicle/v2/internal/ghapi"
 )
 
+// gqlString is the GraphQL type of a required string variable, which most
+// parted queries declare more than once.
+const gqlString = "String!"
+
 // queryPart is one selection of a partedQuery: something the query asks that
 // answers on its own, with the variables it uses beyond the wrapper's.
 type queryPart struct {

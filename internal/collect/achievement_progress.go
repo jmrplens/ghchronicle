@@ -116,7 +116,7 @@ type achievementCounts struct {
 // operation keeps its name, which is what the fake GitHub knows it by.
 var achievementCountsQuery = partedQuery{
 	name:  "achievementCounts",
-	decls: map[string]string{"login": "String!", "pulls": "String!", "answers": "String!"},
+	decls: map[string]string{"login": gqlString, "pulls": gqlString, "answers": gqlString},
 	parts: []queryPart{
 		{selection: `  pulls: search(type: ISSUE, query: $pulls) { issueCount }`, vars: []string{"pulls"}},
 		{selection: `  answers: search(type: DISCUSSION, query: $answers) { discussionCount }`, vars: []string{"answers"}},

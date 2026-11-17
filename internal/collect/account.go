@@ -30,7 +30,7 @@ type Account struct {
 // four parts, each its own contributionsCollection, which GraphQL merges into
 // one field when they are asked together.
 var accountQuery = partedQuery{
-	decls: map[string]string{"login": "String!"},
+	decls: map[string]string{"login": gqlString},
 	open:  "  user(login: $login) {", close: "  }", shared: []string{"login"},
 	parts: []queryPart{
 		{selection: `    login createdAt
@@ -999,7 +999,7 @@ type History struct {
 // the heavy one. Asked whole, and in parts when GitHub gives up on the whole
 // (see partedQuery).
 var historyQuery = partedQuery{
-	decls: map[string]string{"login": "String!", "from": "DateTime!", "to": "DateTime!"},
+	decls: map[string]string{"login": gqlString, "from": "DateTime!", "to": "DateTime!"},
 	open:  "  user(login: $login) {\n    contributionsCollection(from: $from, to: $to) {",
 	close: "    }\n  }", shared: []string{"login", "from", "to"},
 	parts: []queryPart{
