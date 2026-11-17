@@ -25,6 +25,10 @@ type Repo struct {
 	// hasDiscussionsEnabled false, so asking them was a third of the daily
 	// GraphQL spend for two hundred and eighteen bytes each.
 	HasDiscussions bool
+	// CreatedAt is when the repository was created, read from the same
+	// listing. For a fork it is when the account forked it, before which
+	// nothing in it is the account's work: see Commits.Author.
+	CreatedAt time.Time
 }
 
 // isSkippable reports whether an error means "there is nothing here", as

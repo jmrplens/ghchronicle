@@ -139,7 +139,8 @@ func (f *Filter) ownedRepos(ctx context.Context, c *ghapi.Client) ([]Repo, error
 				// The listing carries this flag; security_and_analysis it
 				// does not, checked on 2026-09-11, which is why that one is
 				// still read per repository.
-				HasDiscussions bool `json:"has_discussions"`
+				HasDiscussions bool      `json:"has_discussions"`
+				CreatedAt      time.Time `json:"created_at"`
 				Owner          struct {
 					Login string `json:"login"`
 				} `json:"owner"`
@@ -159,7 +160,7 @@ func (f *Filter) ownedRepos(ctx context.Context, c *ghapi.Client) ([]Repo, error
 				out = append(out, Repo{
 					Owner: r.Owner.Login, Name: r.Name, FullName: r.FullName,
 					Private: r.Private, Fork: r.Fork, Archived: r.Archived,
-					HasDiscussions: r.HasDiscussions,
+					HasDiscussions: r.HasDiscussions, CreatedAt: r.CreatedAt,
 				})
 			}
 			if len(batch) < 100 {
@@ -207,10 +208,11 @@ func namedRepos(ctx context.Context, c *ghapi.Client, names []string, listed []R
 			continue
 		}
 		var r struct {
-			Private        bool `json:"private"`
-			Fork           bool `json:"fork"`
-			Archived       bool `json:"archived"`
-			HasDiscussions bool `json:"has_discussions"`
+			Private        bool      `json:"private"`
+			Fork           bool      `json:"fork"`
+			Archived       bool      `json:"archived"`
+			HasDiscussions bool      `json:"has_discussions"`
+			CreatedAt      time.Time `json:"created_at"`
 		}
 		if _, _, err := c.GetJSON(ctx, "/repos/"+full, &r, ""); err != nil && !isSkippable(err) {
 			return out, err
@@ -218,7 +220,7 @@ func namedRepos(ctx context.Context, c *ghapi.Client, names []string, listed []R
 		out = append(out, Repo{
 			Owner: owner, Name: name, FullName: full,
 			Private: r.Private, Fork: r.Fork, Archived: r.Archived,
-			HasDiscussions: r.HasDiscussions,
+			HasDiscussions: r.HasDiscussions, CreatedAt: r.CreatedAt,
 		})
 	}
 	return out, nil

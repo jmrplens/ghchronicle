@@ -293,3 +293,35 @@ func TestAForksHistoryIsTheAccountsCommitsAlone(t *testing.T) {
 		}
 	}
 }
+
+// TestAForksHistoryStartsWhenItWasForked: a history filtered by author is not
+// read from before the repository was created, which for a fork is when the
+// account forked it; GitHub walks the whole upstream history to filter it
+// otherwise, and a long one does not finish. A repository's own history keeps
+// the bound it was given.
+func TestAForksHistoryStartsWhenItWasForked(t *testing.T) {
+	t.Parallel()
+	forked := time.Date(2026, 7, 8, 0, 10, 27, 0, time.UTC)
+	repo := testRepo
+	repo.CreatedAt = forked
+	for _, tc := range []struct {
+		name   string
+		author string
+		since  time.Time
+		want   any
+	}{
+		{"a fork's backfill", "U_kgDOAAAAAQ", time.Time{}, "2026-07-08T00:10:27Z"},
+		{"a fork's sweep", "U_kgDOAAAAAQ", testNow.Add(-2 * time.Hour), testNow.Add(-2 * time.Hour).UTC().Format(time.RFC3339)},
+		{"its own backfill", "", time.Time{}, nil},
+	} {
+		f := newFixtureServer(t)
+		var calls []map[string]any
+		commitsServer(t, f, &calls)
+		if _, err := (Commits{Author: tc.author, Since: tc.since}).Collect(ctx(t), f.Client, repo, testNow); err != nil {
+			t.Fatal(err)
+		}
+		if got := calls[0]["since"]; got != tc.want {
+			t.Errorf("%s: history asked since %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
