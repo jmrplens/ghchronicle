@@ -13,7 +13,7 @@ day the tag was pushed, with two exceptions: 2.5.2 has a section and no tag,
 and its changes shipped in 2.6.0; 2.6.2 has a tag and no release, since its
 release stopped at the containerised suite, and its changes shipped in 2.6.3.
 
-## 2.7.3 - 2026-11-17
+## 2.7.3 - 2026-11-21
 
 - **A fork's history is read from when the account forked it.** 2.7.2 asks
   GitHub for a fork's commits filtered by the account, and GitHub filters by
