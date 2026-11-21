@@ -314,7 +314,7 @@ func TestAFamilyThatKeepsFailingDoesNotTakeEveryTurn(t *testing.T) {
 
 // TestASweepStartsMoreWhenOneCannotKeepTheCadences: a configuration can have
 // more slow families than one a tick can start within their cadence. At
-// every.default: 6h the loop ticks hourly and thirty-three families run every
+// every.default: 6h the loop ticks hourly and thirty-four families run every
 // six hours; one a sweep, measured when there were thirty-one, started the
 // last of them thirty hours late and kept every family near a cadence of
 // thirty-one hours. Six a sweep is the
@@ -329,7 +329,7 @@ func TestASweepStartsMoreWhenOneCannotKeepTheCadences(t *testing.T) {
 	}{
 		{"the built-in table", 11, 6 * time.Hour, 15 * time.Minute, 1},
 		{"the production schedule", 13, 6 * time.Hour, 15 * time.Minute, 1},
-		{"every.default: 6h", 33, 6 * time.Hour, time.Hour, 6},
+		{"every.default: 6h", 34, 6 * time.Hour, time.Hour, 6},
 		{"nothing faster than the hour", 11, 6 * time.Hour, time.Hour, 2},
 		{"a heartbeat longer than the cadence", 5, 6 * time.Hour, 12 * time.Hour, 5},
 	} {
@@ -340,8 +340,8 @@ func TestASweepStartsMoreWhenOneCannotKeepTheCadences(t *testing.T) {
 	}
 
 	r, tick := scheduleRunner(t, config.Every{Default: "6h"})
-	if tick != time.Hour || len(slowFamilies(r)) != 33 {
-		t.Fatalf("tick %s over %d slow families, want an hour over thirty-three", tick, len(slowFamilies(r)))
+	if tick != time.Hour || len(slowFamilies(r)) != 34 {
+		t.Fatalf("tick %s over %d slow families, want an hour over thirty-four", tick, len(slowFamilies(r)))
 	}
 	sweeps := schedule(r, tick, 3)
 	for _, family := range slowFamilies(r) {

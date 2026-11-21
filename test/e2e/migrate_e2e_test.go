@@ -18,6 +18,7 @@ import (
 
 	"github.com/jmrplens/ghchronicle/v2"
 	"github.com/jmrplens/ghchronicle/v2/internal/config"
+	"github.com/jmrplens/ghchronicle/v2/test/e2e/fakegh"
 )
 
 // oldInflux is an InfluxDB 3 that answers the catalog the way 3.11.2 does
@@ -260,8 +261,8 @@ func TestMigrateIsADryRunThatChangesNothing(t *testing.T) {
 		}
 	}
 	for _, r := range gh.Requests() {
-		if r.Method != http.MethodGet || r.Path != "/user/repos" {
-			t.Errorf("a dry run asked GitHub %s %s, want the repository list alone", r.Method, r.Path)
+		if r.Method != http.MethodGet || r.Path != "/user/repos" && r.Path != "/orgs/"+fakegh.Org+"/repos" {
+			t.Errorf("a dry run asked GitHub %s %s, want the repository lists alone", r.Method, r.Path)
 		}
 	}
 	if after := snapshot(t, dir); !maps.Equal(before, after) {

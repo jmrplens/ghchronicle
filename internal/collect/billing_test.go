@@ -159,3 +159,46 @@ func TestABillingChargeIsOwnedByTheOrganizationWhenThereIsOne(t *testing.T) {
 		}
 	}
 }
+
+// TestAnOrganizationsBillIsReadBesideTheAccounts: a repository an
+// organization owns is billed to the organization, so its minutes are read
+// from the organization's own report, into a measurement of their own that
+// the account's cost panels do not add up, owned by the organization and
+// linked to its bill; an organization whose report the token may not read is
+// nothing to write rather than a failure.
+func TestAnOrganizationsBillIsReadBesideTheAccounts(t *testing.T) {
+	t.Parallel()
+	f := newFixtureServer(t)
+	f.file("/users/octocat/settings/billing/usage", "billing_usage.json")
+	f.file("/organizations/acme/settings/billing/usage", "billing_usage_org.json")
+	f.handle("/organizations/strangers/settings/billing/usage", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"message":"Not Found"}`))
+	})
+	points, err := Billing{Login: "octocat", Orgs: []string{"acme", "strangers"}, Months: 1}.Collect(ctx(t), f.Client, testNow)
+	if err != nil {
+		t.Fatalf("an organization whose bill is not ours to read is not an error: %v", err)
+	}
+	checkPoints(t, points)
+	if mine, theirs := len(only(t, points, "gh_billing_usage")), len(only(t, points, "gh_org_billing_usage")); mine != 2 || theirs != 2 {
+		t.Fatalf("got %d rows of the account's bill and %d of the organization's, want 2 and 2", mine, theirs)
+	}
+	for _, p := range only(t, points, "gh_billing_usage") {
+		if p.Tags["owner"] == "acme" {
+			t.Errorf("the organization's charge %v is on the account's bill", p.Tags)
+		}
+	}
+	minutes := find(t, points, "gh_org_billing_usage", map[string]string{"full_name": "acme/agents"})
+	if minutes.Tags["owner"] != "acme" || minutes.Tags["org"] != "acme" {
+		t.Errorf("tags = %v, want the organization as the owner and as whose bill it is", minutes.Tags)
+	}
+	if _, has := minutes.Tags["user"]; has {
+		t.Errorf("an organization's row names no user: %v", minutes.Tags)
+	}
+	if want := "https://github.com/organizations/acme/settings/billing/summary"; minutes.Fields["url"] != want {
+		t.Errorf("url = %v, want the organization's bill %s", minutes.Fields["url"], want)
+	}
+	if n := len(f.calls("/organizations/strangers/settings/billing/usage")); n != 1 {
+		t.Errorf("asked the refused report %d times, want once for the one month", n)
+	}
+}

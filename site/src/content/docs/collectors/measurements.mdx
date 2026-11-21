@@ -8,7 +8,7 @@ compactTables:
 
 import { Aside } from "@astrojs/starlight/components";
 
-Ninety-seven measurements. Each row says how a point is dated, because that is
+Ninety-nine measurements. Each row says how a point is dated, because that is
 the thing that decides which questions it can answer.
 
 ## How to read the tables
@@ -216,7 +216,7 @@ panel, which is the place to copy from.
 
 ### Every measurement, alphabetically
 
-Ninety-seven, each link landing on the table it is in.
+Ninety-nine, each link landing on the table it is in.
 
 [`gh_account`](#account) · [`gh_account_total`](#account) ·
 [`gh_achievement`](#account) · [`gh_achievement_progress`](#account) ·
@@ -251,6 +251,7 @@ Ninety-seven, each link landing on the table it is in.
 [`gh_issue_comment`](#account) · [`gh_issue_event`](#development) ·
 [`gh_job_log`](#job-logs) · [`gh_key`](#account) · [`gh_label`](#development) ·
 [`gh_milestone`](#development) · [`gh_notification`](#activity) ·
+[`gh_org`](#organizations) · [`gh_org_billing_usage`](#organizations) ·
 [`gh_package`](#account) · [`gh_package_version`](#account) ·
 [`gh_pinned_item`](#account) · [`gh_policy_file`](#configuration-and-delivery) ·
 [`gh_profile_flag`](#account) · [`gh_pull_request`](#development) ·
@@ -516,8 +517,8 @@ spells it, with the `[bot]` suffix, on every measurement.
 discussion, replies answer those, and GitHub's own number on the page is the
 two added together.
 
-`gh_external_contribution` is the work the account did in repositories it does
-not own, from five searches, one per `kind` and `state`: pull requests
+`gh_external_contribution` is the work the account did in repositories this
+configuration does not collect, from five searches, one per `kind` and `state`: pull requests
 `merged`, `open` and `closed` unmerged, and issues `open` and `closed`. An item
 still open is rewritten at the start of every day it stays open, so a sweep
 reads both open states whole. A closed item is written once, stamped when it
@@ -1087,10 +1088,15 @@ GraphQL query with a search alias for each, and `commits`, which GraphQL search
 cannot count, is a REST search of its own. So each number is one row and is
 right on the first sweep of a fresh install.
 
-The three fields that end in `_elsewhere` share one meaning of elsewhere: in a
-repository the account does not own, since the search qualifier `-user:LOGIN`
-leaves out the ones it does, so an organisation's repositories count as
-elsewhere even when the account belongs to it. `pulls_merged_elsewhere` is its pull
+The three fields that end in `_elsewhere` share one meaning of elsewhere, the
+one `gh_external_contribution` has: in a repository this configuration does not
+collect. The searches leave out the account's own with `-user:LOGIN`, each
+organisation in `targets.orgs` with another `-user:`, and each repository named
+in `targets.repos` that none of those owns with `-repo:`. An organisation the
+account belongs to and does not collect still counts as elsewhere. Up to 2.7.3
+only `-user:LOGIN` was there, so a pull request in a collected organisation was
+written both as `gh_pull_request` and as work elsewhere: 33 of the 134 pull
+requests of the account this was measured on, on 2026-11-21. `pulls_merged_elsewhere` is its pull
 requests merged there and `issues_elsewhere` the issues it opened there.
 `commented_elsewhere` is the issues and pull requests there that carry at least
 one comment of its own (`commenter:LOGIN -user:LOGIN`): threads, not comments,
@@ -1367,19 +1373,18 @@ is still made here, by when the run finished.
 
 | Measurement        | Dated          | Tags                                    | Fields                                                          |
 | ------------------ | -------------- | --------------------------------------- | --------------------------------------------------------------- |
-| `gh_billing_usage` | dated, per day | `product`, `sku`, `unit` | `quantity`, `price_per_unit`, `gross`, `discount`, `net`, `url` |
+| `gh_billing_usage` | dated, per day | `user`, `product`, `sku`, `unit` | `quantity`, `price_per_unit`, `gross`, `discount`, `net`, `url` |
 
 `unit` is GitHub's own `unitType`, capitalised as GitHub sends it: `Minutes`,
 `GigabyteHours`, `AICredits`, `Requests`. It is passed through rather than
 normalised, and the panels that read minutes filter on the capital.
 
-There is no `org` tag. The only billing endpoint a personal account can read is
-its own, and that report has no `organizationName`: the field belongs to the
-organization report, which needs an organization to ask about. Checked against
-the published OpenAPI description and against the live endpoint, where none of
-487 usage items carried the key. Written anyway it was `(none)` on every row
-ever collected, which is a column and a legend entry that only ever says there
-is nothing here.
+This is the account's own bill, `/users/LOGIN/settings/billing/usage`, and
+`user` is the login. A repository an organisation owns is billed to the
+organisation and never appears here; each organisation in `targets.orgs` has
+its bill read into [`gh_org_billing_usage`](#organizations), which the Cost
+panels do not add to this one, since somebody else pays it. There is no `org`
+tag: this report never carries `organizationName`.
 
 `repo` is `(none)` on a charge that belongs to no repository, which is what a
 Copilot seat is. That is a real row of the bill and not a repository, so the
@@ -1391,6 +1396,40 @@ than one being derived from the others. The row is stamped at the start of its
 day: GitHub's `date` arrives as the first billed minute of the day on half the
 rows, which would double the row had GitHub reported a different minute on the
 next read.
+
+## Organizations
+
+| Measurement            | Dated          | Tags                            | Fields                                                                                                                                                                                                                                                                                           |
+| ---------------------- | -------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `gh_org`               | now            | `org`                           | `members`, `admins`, `teams`, `outside_collaborators`, `pending_invitations`, `copilot_seats`, `copilot_active`, `two_factor_required`, `plan`, `public_repos`, `private_repos`, `followers`, `runners`, `secrets`, `variables`, `hooks`, `installations`, `projects`, `custom_properties`, `actions_caches`, `actions_cache_bytes`, `url` |
+| `gh_org_billing_usage` | dated, per day | `org`, `product`, `sku`, `unit` | `quantity`, `price_per_unit`, `gross`, `discount`, `net`, `url`                                                                                                                                                                                                                                  |
+
+Both are written for each organisation in `targets.orgs` and for nothing else:
+an organisation the account only works in has no row, and its repositories are
+named in `targets.repos` instead. `gh_org` is what the `orgs` family reads of
+each one, a current state stamped at the sweep: `admins` is how many of the
+members own it, `two_factor_required` is 1 when the organisation requires
+two-factor authentication of its members, `copilot_seats` and `copilot_active`
+are the seats it pays for and the ones used this cycle, `hooks` its webhooks,
+`installations` the GitHub Apps installed on it, `actions_caches` and
+`actions_cache_bytes` what all its repositories hold in the Actions cache
+together, and `url` its page. Most of it answers an owner alone. A member is
+refused the outside collaborators, the invitations, the runners, the secrets,
+the variables, the cache, Copilot, the webhooks and the installations, measured
+on conda-forge on 2026-11-21, and a refused part leaves its fields out rather
+than writing a zero that would read as none. Every part answered 304 to
+`If-None-Match` on kleidos-dev, so an hourly pass over an organisation that has
+not moved costs nothing.
+
+`gh_org_billing_usage` is the organisation's own bill,
+`/organizations/ORG/settings/billing/usage`, read by the `billing` family beside
+the account's in the same shape as `gh_billing_usage`: `org` is the organisation,
+`owner` is the organisation on every row that names a repository, and `url` is
+the bill's page. It is a measurement of its own because it is another bill: the
+Cost panels add up `gh_billing_usage`, and an organisation's minutes there would
+read as the account's spending. Only an organisation's owners may read it; to
+anyone else it answers 404, which is a month with nothing in it and not a
+failure.
 
 ## Columns that exist only once written
 

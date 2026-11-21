@@ -244,6 +244,12 @@ func (r *Runner) walk() collect.Walk {
 	return collect.Walk{Pages: -1, Since: r.BackfillSince}
 }
 
+// collected is what the targets collect beside the account's own
+// repositories, which the searches for work elsewhere leave out.
+func (r *Runner) collected() collect.Collected {
+	return collect.Collected{Orgs: r.Cfg.Targets.Orgs, Repos: r.Cfg.Targets.Repos}
+}
+
 // discoverInterval bounds how often the repository list is rebuilt. Repos are
 // created rarely and listing them costs a page per hundred, so once an hour is
 // generous.
@@ -422,7 +428,7 @@ func (r *Runner) accountFamilies(ctx context.Context, now time.Time) {
 	// It is also what sizes the pull request page, so a first sweep with no
 	// counts to size it from runs it whether or not it is due: see sizeFirst.
 	r.family(ctx, "totals", now, func() ([]sink.Point, error) {
-		totals := collect.Totals{Login: user, Repos: r.repos, Archived: r.archived}
+		totals := collect.Totals{Login: user, Repos: r.repos, Archived: r.archived, Collected: r.collected()}
 		points, err := totals.Collect(ctx, r.API, now)
 		r.noteCounts(points)
 		return points, err
@@ -442,11 +448,17 @@ func (r *Runner) accountFamilies(ctx context.Context, now time.Time) {
 		if r.Backfill {
 			// Every month GitHub still has. It stops answering somewhere in
 			// the past and the collector notices three empty months in a row.
-			return collect.Billing{Login: user, Walk: r.walk()}.Collect(ctx, r.API, now)
+			return collect.Billing{Login: user, Orgs: r.Cfg.Targets.Orgs, Walk: r.walk()}.Collect(ctx, r.API, now)
 		}
 		// Two months, because the first days of a month still need last
 		// month's rows to be complete before they stop changing.
-		return collect.Billing{Login: user, Months: 2}.Collect(ctx, r.API, now)
+		return collect.Billing{Login: user, Orgs: r.Cfg.Targets.Orgs, Months: 2}.Collect(ctx, r.API, now)
+	})
+	// What each organization in targets.orgs says about itself: its people,
+	// its plan and its machinery, which no repository family sees. Nothing
+	// to do without one; its bill is the billing family's.
+	r.family(ctx, "orgs", now, func() ([]sink.Point, error) {
+		return collect.Orgs{Orgs: r.Cfg.Targets.Orgs}.Collect(ctx, r.API, now)
 	})
 	r.family(ctx, "profile", now, func() ([]sink.Point, error) {
 		return collect.Profile{Login: user, Walk: r.walk()}.Collect(ctx, r.API, now)
@@ -462,7 +474,7 @@ func (r *Runner) accountFamilies(ctx context.Context, now time.Time) {
 	// sweep, and an account past the cap stays past it.
 	r.family(ctx, "outbound", now, func() ([]sink.Point, error) {
 		return collect.Outbound{
-			Login: user, Walk: r.walk(), Moved: r.outboundMoved(now), Warn: r.warnOnce,
+			Login: user, Collected: r.collected(), Walk: r.walk(), Moved: r.outboundMoved(now), Warn: r.warnOnce,
 		}.Collect(ctx, r.API, now)
 	})
 	// The whole green-squares history of every past year, for one point of

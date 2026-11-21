@@ -43,6 +43,8 @@
   "gh_label": ["full_name","label","owner","repo"],
   "gh_milestone": ["full_name","milestone","owner","repo","state"],
   "gh_notification": ["full_name","owner","private","reason","repo","subject_type"],
+  "gh_org": ["org"],
+  "gh_org_billing_usage": ["full_name","org","owner","product","repo","sku","unit"],
   "gh_package": ["full_name","owner","package","repo","type","user","visibility"],
   "gh_package_version": ["full_name","owner","package","repo","tag","type","user","visibility"],
   "gh_pinned_item": ["full_name","owner","repo","user"],

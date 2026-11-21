@@ -291,7 +291,7 @@ summed into their row, an answer both comment walks read is rendered once, and
 the two reads of the day's pull requests and issues go through
 `sink.Distinct`.
 
-**A `url` field is absolute or it is absent.** 68 of the 97 measurements
+**A `url` field is absolute or it is absent.** 70 of the 99 measurements
 carry one (the measurements page says which), and a table listing the rows of
 one selects it as a column called Link. The column itself is
 hidden: the row's link hangs on the table's first column, `linkOn()`, reading

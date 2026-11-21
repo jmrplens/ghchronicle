@@ -14743,7 +14743,578 @@
         "x": 0,
         "y": 565
       },
-      "id": 142,
+      "id": 139,
+      "panels": [
+        {
+          "description": "",
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 24,
+            "x": 0,
+            "y": 566
+          },
+          "id": 133,
+          "options": {
+            "content": "**Not available from Graphite.** In the InfluxDB dashboard this panel shows each organization with its counts beside one another.\n\nA Graphite table reduces one series to one row, and an organization is a series per count.\n\nEach row of it links to the item on GitHub.",
+            "mode": "markdown"
+          },
+          "targets": [],
+          "title": "Organizations: people",
+          "type": "text"
+        },
+        {
+          "description": "",
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 24,
+            "x": 0,
+            "y": 571
+          },
+          "id": 134,
+          "options": {
+            "content": "**Not available from Graphite.** In the InfluxDB dashboard this panel shows each organization with its counts beside one another.\n\nA Graphite table reduces one series to one row, and an organization is a series per count.\n\nEach row of it links to the item on GitHub.",
+            "mode": "markdown"
+          },
+          "targets": [],
+          "title": "Organizations: machinery",
+          "type": "text"
+        },
+        {
+          "datasource": "${DS_GRAPHITE}",
+          "description": "The organizations' own bills, apart from the account's in Cost: a repository an organization owns is billed to it. What the usage would have cost at list price, what each plan covered, what was billed, and the runner minutes behind it. Only an organization's owners may read its bill.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "fixedColor": "text",
+                "mode": "fixed"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "currencyUSD"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Actions minutes"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Gross"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no usage"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Covered by the plan"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no usage"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Actually billed"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no usage"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Actions minutes"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no usage"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 24,
+            "x": 0,
+            "y": 576
+          },
+          "id": 135,
+          "maxDataPoints": 5000,
+          "options": {
+            "colorMode": "none",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value_and_name"
+          },
+          "targets": [
+            {
+              "datasource": "${DS_GRAPHITE}",
+              "refId": "A",
+              "target": "alias(fallbackSeries(summarize(sumSeries(github.org_billing_usage.*.*.*.*.*.*.*.gross), \"100y\", \"sum\", true), removeBelowValue(constantLine(0), 1)), \"Gross\")",
+              "textEditor": true
+            },
+            {
+              "datasource": "${DS_GRAPHITE}",
+              "refId": "B",
+              "target": "alias(fallbackSeries(summarize(sumSeries(github.org_billing_usage.*.*.*.*.*.*.*.discount), \"100y\", \"sum\", true), removeBelowValue(constantLine(0), 1)), \"Covered by the plan\")",
+              "textEditor": true
+            },
+            {
+              "datasource": "${DS_GRAPHITE}",
+              "refId": "C",
+              "target": "alias(fallbackSeries(summarize(sumSeries(github.org_billing_usage.*.*.*.*.*.*.*.net), \"100y\", \"sum\", true), removeBelowValue(constantLine(0), 1)), \"Actually billed\")",
+              "textEditor": true
+            },
+            {
+              "datasource": "${DS_GRAPHITE}",
+              "refId": "D",
+              "target": "alias(fallbackSeries(summarize(sumSeries(github.org_billing_usage.*.*.*.*.*.*.Minutes.quantity), \"100y\", \"sum\", true), removeBelowValue(constantLine(0), 1)), \"Actions minutes\")",
+              "textEditor": true
+            }
+          ],
+          "title": "Organization spend in range",
+          "type": "stat"
+        },
+        {
+          "datasource": "${DS_GRAPHITE}",
+          "description": "Gross cost per day, by organization. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisSoftMin": 0,
+                "drawStyle": "bars",
+                "fillOpacity": 50,
+                "gradientMode": "none",
+                "lineWidth": 1,
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                }
+              },
+              "unit": "currencyUSD"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 580
+          },
+          "id": 136,
+          "interval": "1d",
+          "maxDataPoints": 5000,
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "max"
+              ],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": "${DS_GRAPHITE}",
+              "refId": "A",
+              "target": "aliasSub(consolidateBy(groupByNode(summarize(github.org_billing_usage.*.*.*.*.*.*.*.gross, '$bucket_1d', \"sum\"), 3, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")",
+              "textEditor": true
+            }
+          ],
+          "title": "Organization cost over time",
+          "type": "timeseries"
+        },
+        {
+          "datasource": "${DS_GRAPHITE}",
+          "description": "Runner minutes per day, by organization. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisSoftMin": 0,
+                "drawStyle": "bars",
+                "fillOpacity": 50,
+                "gradientMode": "none",
+                "lineWidth": 1,
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                }
+              },
+              "decimals": 0,
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 580
+          },
+          "id": 137,
+          "interval": "1d",
+          "maxDataPoints": 5000,
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "max"
+              ],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": "${DS_GRAPHITE}",
+              "refId": "A",
+              "target": "aliasSub(consolidateBy(groupByNode(summarize(github.org_billing_usage.*.*.*.*.*.*.Minutes.quantity, '$bucket_1d', \"sum\"), 3, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")",
+              "textEditor": true
+            }
+          ],
+          "title": "Organization Actions minutes",
+          "type": "timeseries"
+        },
+        {
+          "datasource": "${DS_GRAPHITE}",
+          "description": "Each organization repository's charges in the range, by SKU, read off the organization's own bill, which each row links to. A charge that belongs to no repository, a Copilot seat, is in the totals above and not here. Graphite names each row repository and SKU from the path. Graphite has no rows: each series is reduced over the range to one number, Gross, so Quantity, Unit, Price and Net are not in this table. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "filterable": false,
+                "minWidth": 90
+              },
+              "fieldMinMax": true
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Repository"
+                },
+                "properties": [
+                  {
+                    "id": "custom.minWidth",
+                    "value": 160
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Gross"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "currencyUSD"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 110
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Net"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "currencyUSD"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 110
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Price"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "currencyUSD"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 100
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "SKU"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 160
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Unit"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Quantity"
+                },
+                "properties": [
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "mode": "gradient",
+                      "type": "gauge"
+                    }
+                  },
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  },
+                  {
+                    "id": "min",
+                    "value": 0
+                  },
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "green",
+                          "value": null
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 120
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 24,
+            "x": 0,
+            "y": 588
+          },
+          "id": 138,
+          "maxDataPoints": 5000,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "reducer": [
+                "sum"
+              ],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": [
+              {
+                "desc": true,
+                "displayName": "Gross"
+              }
+            ]
+          },
+          "targets": [
+            {
+              "datasource": "${DS_GRAPHITE}",
+              "refId": "A",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(limit(sortByTotal(exclude(aliasByNode(github.org_billing_usage.*.*.*.*.*.*.*.gross, 2, 7), \"^_none_\\.\")), 40), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
+              "textEditor": true
+            }
+          ],
+          "title": "Organization usage by repo",
+          "transformations": [
+            {
+              "id": "reduce",
+              "options": {
+                "includeTimeField": false,
+                "mode": "seriesToRows",
+                "reducers": [
+                  "sum"
+                ]
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {},
+                "renameByName": {
+                  "Field": "Repository, SKU",
+                  "Total": "Gross"
+                }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Gross": 1,
+                  "Repository, SKU": 0
+                },
+                "renameByName": {}
+              }
+            }
+          ],
+          "type": "table"
+        }
+      ],
+      "title": "Organizations",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 598
+      },
+      "id": 149,
       "panels": [
         {
           "datasource": "${DS_GRAPHITE}",
@@ -14775,9 +15346,9 @@
             "h": 8,
             "w": 16,
             "x": 0,
-            "y": 566
+            "y": 599
           },
-          "id": 133,
+          "id": 140,
           "interval": "1h",
           "maxDataPoints": 5000,
           "options": {
@@ -14829,9 +15400,9 @@
             "h": 16,
             "w": 8,
             "x": 16,
-            "y": 566
+            "y": 599
           },
-          "id": 134,
+          "id": 141,
           "maxDataPoints": 5000,
           "options": {
             "displayLabels": [],
@@ -14928,9 +15499,9 @@
             "h": 8,
             "w": 8,
             "x": 0,
-            "y": 574
+            "y": 607
           },
-          "id": 135,
+          "id": 142,
           "maxDataPoints": 5000,
           "options": {
             "legend": {
@@ -15044,9 +15615,9 @@
             "h": 8,
             "w": 8,
             "x": 8,
-            "y": 574
+            "y": 607
           },
-          "id": 136,
+          "id": 143,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -15140,9 +15711,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 582
+            "y": 615
           },
-          "id": 137,
+          "id": 144,
           "interval": "1d",
           "maxDataPoints": 5000,
           "options": {
@@ -15181,9 +15752,9 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 590
+            "y": 623
           },
-          "id": 138,
+          "id": 145,
           "options": {
             "content": "**Not available from Graphite.** In the InfluxDB dashboard this panel shows the newest notification threads, with their titles and a link to each.\n\nGraphite keeps no strings, and has no way to list by date.\n\nEach row of it links to the item on GitHub.",
             "mode": "markdown"
@@ -15310,9 +15881,9 @@
             "h": 9,
             "w": 24,
             "x": 0,
-            "y": 597
+            "y": 630
           },
-          "id": 139,
+          "id": 146,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -15394,9 +15965,9 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 606
+            "y": 639
           },
-          "id": 140,
+          "id": 147,
           "maxDataPoints": 5000,
           "options": {
             "legend": {
@@ -15550,9 +16121,9 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 606
+            "y": 639
           },
-          "id": 141,
+          "id": 148,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -15621,9 +16192,9 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 615
+        "y": 648
       },
-      "id": 159,
+      "id": 166,
       "panels": [
         {
           "datasource": "${DS_GRAPHITE}",
@@ -15647,9 +16218,9 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 616
+            "y": 649
           },
-          "id": 143,
+          "id": 150,
           "maxDataPoints": 5000,
           "options": {
             "legend": {
@@ -16063,9 +16634,9 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 616
+            "y": 649
           },
-          "id": 144,
+          "id": 151,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -16335,9 +16906,9 @@
             "h": 11,
             "w": 24,
             "x": 0,
-            "y": 624
+            "y": 657
           },
-          "id": 145,
+          "id": 152,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -16435,9 +17006,9 @@
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 635
+            "y": 668
           },
-          "id": 146,
+          "id": 153,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -16589,9 +17160,9 @@
             "h": 8,
             "w": 9,
             "x": 6,
-            "y": 635
+            "y": 668
           },
-          "id": 147,
+          "id": 154,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -16783,9 +17354,9 @@
             "h": 8,
             "w": 9,
             "x": 15,
-            "y": 635
+            "y": 668
           },
-          "id": 148,
+          "id": 155,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -16933,9 +17504,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 643
+            "y": 676
           },
-          "id": 149,
+          "id": 156,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -17159,9 +17730,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 651
+            "y": 684
           },
-          "id": 150,
+          "id": 157,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -17241,9 +17812,9 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 659
+            "y": 692
           },
-          "id": 151,
+          "id": 158,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -17325,9 +17896,9 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 659
+            "y": 692
           },
-          "id": 152,
+          "id": 159,
           "maxDataPoints": 5000,
           "options": {
             "legend": {
@@ -17414,9 +17985,9 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 666
+            "y": 699
           },
-          "id": 153,
+          "id": 160,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -17484,9 +18055,9 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 666
+            "y": 699
           },
-          "id": 154,
+          "id": 161,
           "options": {
             "content": "**Not available from Graphite.** In the InfluxDB dashboard this panel shows the repositories whose configuration changed inside the range.\n\nEach combination is its own path in Graphite, and counting how many paths a repository has is not something the function list does.\n\nEach row of it links to the item on GitHub.",
             "mode": "markdown"
@@ -17613,9 +18184,9 @@
             "h": 12,
             "w": 12,
             "x": 0,
-            "y": 673
+            "y": 706
           },
-          "id": 155,
+          "id": 162,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -17771,9 +18342,9 @@
             "h": 12,
             "w": 12,
             "x": 12,
-            "y": 673
+            "y": 706
           },
-          "id": 156,
+          "id": 163,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -17860,9 +18431,9 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 685
+            "y": 718
           },
-          "id": 157,
+          "id": 164,
           "maxDataPoints": 5000,
           "options": {
             "legend": {
@@ -17973,9 +18544,9 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 685
+            "y": 718
           },
-          "id": 158,
+          "id": 165,
           "interval": "1d",
           "maxDataPoints": 5000,
           "options": {
@@ -18020,9 +18591,9 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 693
+        "y": 726
       },
-      "id": 168,
+      "id": 175,
       "panels": [
         {
           "datasource": "${DS_GRAPHITE}",
@@ -18148,9 +18719,9 @@
             "h": 4,
             "w": 24,
             "x": 0,
-            "y": 694
+            "y": 727
           },
-          "id": 160,
+          "id": 167,
           "maxDataPoints": 5000,
           "options": {
             "colorMode": "none",
@@ -18345,9 +18916,9 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 698
+            "y": 731
           },
-          "id": 161,
+          "id": 168,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -18570,9 +19141,9 @@
             "h": 10,
             "w": 12,
             "x": 12,
-            "y": 698
+            "y": 731
           },
-          "id": 162,
+          "id": 169,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -18724,9 +19295,9 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 708
+            "y": 741
           },
-          "id": 163,
+          "id": 170,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -18879,9 +19450,9 @@
             "h": 10,
             "w": 12,
             "x": 12,
-            "y": 708
+            "y": 741
           },
-          "id": 164,
+          "id": 171,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -19094,9 +19665,9 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 718
+            "y": 751
           },
-          "id": 165,
+          "id": 172,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -19206,9 +19777,9 @@
             "h": 10,
             "w": 24,
             "x": 0,
-            "y": 725
+            "y": 758
           },
-          "id": 166,
+          "id": 173,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -19517,9 +20088,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 735
+            "y": 768
           },
-          "id": 167,
+          "id": 174,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "lg",
@@ -19588,9 +20159,9 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 744
+        "y": 777
       },
-      "id": 173,
+      "id": 180,
       "panels": [
         {
           "datasource": "${DS_GRAPHITE}",
@@ -19621,9 +20192,9 @@
             "h": 11,
             "w": 12,
             "x": 0,
-            "y": 745
+            "y": 778
           },
-          "id": 169,
+          "id": 176,
           "interval": "5m",
           "maxDataPoints": 5000,
           "options": {
@@ -19673,9 +20244,9 @@
             "h": 11,
             "w": 12,
             "x": 12,
-            "y": 745
+            "y": 778
           },
-          "id": 170,
+          "id": 177,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -19836,9 +20407,9 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 756
+            "y": 789
           },
-          "id": 171,
+          "id": 178,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
@@ -19964,9 +20535,9 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 756
+            "y": 789
           },
-          "id": 172,
+          "id": 179,
           "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",

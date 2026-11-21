@@ -68,6 +68,7 @@ var Measurements = map[string]string{
 	"joblogs":      "gh_job_log",
 	"keys":         "gh_key",
 	"notifs":       "gh_notification",
+	"orgs":         "gh_org",
 	"outbound":     "gh_external_contribution",
 	"planning":     "gh_milestone",
 	"policyfiles":  "gh_policy_file",

@@ -69,6 +69,14 @@ const (
 	repoPath = "/repos/octocat/hello-world"
 )
 
+// Org is the organization a config lists in targets.orgs: one the account
+// owns, so every part of gh_org answers, with no repositories of its own and
+// a bill of its own.
+const (
+	Org     = "octo-org"
+	orgPath = "/orgs/" + Org
+)
+
 // The two answers that are not a fixture. emptyPage is a page past the first:
 // an empty JSON array, which is how the real API ends a paginated walk.
 // graphQLUnknown is a query no marker matches, which GraphQL reports as a
@@ -107,28 +115,44 @@ var rest = map[string]string{
 	// inbox thread, the search and the contributions, someone/credited by
 	// the global database alone.
 	"/advisories": "global_advisories.json",
-	"/repos/someone/elsewhere/security-advisories":  "reported_advisories.json",
-	"/repos/someone/credited/security-advisories":   "reported_advisories.json",
-	repoPath + "/code-scanning/alerts":              "code_scanning_alerts.json",
-	repoPath + "/code-scanning/analyses":            "code_scanning_analyses.json",
-	repoPath + "/stats/participation":               "stats_participation.json",
-	repoPath + "/stats/punch_card":                  "stats_punch_card.json",
-	repoPath + "/activity":                          "repo_activity.json",
-	repoPath + "/forks":                             "forks.json",
-	repoPath + "/hooks":                             "hooks.json",
-	repoPath + "/hooks/12345678/deliveries":         "hook_deliveries.json",
-	repoPath + "/rulesets":                          "rulesets.json",
-	repoPath + "/rulesets/21/history":               "ruleset_history.json",
-	repoPath + "/rulesets/22/history":               "ruleset_history_single.json",
-	repoPath + "/actions/permissions/workflow":      "actions_permissions_workflow.json",
-	repoPath + "/actions/secrets":                   "actions_secrets.json",
-	repoPath + "/dependabot/secrets":                "dependabot_secrets.json",
-	repoPath + "/code-scanning/default-setup":       "code_scanning_setup.json",
-	repoPath + "/environments":                      "environments.json",
-	repoPath + "/keys":                              "deploy_keys.json",
-	"/users/octocat/events":                         "events.json",
-	"/notifications":                                "notifications.json",
-	"/users/octocat/settings/billing/usage":         "billing_usage.json",
+	"/repos/someone/elsewhere/security-advisories":      "reported_advisories.json",
+	"/repos/someone/credited/security-advisories":       "reported_advisories.json",
+	repoPath + "/code-scanning/alerts":                  "code_scanning_alerts.json",
+	repoPath + "/code-scanning/analyses":                "code_scanning_analyses.json",
+	repoPath + "/stats/participation":                   "stats_participation.json",
+	repoPath + "/stats/punch_card":                      "stats_punch_card.json",
+	repoPath + "/activity":                              "repo_activity.json",
+	repoPath + "/forks":                                 "forks.json",
+	repoPath + "/hooks":                                 "hooks.json",
+	repoPath + "/hooks/12345678/deliveries":             "hook_deliveries.json",
+	repoPath + "/rulesets":                              "rulesets.json",
+	repoPath + "/rulesets/21/history":                   "ruleset_history.json",
+	repoPath + "/rulesets/22/history":                   "ruleset_history_single.json",
+	repoPath + "/actions/permissions/workflow":          "actions_permissions_workflow.json",
+	repoPath + "/actions/secrets":                       "actions_secrets.json",
+	repoPath + "/dependabot/secrets":                    "dependabot_secrets.json",
+	repoPath + "/code-scanning/default-setup":           "code_scanning_setup.json",
+	repoPath + "/environments":                          "environments.json",
+	repoPath + "/keys":                                  "deploy_keys.json",
+	"/users/octocat/events":                             "events.json",
+	"/notifications":                                    "notifications.json",
+	"/users/octocat/settings/billing/usage":             "billing_usage.json",
+	"/organizations/" + Org + "/settings/billing/usage": "billing_usage_org.json",
+	orgPath:                                         "org.json",
+	orgPath + "/repos":                              emptyPage,
+	orgPath + "/members":                            "org_members.json",
+	orgPath + "/teams":                              "org_teams.json",
+	orgPath + "/outside_collaborators":              emptyPage,
+	orgPath + "/invitations":                        emptyPage,
+	orgPath + "/projectsV2":                         emptyPage,
+	orgPath + "/properties/schema":                  emptyPage,
+	orgPath + "/hooks":                              emptyPage,
+	orgPath + "/installations":                      "org_installations.json",
+	orgPath + "/actions/runners":                    "org_runners.json",
+	orgPath + "/actions/secrets":                    "org_secrets.json",
+	orgPath + "/actions/variables":                  "org_variables.json",
+	orgPath + "/copilot/billing":                    "org_copilot.json",
+	orgPath + "/actions/cache/usage":                "org_cache_usage.json",
 	"/user/packages/container/ghchronicle/versions": "package_versions.json",
 	"/gists":                         "gists.json",
 	"/users/octocat/social_accounts": "social_accounts.json",

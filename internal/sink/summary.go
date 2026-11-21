@@ -100,6 +100,7 @@ type rule struct {
 var promRules = map[string]rule{
 	// Account-wide snapshots.
 	"gh_account":             {mode: keepLast, keep: []string{"user"}},
+	"gh_org":                 {mode: keepLast, keep: []string{"org"}},
 	"gh_contributions_total": {mode: keepLast, keep: []string{"user"}},
 	"gh_contribution_repo":   {mode: keepLast, keep: []string{"user", "owner", "repo", "full_name", "kind"}},
 	"gh_social_account":      {mode: keepLast, keep: []string{"user", "provider"}},
@@ -162,6 +163,10 @@ var promRules = map[string]rule{
 	"gh_traffic_referrer": {mode: sum, keep: []string{"owner", "repo", "full_name", "referrer"}},
 	"gh_billing_usage": {
 		mode: sum, keep: []string{"product", "sku", "unit", "owner", "repo", "full_name"},
+		highest: []string{"price_per_unit"},
+	},
+	"gh_org_billing_usage": {
+		mode: sum, keep: []string{"org", "product", "sku", "unit", "owner", "repo", "full_name"},
 		highest: []string{"price_per_unit"},
 	},
 

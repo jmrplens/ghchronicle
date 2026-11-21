@@ -1,0 +1,30 @@
+{
+  "usageItems": [
+    {
+      "date": "2026-09-01T03:12:09Z",
+      "product": "actions",
+      "sku": "Actions Linux",
+      "quantity": 1866,
+      "unitType": "Minutes",
+      "pricePerUnit": 0.006,
+      "grossAmount": 11.196,
+      "discountAmount": 11.196,
+      "netAmount": 0,
+      "organizationName": "acme",
+      "repositoryName": "agents"
+    },
+    {
+      "date": "2026-09-02T00:00:00Z",
+      "product": "Copilot",
+      "sku": "Copilot Individual",
+      "quantity": 1,
+      "unitType": "Seats",
+      "pricePerUnit": 19,
+      "grossAmount": 19,
+      "discountAmount": 0,
+      "netAmount": 19,
+      "organizationName": "acme",
+      "repositoryName": ""
+    }
+  ]
+}

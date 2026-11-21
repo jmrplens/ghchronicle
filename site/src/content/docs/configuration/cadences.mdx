@@ -79,6 +79,7 @@ the same membership.
 | `account`   | `billing`      | `1h`    | the month in progress moves while continuous integration runs: it had changed at every one of 46 six-hourly reads measured, and a pass is two requests, that month and the one before, of which only the first is charged                                                                                                                                  |
 | `account`   | `history`      | `0`     | off until asked for by name: it walks every past year and the year so far, and the rows are idempotent                                                                                                                                                                                                                                                     |
 | `account`   | `keys`         | `24h`   | an SSH or GPG key changes when somebody changes it, and what matters is its expiry date, not the hour it was noticed                                                                                                                                                                                                                                       |
+| `account`   | `orgs`         | `1h`    | members, teams, invitations and seats are edited by hand, and every part of an organization that has not moved answers 304 at no cost                                                                                                                                                                                                                      |
 | `account`   | `outbound`     | `1h`    | stars given, work in other people's repositories and the answers accepted there, for about nine GraphQL points a pass, so the hour costs nothing that shows and an answer accepted this afternoon is on the dashboard this afternoon                                                                                                                       |
 | `account`   | `profile`      | `12h`   | packages, gists and social accounts, all of them edited by hand                                                                                                                                                                                                                                                                                            |
 | `account`   | `totals`       | `1h`    | the lifetime numbers move with every star, fork, merge and push, and a pass is one GraphQL point for the account, one per ten repositories and one per twenty-five archived ones set aside, and one request of the search budget                                                                                                                           |
@@ -166,7 +167,7 @@ which is:
 | Group       | Families                                                                                 |
 | ----------- | ---------------------------------------------------------------------------------------- |
 | `audience`  | `forks`, `stars`, `traffic`                                                              |
-| `account`   | `account`, `achievements`, `billing`, `history`, `keys`, `outbound`, `profile`, `totals` |
+| `account`   | `account`, `achievements`, `billing`, `history`, `keys`, `orgs`, `outbound`, `profile`, `totals` |
 | `repos`     | `branches`, `deps`, `inventory`, `policyfiles`, `repo`, `rulesets`, `settings`           |
 | `work`      | `commits`, `discussions`, `issueevents`, `issues`, `planning`, `stats`                   |
 | `ci`        | `actions`, `artifacts`, `deployments`, `joblogs`                                         |
@@ -351,8 +352,8 @@ level=INFO msg="slow families due together take turns" starting=planning
 
 One a sweep holds while it can keep every cadence, and a configuration with a
 longer tick can have more slow families than that. `every.default: 6h` ticks
-hourly, because nothing in it runs more often, with thirty-three families at
-six hours, and one a sweep would start each of them every thirty-three hours. A
+hourly, because nothing in it runs more often, with thirty-four families at
+six hours, and one a sweep would start each of them every thirty-four hours. A
 sweep there starts the fewest that fit, six, and no family waits as long as its
 cadence.
 

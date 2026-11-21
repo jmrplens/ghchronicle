@@ -6,11 +6,11 @@ importer to choose their own.
 
 | File | Panels | Store |
 |---|---|---|
-| `ghchronicle-influxdb.json` | 156 | InfluxDB 3, queried with SQL |
-| `ghchronicle-prometheus.json` | 156 | Prometheus |
-| `ghchronicle-postgres.json` | 156 | PostgreSQL or TimescaleDB, from either PostgreSQL sink |
-| `ghchronicle-graphite.json` | 156 | Graphite, from the Graphite sink |
-| `ghchronicle-elasticsearch.json` | 156 | Elasticsearch or OpenSearch, from the Elasticsearch sink |
+| `ghchronicle-influxdb.json` | 162 | InfluxDB 3, queried with SQL |
+| `ghchronicle-prometheus.json` | 162 | Prometheus |
+| `ghchronicle-postgres.json` | 162 | PostgreSQL or TimescaleDB, from either PostgreSQL sink |
+| `ghchronicle-graphite.json` | 162 | Graphite, from the Graphite sink |
+| `ghchronicle-elasticsearch.json` | 162 | Elasticsearch or OpenSearch, from the Elasticsearch sink |
 
 ## Importing
 

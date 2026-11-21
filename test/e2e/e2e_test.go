@@ -118,6 +118,7 @@ func writeConfigWithCadence(t *testing.T, dir, base, token, user, cadence, extra
   timeout: 20s
 targets:
   user: %s
+  orgs: [octo-org]
 sinks:
   file:
     path: %s
@@ -1031,6 +1032,7 @@ func TestLiveAPI(t *testing.T) {
   timeout: 60s
 targets:
   user: %s
+  orgs: [octo-org]
 sinks:
   file:
     path: %s

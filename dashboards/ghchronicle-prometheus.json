@@ -14347,7 +14347,1174 @@
         "x": 0,
         "y": 565
       },
-      "id": 142,
+      "id": 139,
+      "panels": [
+        {
+          "datasource": "${DS_PROMETHEUS}",
+          "description": "Who is in each organization, newest row in the range: its members and how many of them own it, its teams, the outside collaborators given a repository, the invitations not yet answered, and the Copilot seats it pays for against the ones used this cycle. Two-factor says whether the organization requires it of its members. The outside collaborators, the invitations, Copilot and two-factor answer an owner alone, and are empty for an organization the account is only a member of. Prometheus draws seven counts, a query each, and leaves out Two-factor. The exporter carries numbers alone, so there is no Plan column. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "filterable": false,
+                "minWidth": 90
+              },
+              "fieldMinMax": true
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Two-factor"
+                },
+                "properties": [
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-text"
+                    }
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "0": {
+                            "color": "text",
+                            "index": 1,
+                            "text": "off"
+                          },
+                          "1": {
+                            "color": "green",
+                            "index": 0,
+                            "text": "on"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "off"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "on"
+                          }
+                        },
+                        "type": "value"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 100
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Members"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 100
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Owners"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Teams"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 80
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Outside collaborators"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 175
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Invitations"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 110
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Copilot seats"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 120
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Copilot used"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 120
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Plan"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 24,
+            "x": 0,
+            "y": 566
+          },
+          "id": 133,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "reducer": [
+                "sum"
+              ],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": [
+              {
+                "desc": true,
+                "displayName": "Organization"
+              }
+            ]
+          },
+          "targets": [
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "max by (org) (github_org_members)",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "A"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "max by (org) (github_org_admins)",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "B"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "max by (org) (github_org_teams)",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "C"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "max by (org) (github_org_outside_collaborators)",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "D"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "max by (org) (github_org_pending_invitations)",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "E"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "max by (org) (github_org_copilot_seats)",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "F"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "max by (org) (github_org_copilot_active)",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "G"
+            }
+          ],
+          "title": "Organizations: people",
+          "transformations": [
+            {
+              "id": "merge",
+              "options": {}
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "__name__": true,
+                  "full_name": true,
+                  "instance": true,
+                  "job": true,
+                  "owner": true
+                },
+                "indexByName": {},
+                "renameByName": {
+                  "Value #A": "Members",
+                  "Value #B": "Owners",
+                  "Value #C": "Teams",
+                  "Value #D": "Outside collaborators",
+                  "Value #E": "Invitations",
+                  "Value #F": "Copilot seats",
+                  "Value #G": "Copilot used",
+                  "org": "Organization"
+                }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Copilot seats": 6,
+                  "Copilot used": 7,
+                  "Invitations": 5,
+                  "Members": 1,
+                  "Organization": 0,
+                  "Outside collaborators": 4,
+                  "Owners": 2,
+                  "Teams": 3
+                },
+                "renameByName": {}
+              }
+            }
+          ],
+          "type": "table"
+        },
+        {
+          "datasource": "${DS_PROMETHEUS}",
+          "description": "What the organization's owners set up, newest row in the range: its repositories, its self-hosted runners, the Actions secrets and variables shared by its repositories, its webhooks, the GitHub Apps installed on it, its projects, and what all its repositories hold in the Actions cache together. Each repository's own are in their sections. Every column but the repositories and the projects answers an owner alone. Prometheus draws seven counts, a query each, and leaves out Projects and Actions cache. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "filterable": false,
+                "minWidth": 90
+              },
+              "fieldMinMax": true
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Actions cache"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "bytes"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 130
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Public repositories"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 160
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Private repositories"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 165
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Runners"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Secrets"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Variables"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Webhooks"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 100
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Apps"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 80
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Projects"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Actions cache"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 130
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 24,
+            "x": 0,
+            "y": 571
+          },
+          "id": 134,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "reducer": [
+                "sum"
+              ],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": [
+              {
+                "desc": true,
+                "displayName": "Organization"
+              }
+            ]
+          },
+          "targets": [
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "max by (org) (github_org_public_repos)",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "A"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "max by (org) (github_org_private_repos)",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "B"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "max by (org) (github_org_runners)",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "C"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "max by (org) (github_org_secrets)",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "D"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "max by (org) (github_org_variables)",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "E"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "max by (org) (github_org_hooks)",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "F"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "max by (org) (github_org_installations)",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "G"
+            }
+          ],
+          "title": "Organizations: machinery",
+          "transformations": [
+            {
+              "id": "merge",
+              "options": {}
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "__name__": true,
+                  "full_name": true,
+                  "instance": true,
+                  "job": true,
+                  "owner": true
+                },
+                "indexByName": {},
+                "renameByName": {
+                  "Value #A": "Public repositories",
+                  "Value #B": "Private repositories",
+                  "Value #C": "Runners",
+                  "Value #D": "Secrets",
+                  "Value #E": "Variables",
+                  "Value #F": "Webhooks",
+                  "Value #G": "Apps",
+                  "org": "Organization"
+                }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Apps": 7,
+                  "Organization": 0,
+                  "Private repositories": 2,
+                  "Public repositories": 1,
+                  "Runners": 3,
+                  "Secrets": 4,
+                  "Variables": 5,
+                  "Webhooks": 6
+                },
+                "renameByName": {}
+              }
+            }
+          ],
+          "type": "table"
+        },
+        {
+          "datasource": "${DS_PROMETHEUS}",
+          "description": "The organizations' own bills, apart from the account's in Cost: a repository an organization owns is billed to it. What the usage would have cost at list price, what each plan covered, what was billed, and the runner minutes behind it. Only an organization's owners may read its bill. In Prometheus this counts the collector's last sweep, not the dashboard range.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "fixedColor": "text",
+                "mode": "fixed"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "currencyUSD"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Actions minutes"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Gross"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no usage"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Covered by the plan"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no usage"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Actually billed"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no usage"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Actions minutes"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no usage"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 24,
+            "x": 0,
+            "y": 576
+          },
+          "id": 135,
+          "options": {
+            "colorMode": "none",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value_and_name"
+          },
+          "targets": [
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "(sum(github_org_billing_usage_gross)) or vector(NaN)",
+              "instant": true,
+              "legendFormat": "Gross",
+              "range": false,
+              "refId": "A"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "(sum(github_org_billing_usage_discount)) or vector(NaN)",
+              "instant": true,
+              "legendFormat": "Covered by the plan",
+              "range": false,
+              "refId": "B"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "(sum(github_org_billing_usage_net)) or vector(NaN)",
+              "instant": true,
+              "legendFormat": "Actually billed",
+              "range": false,
+              "refId": "C"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "(sum(github_org_billing_usage_quantity{unit=\"Minutes\"})) or vector(NaN)",
+              "instant": true,
+              "legendFormat": "Actions minutes",
+              "range": false,
+              "refId": "D"
+            }
+          ],
+          "title": "Organization spend in range",
+          "type": "stat"
+        },
+        {
+          "datasource": "${DS_PROMETHEUS}",
+          "description": "Gross cost per day, by organization. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Prometheus this is GitHub's whole trailing window as one number that moves, not days.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisSoftMin": 0,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "opacity",
+                "lineWidth": 1,
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                }
+              },
+              "unit": "currencyUSD"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 580
+          },
+          "id": 136,
+          "interval": "1d",
+          "maxDataPoints": 100,
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "max"
+              ],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "sum by (org) (github_org_billing_usage_gross)",
+              "instant": false,
+              "legendFormat": "{{org}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Organization cost over time",
+          "type": "timeseries"
+        },
+        {
+          "datasource": "${DS_PROMETHEUS}",
+          "description": "Runner minutes per day, by organization. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Prometheus this is GitHub's whole trailing window as one number that moves, not days.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisSoftMin": 0,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "opacity",
+                "lineWidth": 1,
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                }
+              },
+              "decimals": 0,
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 580
+          },
+          "id": 137,
+          "interval": "1d",
+          "maxDataPoints": 100,
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "max"
+              ],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "sum by (org) (github_org_billing_usage_quantity{unit=\"Minutes\"})",
+              "instant": false,
+              "legendFormat": "{{org}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Organization Actions minutes",
+          "type": "timeseries"
+        },
+        {
+          "datasource": "${DS_PROMETHEUS}",
+          "description": "Each organization repository's charges in the range, by SKU, read off the organization's own bill, which each row links to. A charge that belongs to no repository, a Copilot seat, is in the totals above and not here. In Prometheus this counts the collector's last sweep, not the dashboard range. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "filterable": false,
+                "minWidth": 90
+              },
+              "fieldMinMax": true
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Repository"
+                },
+                "properties": [
+                  {
+                    "id": "custom.minWidth",
+                    "value": 160
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Gross"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "currencyUSD"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 110
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Net"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "currencyUSD"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 110
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Price"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "currencyUSD"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 100
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "SKU"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 160
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Unit"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Quantity"
+                },
+                "properties": [
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "mode": "gradient",
+                      "type": "gauge"
+                    }
+                  },
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  },
+                  {
+                    "id": "min",
+                    "value": 0
+                  },
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "green",
+                          "value": null
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 120
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 24,
+            "x": 0,
+            "y": 588
+          },
+          "id": 138,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "reducer": [
+                "sum"
+              ],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": [
+              {
+                "desc": true,
+                "displayName": "Gross"
+              }
+            ]
+          },
+          "targets": [
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "sum by (full_name, sku, unit) (github_org_billing_usage_quantity{repo!=\"(none)\"})",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "A"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "max by (full_name, sku, unit) (github_org_billing_usage_price_per_unit{repo!=\"(none)\"})",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "B"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "sum by (full_name, sku, unit) (github_org_billing_usage_gross{repo!=\"(none)\"})",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "C"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "sum by (full_name, sku, unit) (github_org_billing_usage_net{repo!=\"(none)\"})",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "D"
+            }
+          ],
+          "title": "Organization usage by repo",
+          "transformations": [
+            {
+              "id": "merge",
+              "options": {}
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "__name__": true,
+                  "instance": true,
+                  "job": true,
+                  "owner": true
+                },
+                "indexByName": {},
+                "renameByName": {
+                  "Value #A": "Quantity",
+                  "Value #B": "Price",
+                  "Value #C": "Gross",
+                  "Value #D": "Net",
+                  "full_name": "Repository",
+                  "sku": "SKU",
+                  "unit": "Unit"
+                }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Gross": 1,
+                  "Net": 6,
+                  "Price": 5,
+                  "Quantity": 3,
+                  "Repository": 0,
+                  "SKU": 2,
+                  "Unit": 4
+                },
+                "renameByName": {}
+              }
+            }
+          ],
+          "type": "table"
+        }
+      ],
+      "title": "Organizations",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 598
+      },
+      "id": 149,
       "panels": [
         {
           "datasource": "${DS_PROMETHEUS}",
@@ -14379,9 +15546,9 @@
             "h": 8,
             "w": 16,
             "x": 0,
-            "y": 566
+            "y": 599
           },
-          "id": 133,
+          "id": 140,
           "interval": "1h",
           "maxDataPoints": 100,
           "options": {
@@ -14437,9 +15604,9 @@
             "h": 16,
             "w": 8,
             "x": 16,
-            "y": 566
+            "y": 599
           },
-          "id": 134,
+          "id": 141,
           "options": {
             "displayLabels": [],
             "legend": {
@@ -14522,9 +15689,9 @@
             "h": 8,
             "w": 8,
             "x": 0,
-            "y": 574
+            "y": 607
           },
-          "id": 135,
+          "id": 142,
           "options": {
             "content": "**Not available from Prometheus.** In the InfluxDB dashboard this panel shows the ten repositories with the most events in the range.\n\nThe exporter keeps only `type` on events: a repository label would multiply the series by every repository the feed touches, including other people's.",
             "mode": "markdown"
@@ -14594,9 +15761,9 @@
             "h": 8,
             "w": 8,
             "x": 8,
-            "y": 574
+            "y": 607
           },
-          "id": 136,
+          "id": 143,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -14691,9 +15858,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 582
+            "y": 615
           },
-          "id": 137,
+          "id": 144,
           "interval": "1d",
           "maxDataPoints": 100,
           "options": {
@@ -14736,9 +15903,9 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 590
+            "y": 623
           },
-          "id": 138,
+          "id": 145,
           "options": {
             "content": "**Not available from Prometheus.** In the InfluxDB dashboard this panel shows the newest notification threads, with their titles and a link to each.\n\nThe exporter reduces notifications to a count per reason and subject type; no thread survives, and the title and the url are strings.\n\nEach row of it links to the item on GitHub.",
             "mode": "markdown"
@@ -14920,9 +16087,9 @@
             "h": 9,
             "w": 24,
             "x": 0,
-            "y": 597
+            "y": 630
           },
-          "id": 139,
+          "id": 146,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -15039,9 +16206,9 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 606
+            "y": 639
           },
-          "id": 140,
+          "id": 147,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -15194,9 +16361,9 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 606
+            "y": 639
           },
-          "id": 141,
+          "id": 148,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -15265,9 +16432,9 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 615
+        "y": 648
       },
-      "id": 159,
+      "id": 166,
       "panels": [
         {
           "datasource": "${DS_PROMETHEUS}",
@@ -15291,9 +16458,9 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 616
+            "y": 649
           },
-          "id": 143,
+          "id": 150,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -15706,9 +16873,9 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 616
+            "y": 649
           },
-          "id": 144,
+          "id": 151,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -16047,9 +17214,9 @@
             "h": 11,
             "w": 24,
             "x": 0,
-            "y": 624
+            "y": 657
           },
-          "id": 145,
+          "id": 152,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -16233,9 +17400,9 @@
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 635
+            "y": 668
           },
-          "id": 146,
+          "id": 153,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -16386,9 +17553,9 @@
             "h": 8,
             "w": 9,
             "x": 6,
-            "y": 635
+            "y": 668
           },
-          "id": 147,
+          "id": 154,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -16607,9 +17774,9 @@
             "h": 8,
             "w": 9,
             "x": 15,
-            "y": 635
+            "y": 668
           },
-          "id": 148,
+          "id": 155,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -16714,9 +17881,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 643
+            "y": 676
           },
-          "id": 149,
+          "id": 156,
           "options": {
             "content": "**Not available from Prometheus.** In the InfluxDB dashboard this panel shows every tagged package version, dated when it was published.\n\nThe exporter skips `gh_package_version`: a publication date is history, and the count of versions is already a field on `gh_package`, shown in the Packages table.\n\nEach row of it links to the item on GitHub.",
             "mode": "markdown"
@@ -16891,9 +18058,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 651
+            "y": 684
           },
-          "id": 150,
+          "id": 157,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -17031,9 +18198,9 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 659
+            "y": 692
           },
-          "id": 151,
+          "id": 158,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -17142,9 +18309,9 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 659
+            "y": 692
           },
-          "id": 152,
+          "id": 159,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -17230,9 +18397,9 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 666
+            "y": 699
           },
-          "id": 153,
+          "id": 160,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -17300,9 +18467,9 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 666
+            "y": 699
           },
-          "id": 154,
+          "id": 161,
           "options": {
             "content": "**Not available from Prometheus.** In the InfluxDB dashboard this panel shows the repositories whose visibility, archived flag, default branch, license or main language changed inside the range, counted as distinct values per repository.\n\nThose are labels on a gauge, and a change of label is a new series rather than a value: counting distinct label values over a range is `count(count by (visibility) (...))`, which cannot be grouped per repository and per label at once.\n\nEach row of it links to the item on GitHub.",
             "mode": "markdown"
@@ -17429,9 +18596,9 @@
             "h": 12,
             "w": 12,
             "x": 0,
-            "y": 673
+            "y": 706
           },
-          "id": 155,
+          "id": 162,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -17603,9 +18770,9 @@
             "h": 12,
             "w": 12,
             "x": 12,
-            "y": 673
+            "y": 706
           },
-          "id": 156,
+          "id": 163,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -17695,9 +18862,9 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 685
+            "y": 718
           },
-          "id": 157,
+          "id": 164,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -17807,9 +18974,9 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 685
+            "y": 718
           },
-          "id": 158,
+          "id": 165,
           "interval": "1d",
           "maxDataPoints": 100,
           "options": {
@@ -17860,9 +19027,9 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 693
+        "y": 726
       },
-      "id": 168,
+      "id": 175,
       "panels": [
         {
           "datasource": "${DS_PROMETHEUS}",
@@ -17988,9 +19155,9 @@
             "h": 4,
             "w": 24,
             "x": 0,
-            "y": 694
+            "y": 727
           },
-          "id": 160,
+          "id": 167,
           "options": {
             "colorMode": "none",
             "graphMode": "none",
@@ -18244,9 +19411,9 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 698
+            "y": 731
           },
-          "id": 161,
+          "id": 168,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -18506,9 +19673,9 @@
             "h": 10,
             "w": 12,
             "x": 12,
-            "y": 698
+            "y": 731
           },
-          "id": 162,
+          "id": 169,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -18697,9 +19864,9 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 708
+            "y": 741
           },
-          "id": 163,
+          "id": 170,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -18878,9 +20045,9 @@
             "h": 10,
             "w": 12,
             "x": 12,
-            "y": 708
+            "y": 741
           },
-          "id": 164,
+          "id": 171,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -19093,9 +20260,9 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 718
+            "y": 751
           },
-          "id": 165,
+          "id": 172,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -19242,9 +20409,9 @@
             "h": 10,
             "w": 24,
             "x": 0,
-            "y": 725
+            "y": 758
           },
-          "id": 166,
+          "id": 173,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -19553,9 +20720,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 735
+            "y": 768
           },
-          "id": 167,
+          "id": 174,
           "options": {
             "cellHeight": "lg",
             "footer": {
@@ -19672,9 +20839,9 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 744
+        "y": 777
       },
-      "id": 173,
+      "id": 180,
       "panels": [
         {
           "datasource": "${DS_PROMETHEUS}",
@@ -19705,9 +20872,9 @@
             "h": 11,
             "w": 12,
             "x": 0,
-            "y": 745
+            "y": 778
           },
-          "id": 169,
+          "id": 176,
           "interval": "5m",
           "maxDataPoints": 100,
           "options": {
@@ -19760,9 +20927,9 @@
             "h": 11,
             "w": 12,
             "x": 12,
-            "y": 745
+            "y": 778
           },
-          "id": 170,
+          "id": 177,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -19948,9 +21115,9 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 756
+            "y": 789
           },
-          "id": 171,
+          "id": 178,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -20093,9 +21260,9 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 756
+            "y": 789
           },
-          "id": 172,
+          "id": 179,
           "options": {
             "cellHeight": "sm",
             "footer": {

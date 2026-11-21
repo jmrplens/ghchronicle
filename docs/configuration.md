@@ -724,6 +724,38 @@ four things discovery wants to know about it. Only a name no listing returns,
 someone else's repository or one of an organisation not in `orgs`, is read on
 its own each time the list is rebuilt.
 
+### An organisation
+
+`orgs` collects every repository the organisation's listing returns to the
+token, private ones included where the account can see them, under the same
+three switches as the account's own. Three more things follow from listing one:
+
+- **What it says about itself.** The `orgs` family writes a row of `gh_org` for
+  each: its members and owners, teams, outside collaborators, invitations,
+  Copilot seats, runners, secrets, variables, webhooks, apps, projects and
+  Actions cache, which the dashboard's Organizations section draws. Most of it
+  answers an owner alone, and a member's row leaves those counts out.
+- **Its bill.** The `billing` family reads the organisation's usage report into
+  `gh_org_billing_usage`, apart from the account's, since an organisation's
+  repositories are billed to it and somebody else pays it. Only its owners may
+  read it; for a member it is nothing to write.
+- **Its work is not work elsewhere.** The pull requests, issues and comment
+  counts of `gh_external_contribution` and the `_elsewhere` totals leave out
+  every listed organisation and every named repository, which the repository
+  families already write. An organisation the account belongs to without
+  listing it still counts as elsewhere.
+
+Listing is the wrong tool for an organisation the account only works in. One
+that hosts thousands of repositories (conda-forge held 30,214 on 2026-11-21)
+would put every one in the sweep, so name the few the account maintains in
+`repos` instead. A named repository is left out of work elsewhere the same way,
+but brings no bill and no `gh_org` row: the organisation's report covers all of
+its repositories, and only its owners may read it.
+
+The tag `own` on the comment and contribution rows is narrower: it says the
+account itself owns the repository, and a listed organisation does not change
+it, since it is part of every such row's identity.
+
 ### Why forks and archived are off by default
 
 Both defaults exist for the same reason, which is the rate limit.
@@ -870,6 +902,7 @@ the same membership.
 | `account`   | `billing`      | `1h`    | the month in progress moves while continuous integration runs: it had changed at every one of 46 six-hourly reads measured, and a pass is two requests, that month and the one before, of which only the first is charged                                                                                                                                  |
 | `account`   | `history`      | `0`     | off until asked for by name: it walks every past year and the year so far, and the rows are idempotent                                                                                                                                                                                                                                                     |
 | `account`   | `keys`         | `24h`   | an SSH or GPG key changes when somebody changes it, and what matters is its expiry date, not the hour it was noticed                                                                                                                                                                                                                                       |
+| `account`   | `orgs`         | `1h`    | members, teams, invitations and seats are edited by hand, and every part of an organization that has not moved answers 304 at no cost                                                                                                                                                                                                                      |
 | `account`   | `outbound`     | `1h`    | stars given, work in other people's repositories and the answers accepted there, for about nine GraphQL points a pass, so the hour costs nothing that shows and an answer accepted this afternoon is on the dashboard this afternoon                                                                                                                       |
 | `account`   | `profile`      | `12h`   | packages, gists and social accounts, all of them edited by hand                                                                                                                                                                                                                                                                                            |
 | `account`   | `totals`       | `1h`    | the lifetime numbers move with every star, fork, merge and push, and a pass is one GraphQL point for the account, one per ten repositories and one per twenty-five archived ones set aside, and one request of the search budget                                                                                                                           |
@@ -957,7 +990,7 @@ which is:
 | Group       | Families                                                                                 |
 | ----------- | ---------------------------------------------------------------------------------------- |
 | `audience`  | `forks`, `stars`, `traffic`                                                              |
-| `account`   | `account`, `achievements`, `billing`, `history`, `keys`, `outbound`, `profile`, `totals` |
+| `account`   | `account`, `achievements`, `billing`, `history`, `keys`, `orgs`, `outbound`, `profile`, `totals` |
 | `repos`     | `branches`, `deps`, `inventory`, `policyfiles`, `repo`, `rulesets`, `settings`           |
 | `work`      | `commits`, `discussions`, `issueevents`, `issues`, `planning`, `stats`                   |
 | `ci`        | `actions`, `artifacts`, `deployments`, `joblogs`                                         |
@@ -1138,8 +1171,8 @@ level=INFO msg="slow families due together take turns" starting=planning
 
 One a sweep holds while it can keep every cadence, and a configuration with a
 longer tick can have more slow families than that. `every.default: 6h` ticks
-hourly, because nothing in it runs more often, with thirty-three families at
-six hours, and one a sweep would start each of them every thirty-three hours. A
+hourly, because nothing in it runs more often, with thirty-four families at
+six hours, and one a sweep would start each of them every thirty-four hours. A
 sweep there starts the fewest that fit, six, and no family waits as long as its
 cadence.
 

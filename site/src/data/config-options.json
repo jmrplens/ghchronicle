@@ -610,6 +610,7 @@
         "joblogs",
         "keys",
         "notifs",
+        "orgs",
         "outbound",
         "planning",
         "policyfiles",
@@ -825,6 +826,7 @@
         "billing",
         "history",
         "keys",
+        "orgs",
         "outbound",
         "profile",
         "totals"
@@ -1011,6 +1013,11 @@
       "name": "notifs",
       "group": "feeds",
       "every": "15m"
+    },
+    {
+      "name": "orgs",
+      "group": "account",
+      "every": "1h"
     },
     {
       "name": "outbound",

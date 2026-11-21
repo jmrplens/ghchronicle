@@ -14,16 +14,16 @@ importer to choose their own.
 
 | File                             | Panels | Store                                                                   |
 | -------------------------------- | ------ | ----------------------------------------------------------------------- |
-| `ghchronicle-influxdb.json`      | 156 | InfluxDB 3, queried with SQL                                            |
-| `ghchronicle-prometheus.json`    | 156 | Prometheus                                                              |
-| `ghchronicle-postgres.json`      | 156 | PostgreSQL or TimescaleDB, from the sink that connects or the SQL file |
-| `ghchronicle-graphite.json`      | 156 | Graphite, from the Graphite sink                                        |
-| `ghchronicle-elasticsearch.json` | 156 | Elasticsearch or OpenSearch, from the Elasticsearch sink                |
+| `ghchronicle-influxdb.json`      | 162 | InfluxDB 3, queried with SQL                                            |
+| `ghchronicle-prometheus.json`    | 162 | Prometheus                                                              |
+| `ghchronicle-postgres.json`      | 162 | PostgreSQL or TimescaleDB, from the sink that connects or the SQL file |
+| `ghchronicle-graphite.json`      | 162 | Graphite, from the Graphite sink                                        |
+| `ghchronicle-elasticsearch.json` | 162 | Elasticsearch or OpenSearch, from the Elasticsearch sink                |
 
 The five hold the same panels in the same order. What differs is how many of
 them the store behind each one can answer.
 
-Each cell is the panels that store answers with a query, out of the panels in that section. A panel a store cannot answer ships as a text panel with the same title, so every dashboard has the same 156 panels; the 2 that are prose in all five are left out here.
+Each cell is the panels that store answers with a query, out of the panels in that section. A panel a store cannot answer ships as a text panel with the same title, so every dashboard has the same 162 panels; the 2 that are prose in all five are left out here.
 
 | Section | InfluxDB | PostgreSQL | Elasticsearch | Graphite | Prometheus | Panels |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -40,11 +40,12 @@ Each cell is the panels that store answers with a query, out of the panels in th
 | Releases | 4 | 4 | 3 | 4 | 2 | 4 |
 | Security | 16 | 16 | 16 | 13 | 13 | 16 |
 | Cost | 6 | 6 | 6 | 6 | 6 | 6 |
+| Organizations | 6 | 6 | 6 | 4 | 6 | 6 |
 | Activity | 9 | 9 | 9 | 8 | 7 | 9 |
 | Inventory | 16 | 16 | 15 | 15 | 14 | 16 |
 | Profile and sponsorship | 8 | 8 | 8 | 8 | 8 | 8 |
 | The collector itself | 4 | 4 | 4 | 4 | 4 | 4 |
-| **Total** | **154** | **154** | **149** | **146** | **128** | **154** |
+| **Total** | **160** | **160** | **155** | **150** | **134** | **160** |
 
 ![The InfluxDB dashboard over ninety days of the demonstration database: the repository picker and the range across the top, the Overview with the ghchronicle badge and four tile groups reading 5 repositories with 350 stars and 51 forks, 37.5 thousand views with 21.1 thousand unique visitors and 19.6 thousand clones, 117 followers and 58 following with 4 sponsors and 2 sponsored, and 3.22 thousand contributions over 7.78 years, then the collapsed Lifetime header and the Audience section with views, unique visitors and clones per day, the top referrers, the top paths and clone amplification](../site/src/assets/dashboard-influxdb-demo.png)
 
@@ -345,12 +346,12 @@ in the repository.
 
 ## What they show
 
-The seventeen sections and their one hundred and fifty six panels, one capture each, and what changes when the store cannot answer.
+The seventeen sections and their one hundred and sixty two panels, one capture each, and what changes when the store cannot answer.
 
 Source: <https://docs.jmrp.io/ghchronicle/dashboards/panels/>
 
 One dashboard, rendered once per store. Seventeen sections, one hundred and
-fifty six panels, in the same places with the same titles whichever database
+sixty two panels, in the same places with the same titles whichever database
 you chose. One capture per section below, in the order the dashboard puts them.
 
 Every section but the Overview opens collapsed. Open, the first seven were
@@ -1004,6 +1005,35 @@ exporter drops it a day later, or, pushed over OTLP, until the process
 restarts.
 
 Reads `gh_billing_usage`, `gh_actions_cache` and `gh_actions_cache_entry`.
+
+### Organizations
+
+Two tables of each organisation in `targets.orgs`, its people and its
+machinery, then its own bill: what it came to, cost and Actions minutes over
+time by organisation, and usage by repository.
+
+The people are the members and how many of them own the organisation, its
+teams, the outside collaborators given a repository, the invitations nobody has
+answered, the Copilot seats it pays for against the ones used this cycle, and
+whether it requires two-factor authentication. The machinery is its
+repositories, its self-hosted runners, the Actions secrets and variables its
+repositories share, its webhooks, the GitHub Apps installed on it, its projects
+and what its repositories hold in the Actions cache together. Each row is the
+organisation's newest in the range, since a count goes down when someone
+leaves. Most of these counts answer an owner alone, and an organisation the
+account is only a member of has them empty; in InfluxDB and PostgreSQL a column
+no row has written is refused, so the two tables answer once one organisation
+of the configuration is the account's to own. Graphite draws neither table: it
+reduces one series to one row, and an organisation is a series per count.
+
+The bill is apart from Cost on purpose. A repository an organisation owns is
+billed to the organisation and not to the account, and somebody else pays it,
+so adding it to the account's spending would misstate both. The panels are the
+Cost section's, drawn over the organisations' bills and split by organisation,
+and each row of the usage table links to the bill it was read from, which only
+the organisation's owners can open.
+
+Reads `gh_org` and `gh_org_billing_usage`.
 
 ### Activity
 
