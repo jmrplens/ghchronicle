@@ -328,7 +328,9 @@ Workflow jobs are tagged `job_name`.
 **A fork's default branch is somebody else's history.** It is its upstream's,
 synced in, and none of it is the account's work, so a fork writes the
 account's part alone: `gh_commit` asks `history(author: {id})` with the
-account's node id (`Runner.accountID`), `gh_commits_week` writes the owner's
+account's node id (`Runner.accountID`), never from before the fork was created
+(`Repo.CreatedAt`, since GitHub walks the history to filter it and a whole
+upstream's took 9.3 s for six commits), `gh_commits_week` writes the owner's
 commits as `commits`, and there is no punch card, which GitHub does not split
 by author. A new per-repository measurement of commits does the same.
 

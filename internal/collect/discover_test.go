@@ -4,6 +4,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 )
 
 func names(repos []Repo) []string {
@@ -232,7 +233,10 @@ func TestDiscoverTakesANamedRepositoryFromTheListing(t *testing.T) {
 
 	want := map[string]Repo{
 		"octocat/old-fork": {Owner: "octocat", Name: "old-fork", FullName: "octocat/old-fork", Fork: true, Archived: true},
-		"OctoCat/Linguist": {Owner: "OctoCat", Name: "Linguist", FullName: "OctoCat/Linguist", Fork: true},
+		"OctoCat/Linguist": {
+			Owner: "OctoCat", Name: "Linguist", FullName: "OctoCat/Linguist", Fork: true,
+			CreatedAt: time.Date(2026, 7, 8, 0, 10, 27, 0, time.UTC),
+		},
 		"someone/a-fork-i-maintain": {
 			Owner: "someone", Name: "a-fork-i-maintain", FullName: "someone/a-fork-i-maintain",
 			Fork: true, Archived: true, HasDiscussions: true,
@@ -325,4 +329,26 @@ func TestExcluded(t *testing.T) {
 			t.Errorf("excluded(%q, %v) = %v, want %v", tc.full, tc.patterns, got, tc.want)
 		}
 	}
+}
+
+// TestDiscoverKeepsWhenARepositoryWasCreated: a fork's commits are read from
+// when the account forked it, which the listing says and a fork's history
+// filtered by author needs, or GitHub walks the upstream's whole history.
+func TestDiscoverKeepsWhenARepositoryWasCreated(t *testing.T) {
+	t.Parallel()
+	f := newFixtureServer(t)
+	f.file("/user/repos", "user_repos.json")
+	got, err := Discover(ctx(t), f.Client, &Filter{User: "octocat", IncludeForks: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range got.Repos {
+		if r.FullName == "octocat/linguist" {
+			if want := time.Date(2026, 7, 8, 0, 10, 27, 0, time.UTC); !r.CreatedAt.Equal(want) {
+				t.Errorf("linguist created %v, want %v", r.CreatedAt, want)
+			}
+			return
+		}
+	}
+	t.Error("the fork was not discovered")
 }

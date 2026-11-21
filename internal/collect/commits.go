@@ -37,6 +37,15 @@ type Commits struct {
 	// costs a page however long its upstream is: measured on 2026-11-17,
 	// jmrplens/renovate's default branch held 27,158 commits and none by the
 	// account. Empty reads every commit, which is a repository of its own.
+	//
+	// With an author the history is never read from before the repository
+	// was created, which for a fork is when the account forked it. GitHub
+	// filters by author by walking the history, so a whole history is a walk
+	// of the upstream's: on 2026-11-17 the first page of six of
+	// jmrplens/winget-pkgs took 9.3 s unbounded, and a backfill's walk of it
+	// met the gateway's ten seconds at the smallest page, where bounded by the
+	// fork's creation the same page took 3.0 s and held the same eleven
+	// commits.
 	Author string
 }
 
@@ -179,8 +188,8 @@ func (cm Commits) Collect(ctx context.Context, c *ghapi.Client, repo Repo, _ tim
 		if cm.Author != "" {
 			vars["author"] = map[string]any{"id": cm.Author}
 		}
-		if !cm.Since.IsZero() {
-			vars["since"] = cm.Since.UTC().Format(time.RFC3339)
+		if since := cm.floor(repo); !since.IsZero() {
+			vars["since"] = since.UTC().Format(time.RFC3339)
 		}
 		if after != "" {
 			vars["after"] = after
@@ -223,6 +232,15 @@ func (cm Commits) Collect(ctx context.Context, c *ghapi.Client, repo Repo, _ tim
 		after = next
 	}
 	return points, nil
+}
+
+// floor is the earliest commit the history is read from: Since, or for a
+// history filtered by author, the repository's creation if that is later.
+func (cm Commits) floor(repo Repo) time.Time {
+	if cm.Author != "" && repo.CreatedAt.After(cm.Since) {
+		return repo.CreatedAt
+	}
+	return cm.Since
 }
 
 // commitPoints renders one page and returns the cursor of the next, or empty

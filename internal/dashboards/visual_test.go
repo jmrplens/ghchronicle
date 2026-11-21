@@ -450,8 +450,10 @@ func TestGraphiteContributionTotalsReadAsTheOthers(t *testing.T) {
 
 // TestACountAxisTicksWholeNumbers: a bar chart of counts drew its axis in
 // Grafana's default decimals, so one open alert stood on ticks every 0.05 up
-// to 2 and three events on ticks every 0.2. A count is `short`, and every
-// chart of one keeps whole numbers, the line charts as the bar charts.
+// to 2 and three events on ticks every 0.2. A count keeps whole numbers in
+// every chart, the line charts as the bar charts, and is written out rather
+// than scaled: `short` with no decimals rounded every tick between two
+// thousands to the same label, 2K 2K 2K 1K 1K up "Commits per week".
 func TestACountAxisTicksWholeNumbers(t *testing.T) {
 	t.Parallel()
 	checked := 0
@@ -461,7 +463,11 @@ func TestACountAxisTicksWholeNumbers(t *testing.T) {
 				continue
 			}
 			defaults := defaultsOf(t, p)
-			if defaults["unit"] != "short" {
+			if defaults["unit"] == "short" {
+				t.Errorf("%s %q scales its counts, which rounds the ticks between two thousands alike",
+					store.Name, p["title"])
+			}
+			if defaults["unit"] != "none" {
 				continue
 			}
 			checked++
