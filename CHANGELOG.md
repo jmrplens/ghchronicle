@@ -13,6 +13,39 @@ day the tag was pushed, with two exceptions: 2.5.2 has a section and no tag,
 and its changes shipped in 2.6.0; 2.6.2 has a tag and no release, since its
 release stopped at the containerised suite, and its changes shipped in 2.6.3.
 
+## 2.8.0 - 2026-11-21
+
+- **An organisation in `targets.orgs` brings its bill.** A repository an
+  organisation owns is billed to the organisation, and the account's usage
+  report never names it: on 2026-11-21 kleidos-dev had burned 1,866 Actions
+  minutes that month, none of them in the account's report. The `billing`
+  family now reads `/organizations/ORG/settings/billing/usage` for each listed
+  organisation beside the account's own report, into the same
+  `gh_billing_usage`, with `owner` the organisation, `user` the bill the row is
+  on and `url` that bill's page, so the cost panels count it with nothing
+  changed in them. Only an organisation's owners may read its report, and to
+  anyone else it is a month with nothing in it, not a failure.
+- **What the configuration collects is no longer work elsewhere.** The
+  searches behind `gh_external_contribution`, `gh_upstream_repo` and the three
+  `_elsewhere` totals left out the account's own repositories alone, so a pull
+  request in an organisation the configuration collects whole was written once
+  by the repository families and again as work sent elsewhere: 33 of the 134
+  pull requests of this account on 2026-11-21, all in kleidos-dev. They now
+  leave out each listed organisation and each named repository as well, with
+  `-user:` and `-repo:`, which GitHub took seven at a time without complaint.
+  An organisation the account belongs to without listing it still counts as
+  elsewhere, and the tag `own` keeps meaning the account owns the repository,
+  since it is part of each row's identity. Rows written before this release
+  stay where they are: the merged items of a collected organisation already
+  stored as work elsewhere keep their rows, and the open ones stop being
+  rewritten the day this release runs.
+- Verified against GitHub: a run of `billing`, `outbound` and `totals` with
+  kleidos-dev listed and conda-forge/phonometry-feedstock named wrote 48 daily
+  rows of kleidos-dev's bill and no work elsewhere in kleidos-dev.
+  Not verified: an organisation with a Copilot seat of its own, whose row
+  names no repository and is kept apart from the account's seat by `user`
+  alone; kleidos-dev has none.
+
 ## 2.7.3 - 2026-11-21
 
 - **A fork's history is read from when the account forked it.** 2.7.2 asks

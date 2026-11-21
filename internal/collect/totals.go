@@ -35,6 +35,9 @@ import (
 type Totals struct {
 	Login string
 	Repos []Repo
+	// Collected is left out of the counts of work elsewhere, as Outbound
+	// leaves it out of its items: see Collected.
+	Collected Collected
 	// Archived is the archived repositories the filter set aside. Their
 	// history is not walked, because none of it moves again, but each gets
 	// two rows from one query per archivedBatch of them: the date it was
@@ -77,6 +80,7 @@ const (
 // because search has no COMMIT type in GraphQL.
 func (t Totals) searchCounts() []searchCount {
 	login := t.Login
+	elsewhere := " " + t.Collected.notIn(login)
 	issues := func(field, q string) searchCount {
 		return searchCount{field: field, kind: "ISSUE", query: q}
 	}
@@ -86,17 +90,17 @@ func (t Totals) searchCounts() []searchCount {
 		issues("pulls_open_now", pullsByAuthor+login+" is:open"),
 		// Merged somewhere that is not this account: the work that a sweep
 		// over one's own repositories cannot see at all.
-		issues("pulls_merged_elsewhere", pullsByAuthor+login+" is:merged -user:"+login),
+		issues("pulls_merged_elsewhere", pullsByAuthor+login+" is:merged"+elsewhere),
 		issues("pulls_reviewed", "type:pr reviewed-by:"+login),
 		issues("issues_opened", issuesByAuthor+login),
 		issues("issues_closed", issuesByAuthor+login+" is:closed"),
-		issues("issues_elsewhere", issuesByAuthor+login+" -user:"+login),
+		issues("issues_elsewhere", issuesByAuthor+login+elsewhere),
 		// The same elsewhere as the two above. It was -author:, which kept
 		// every thread the account commented on in its own repositories, a
 		// Dependabot pull request included: measured on 2026-09-26, 125
 		// where this reads 55, 103 of the 125 at home and 54 of those
 		// Dependabot's.
-		issues("commented_elsewhere", "commenter:"+login+" -user:"+login),
+		issues("commented_elsewhere", "commenter:"+login+elsewhere),
 		{field: "repositories", kind: "REPOSITORY", query: "user:" + login},
 	}
 }

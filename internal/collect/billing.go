@@ -22,6 +22,14 @@ import (
 // one can be derived from the others.
 type Billing struct {
 	Login string
+	// Orgs are the organizations whose own report is read beside the
+	// account's. A repository an organization owns is billed to that
+	// organization and never appears in the account's report: on 2026-11-21
+	// kleidos-dev had burned 1,866 Actions minutes that month, and the
+	// account's report named none of its repositories. The organization form
+	// answers its owners alone; to anyone else it is a 404, read as a month
+	// with nothing in it.
+	Orgs []string
 	// Months is how far back to walk, counting the current one.
 	Months int
 	// Walk widens it: a bounded Since walks back to that month, an unbounded
@@ -30,7 +38,41 @@ type Billing struct {
 	Walk Walk
 }
 
+// billingReport is one usage report: whose bill it is, which is the `user`
+// tag of its rows, the path that answers it, and the page it is read on.
+type billingReport struct {
+	who, path, page string
+}
+
 func (b Billing) Collect(ctx context.Context, c *ghapi.Client, now time.Time) ([]sink.Point, error) {
+	reports := []billingReport{{
+		who: b.Login, path: "/users/" + b.Login + "/settings/billing/usage",
+		page: "https://github.com/settings/billing/summary",
+	}}
+	for _, org := range b.Orgs {
+		reports = append(reports, billingReport{
+			who: org, path: "/organizations/" + org + "/settings/billing/usage",
+			page: "https://github.com/organizations/" + org + "/settings/billing/summary",
+		})
+	}
+	var points []sink.Point
+	for _, r := range reports {
+		more, err := b.report(ctx, c, r, now)
+		points = append(points, more...)
+		if err != nil {
+			return points, err
+		}
+	}
+	return points, nil
+}
+
+// report walks one report back month by month.
+//
+// Each report's rows say whose bill they are in `user`. The tags that name a
+// repository keep two reports apart wherever there is one, but a charge that
+// belongs to none, a Copilot seat, names none, and an organization's seat of
+// the same day and SKU as the account's would otherwise have been one row.
+func (b Billing) report(ctx context.Context, c *ghapi.Client, r billingReport, now time.Time) ([]sink.Point, error) {
 	months := b.Months
 	if months <= 0 {
 		months = 1
@@ -48,7 +90,7 @@ func (b Billing) Collect(ctx context.Context, c *ghapi.Client, now time.Time) ([
 		if empty >= 3 {
 			break
 		}
-		path := fmt.Sprintf("/users/%s/settings/billing/usage?year=%d&month=%d", b.Login, t.Year(), int(t.Month()))
+		path := fmt.Sprintf("%s?year=%d&month=%d", r.path, t.Year(), int(t.Month()))
 		var res struct {
 			UsageItems []struct {
 				Date           string  `json:"date"`
@@ -61,10 +103,8 @@ func (b Billing) Collect(ctx context.Context, c *ghapi.Client, now time.Time) ([
 				DiscountAmount float64 `json:"discountAmount"`
 				NetAmount      float64 `json:"netAmount"`
 				RepositoryName string  `json:"repositoryName"`
-				// Read, but never sent by this endpoint: see billingRepoTags.
-				// It is kept so that the day the organization form of the
-				// report is collected, the owner is already read from where
-				// GitHub puts it.
+				// Sent by the organization form of the report alone, where
+				// it names the organization asked about: see billingRepoTags.
 				OrgName string `json:"organizationName"`
 			} `json:"usageItems"`
 		}
@@ -105,9 +145,9 @@ func (b Billing) Collect(ctx context.Context, c *ghapi.Client, now time.Time) ([
 			day = day.UTC().Truncate(24 * time.Hour)
 			points = append(points, sink.Point{
 				Measurement: "gh_billing_usage",
-				Tags: merge(billingRepoTags(b.Login, u.OrgName, u.RepositoryName),
+				Tags: merge(billingRepoTags(r.who, u.OrgName, u.RepositoryName),
 					map[string]string{
-						"user": b.Login, "product": u.Product, "sku": u.SKU,
+						"user": r.who, "product": u.Product, "sku": u.SKU,
 						"unit": u.UnitType,
 					}),
 				Fields: map[string]any{
@@ -115,7 +155,7 @@ func (b Billing) Collect(ctx context.Context, c *ghapi.Client, now time.Time) ([
 					"gross": u.GrossAmount, "discount": u.DiscountAmount, "net": u.NetAmount,
 					// The bill itself, which is the only page any of this can
 					// be checked against.
-					"url": "https://github.com/settings/billing/summary",
+					"url": r.page,
 				},
 				Time: day,
 			})
@@ -127,18 +167,11 @@ func (b Billing) Collect(ctx context.Context, c *ghapi.Client, now time.Time) ([
 // billingRepoTags names the repository a charge belongs to, in the one shape
 // every other measurement names one in.
 //
-// The `org` tag this replaces was the same dimension as `owner`, recorded
-// where it could never arrive. `organizationName` is not a property of
-// /users/{login}/settings/billing/usage: it is absent from every row that
-// endpoint returns, absent rather than present and empty, and absent from that
-// path's published schema. It exists only on the organization form of the
-// report, /organizations/{org}/settings/billing/usage, where it is required
-// and names the organization whose report was asked for, which is the owner of
-// every repository in that report. So the tag could only ever carry the
-// sentinel, and a reader asking whose repository burned the minutes had no
-// answer at all. Folding it into `owner` loses nothing in either direction:
-// this endpoint bills the login, and the day the organization report is
-// collected the organization it names is the owner, which is where it goes.
+// `organizationName` is sent by the organization form of the report alone,
+// where it is required and names the organization asked about, the owner of
+// every repository in it; the account's form never sends it, absent rather
+// than empty, and bills the login. So the organization, where there is one,
+// is the owner, and otherwise the account is.
 //
 // A charge that belongs to no repository names none of the three. Those rows
 // are the monthly Copilot credit, three of the 937 measured, and they are not

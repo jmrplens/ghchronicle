@@ -277,7 +277,11 @@ func (Planning) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now tim
 // the comments that exist, said 0.
 type Outbound struct {
 	Login string
-	Walk  Walk
+	// Collected is left out of every search beside the account's own
+	// repositories: its pull requests and issues are the repository
+	// families' rows already. See Collected.
+	Collected Collected
+	Walk      Walk
 	// Moved bounds a sweep's closed searches by time rather than by page:
 	// each reads until a page ends on an item that last moved before it,
 	// however many pages that takes. The runner sets it a cadence before the
@@ -1037,7 +1041,7 @@ func (o Outbound) search(ctx context.Context, c *ghapi.Client, s outboundSearch,
 		order, most = "sort:created-desc", Unbounded.limit(0)
 	}
 	vars := map[string]any{
-		"query": fmt.Sprintf("%s author:%s -user:%s %s", s.filter, o.Login, o.Login, order),
+		"query": fmt.Sprintf("%s author:%s %s %s", s.filter, o.Login, o.Collected.notIn(o.Login), order),
 		"first": 100,
 	}
 	var points []sink.Point

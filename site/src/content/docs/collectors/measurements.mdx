@@ -516,8 +516,8 @@ spells it, with the `[bot]` suffix, on every measurement.
 discussion, replies answer those, and GitHub's own number on the page is the
 two added together.
 
-`gh_external_contribution` is the work the account did in repositories it does
-not own, from five searches, one per `kind` and `state`: pull requests
+`gh_external_contribution` is the work the account did in repositories this
+configuration does not collect, from five searches, one per `kind` and `state`: pull requests
 `merged`, `open` and `closed` unmerged, and issues `open` and `closed`. An item
 still open is rewritten at the start of every day it stays open, so a sweep
 reads both open states whole. A closed item is written once, stamped when it
@@ -1087,10 +1087,15 @@ GraphQL query with a search alias for each, and `commits`, which GraphQL search
 cannot count, is a REST search of its own. So each number is one row and is
 right on the first sweep of a fresh install.
 
-The three fields that end in `_elsewhere` share one meaning of elsewhere: in a
-repository the account does not own, since the search qualifier `-user:LOGIN`
-leaves out the ones it does, so an organisation's repositories count as
-elsewhere even when the account belongs to it. `pulls_merged_elsewhere` is its pull
+The three fields that end in `_elsewhere` share one meaning of elsewhere, the
+one `gh_external_contribution` has: in a repository this configuration does not
+collect. The searches leave out the account's own with `-user:LOGIN`, each
+organisation in `targets.orgs` with another `-user:`, and each repository named
+in `targets.repos` that none of those owns with `-repo:`. An organisation the
+account belongs to and does not collect still counts as elsewhere. Up to 2.7.3
+only `-user:LOGIN` was there, so a pull request in a collected organisation was
+written both as `gh_pull_request` and as work elsewhere: 33 of the 134 pull
+requests of the account this was measured on, on 2026-11-21. `pulls_merged_elsewhere` is its pull
 requests merged there and `issues_elsewhere` the issues it opened there.
 `commented_elsewhere` is the issues and pull requests there that carry at least
 one comment of its own (`commenter:LOGIN -user:LOGIN`): threads, not comments,
@@ -1367,19 +1372,23 @@ is still made here, by when the run finished.
 
 | Measurement        | Dated          | Tags                                    | Fields                                                          |
 | ------------------ | -------------- | --------------------------------------- | --------------------------------------------------------------- |
-| `gh_billing_usage` | dated, per day | `product`, `sku`, `unit` | `quantity`, `price_per_unit`, `gross`, `discount`, `net`, `url` |
+| `gh_billing_usage` | dated, per day | `user`, `product`, `sku`, `unit` | `quantity`, `price_per_unit`, `gross`, `discount`, `net`, `url` |
 
 `unit` is GitHub's own `unitType`, capitalised as GitHub sends it: `Minutes`,
 `GigabyteHours`, `AICredits`, `Requests`. It is passed through rather than
 normalised, and the panels that read minutes filter on the capital.
 
-There is no `org` tag. The only billing endpoint a personal account can read is
-its own, and that report has no `organizationName`: the field belongs to the
-organization report, which needs an organization to ask about. Checked against
-the published OpenAPI description and against the live endpoint, where none of
-487 usage items carried the key. Written anyway it was `(none)` on every row
-ever collected, which is a column and a legend entry that only ever says there
-is nothing here.
+Two reports are read. The account's own, `/users/LOGIN/settings/billing/usage`,
+bills what the account owns, and each organisation in `targets.orgs` has its
+own, `/organizations/ORG/settings/billing/usage`, since 2.8.0: a repository an
+organisation owns is billed to the organisation and never appears in the
+account's report. `user` says whose bill a row is on, the login or the
+organisation, `owner` is the organisation on every row of its report, and `url`
+is that bill's page. Only an organisation's owners may read its report; to
+anyone else it answers 404, which is a month with nothing in it and not a
+failure. There is no `org` tag: the account's report never carries
+`organizationName`, and on the organisation's it is the owner, which is where
+it goes.
 
 `repo` is `(none)` on a charge that belongs to no repository, which is what a
 Copilot seat is. That is a real row of the bill and not a repository, so the

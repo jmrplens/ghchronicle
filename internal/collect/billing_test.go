@@ -159,3 +159,48 @@ func TestABillingChargeIsOwnedByTheOrganizationWhenThereIsOne(t *testing.T) {
 		}
 	}
 }
+
+// TestAnOrganizationsBillIsReadBesideTheAccounts: a repository an
+// organization owns is billed to the organization, so its minutes are read
+// from the organization's own report, owned by it and said to be its bill,
+// and an organization whose report the token may not read is nothing to
+// write rather than a failure.
+func TestAnOrganizationsBillIsReadBesideTheAccounts(t *testing.T) {
+	t.Parallel()
+	f := newFixtureServer(t)
+	f.file("/users/octocat/settings/billing/usage", "billing_usage.json")
+	f.file("/organizations/acme/settings/billing/usage", "billing_usage_org.json")
+	f.handle("/organizations/strangers/settings/billing/usage", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"message":"Not Found"}`))
+	})
+	points, err := Billing{Login: "octocat", Orgs: []string{"acme", "strangers"}, Months: 1}.Collect(ctx(t), f.Client, testNow)
+	if err != nil {
+		t.Fatalf("an organization whose bill is not ours to read is not an error: %v", err)
+	}
+	checkPoints(t, points)
+	if len(points) != 4 {
+		t.Fatalf("got %d points, want the account's 2 and the organization's 2", len(points))
+	}
+	minutes := find(t, points, "gh_billing_usage", map[string]string{"full_name": "acme/agents"})
+	if minutes.Tags["owner"] != "acme" || minutes.Tags["user"] != "acme" {
+		t.Errorf("tags = %v, want the organization as the owner and as whose bill it is", minutes.Tags)
+	}
+	if want := "https://github.com/organizations/acme/settings/billing/summary"; minutes.Fields["url"] != want {
+		t.Errorf("url = %v, want the organization's bill %s", minutes.Fields["url"], want)
+	}
+	// Both seats name no repository and fall on the same day and SKU, so
+	// whose bill each is, is what keeps them two rows.
+	seats := map[string]bool{}
+	for _, p := range points {
+		if p.Tags["repo"] == noneTag {
+			seats[p.Tags["user"]] = true
+		}
+	}
+	if !seats["octocat"] || !seats["acme"] || len(seats) != 2 {
+		t.Errorf("seats by bill = %v, want one on octocat's and one on acme's", seats)
+	}
+	if n := len(f.calls("/organizations/strangers/settings/billing/usage")); n != 1 {
+		t.Errorf("asked the refused report %d times, want once for the one month", n)
+	}
+}

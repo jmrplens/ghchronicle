@@ -37,7 +37,10 @@ targets:
   # The account to collect. Its repositories are discovered automatically.
   user: your-github-login
 
-  # Organisations to include as well.
+  # Organisations to include as well: every repository each one lists, and its
+  # bill when the account is one of its owners. Their work no longer counts as
+  # work elsewhere. For an organisation the account only works in, name its few
+  # repositories under repos instead of listing thousands here.
   orgs: []
 
   # Repositories to collect whatever the filters below say. Naming one is the

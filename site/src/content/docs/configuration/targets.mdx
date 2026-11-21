@@ -66,6 +66,33 @@ four things discovery wants to know about it. Only a name no listing returns,
 someone else's repository or one of an organisation not in `orgs`, is read on
 its own each time the list is rebuilt.
 
+## An organisation
+
+`orgs` collects every repository the organisation's listing returns to the
+token, private ones included where the account can see them, under the same
+three switches as the account's own. Two more things follow from listing one:
+
+- **Its bill.** The `billing` family reads the organisation's usage report
+  beside the account's, since an organisation's repositories are billed to it
+  and never to the account. Only its owners may read it; for a member it is
+  nothing to write.
+- **Its work is not work elsewhere.** The pull requests, issues and comment
+  counts of `gh_external_contribution` and the `_elsewhere` totals leave out
+  every listed organisation and every named repository, which the repository
+  families already write. An organisation the account belongs to without
+  listing it still counts as elsewhere.
+
+Listing is the wrong tool for an organisation the account only works in. One
+that hosts thousands of repositories (conda-forge held 30,214 on 2026-11-21)
+would put every one in the sweep, so name the few the account maintains in
+`repos` instead. A named repository is left out of work elsewhere the same way,
+but brings no bill: the organisation's report covers all of its repositories,
+and only its owners may read it.
+
+The tag `own` on the comment and contribution rows is narrower: it says the
+account itself owns the repository, and a listed organisation does not change
+it, since it is part of every such row's identity.
+
 ## Why forks and archived are off by default
 
 Both defaults exist for the same reason, which is the rate limit.

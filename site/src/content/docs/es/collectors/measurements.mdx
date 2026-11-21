@@ -536,7 +536,7 @@ responden a la discusión, las respuestas responden a esos, y el número que
 GitHub enseña en la página es la suma de los dos.
 
 `gh_external_contribution` es el trabajo que la cuenta hizo en repositorios que
-no son suyos, sacado de cinco búsquedas, una por `kind` y `state`: pull
+esta configuración no recoge, sacado de cinco búsquedas, una por `kind` y `state`: pull
 requests `merged`, `open` y `closed` sin fusionar, e issues `open` y `closed`.
 Un elemento que sigue abierto se reescribe al principio de cada día que sigue
 abierto, así que una pasada lee enteros los dos estados abiertos. Un elemento
@@ -1141,10 +1141,15 @@ diez son una consulta GraphQL con un alias de búsqueda para cada uno, y
 propia. Así que cada número es una fila y es correcto en la primera pasada de
 una instalación recién hecha.
 
-Los tres campos que acaban en `_elsewhere` comparten un mismo sentido de fuera:
-en un repositorio que no es de la cuenta, porque el calificador de búsqueda
-`-user:LOGIN` deja fuera los que sí lo son, así que los repositorios de una
-organización cuentan como fuera aunque la cuenta pertenezca a ella.
+Los tres campos que acaban en `_elsewhere` comparten un mismo sentido de fuera,
+el de `gh_external_contribution`: en un repositorio que esta configuración no
+recoge. Las búsquedas dejan fuera los de la cuenta con `-user:LOGIN`, cada
+organización de `targets.orgs` con otro `-user:`, y cada repositorio nombrado en
+`targets.repos` que no sea de ninguno de ellos con `-repo:`. Una organización a
+la que la cuenta pertenece y que no se recoge sigue contando como fuera. Hasta
+la 2.7.3 solo estaba `-user:LOGIN`, así que una pull request en una organización
+recogida se escribía como `gh_pull_request` y además como trabajo fuera: 33 de
+las 134 pull requests de la cuenta con la que se midió, el 2026-11-21.
 `pulls_merged_elsewhere` son sus pull requests fusionadas allí e
 `issues_elsewhere` las issues que abrió allí. `commented_elsewhere` son las
 issues y pull requests de allí que llevan al menos un comentario suyo
@@ -1433,19 +1438,23 @@ haciendo aquí, por cuándo terminó la ejecución.
 
 | Medida             | Fechado          | Etiquetas                               | Campos                                                          |
 | ------------------ | ---------------- | --------------------------------------- | --------------------------------------------------------------- |
-| `gh_billing_usage` | fechado, por día | `product`, `sku`, `unit` | `quantity`, `price_per_unit`, `gross`, `discount`, `net`, `url` |
+| `gh_billing_usage` | fechado, por día | `user`, `product`, `sku`, `unit` | `quantity`, `price_per_unit`, `gross`, `discount`, `net`, `url` |
 
 `unit` es el propio `unitType` de GitHub, con la mayúscula con la que GitHub lo
 manda: `Minutes`, `GigabyteHours`, `AICredits`, `Requests`. Se pasa tal cual, sin
 normalizar, y los paneles que leen minutos filtran por esa mayúscula.
 
-No hay etiqueta `org`. El único endpoint de facturación que puede leer una
-cuenta personal es el suyo, y ese informe no tiene `organizationName`: el campo
-es del informe de organización, que necesita una organización a la que
-preguntar. Comprobado contra la descripción OpenAPI publicada y contra el
-endpoint en vivo, donde ninguno de 487 elementos de uso traía la clave.
-Escrita igualmente era `(none)` en todas las filas recogidas, que es una columna
-y una entrada de leyenda que solo dicen que ahí no hay nada.
+Se leen dos informes. El de la cuenta, `/users/LOGIN/settings/billing/usage`,
+factura lo que es de la cuenta, y cada organización de `targets.orgs` tiene el
+suyo, `/organizations/ORG/settings/billing/usage`, desde la 2.8.0: un
+repositorio de una organización se factura a la organización y nunca aparece en
+el informe de la cuenta. `user` dice en qué factura está una fila, la del login
+o la de la organización, `owner` es la organización en todas las filas de su
+informe, y `url` es la página de esa factura. Solo los propietarios de una
+organización pueden leer su informe; a cualquier otro le responde 404, que es un
+mes sin nada y no un fallo. No hay etiqueta `org`: el informe de la cuenta nunca
+trae `organizationName`, y en el de la organización es el propietario, que es
+donde va.
 
 `repo` es `(none)` en un cargo que no pertenece a ningún repositorio, que es lo
 que es un asiento de Copilot. Eso es una fila real de la factura y no un
