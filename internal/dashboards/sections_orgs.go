@@ -43,23 +43,23 @@ func orgTables(b *builder) []Panel {
 		{field: "members", name: "Members", w: 100},
 		{field: "admins", name: "Owners", w: 90},
 		{field: "teams", name: "Teams", w: 80},
-		{field: "outside_collaborators", name: "Outside collaborators", w: 110},
-		{field: "pending_invitations", name: "Invitations", w: 100},
-		{field: "copilot_seats", name: "Copilot seats", w: 110},
-		{field: "copilot_active", name: "Copilot used", w: 110},
+		{field: "outside_collaborators", name: "Outside collaborators", w: 175},
+		{field: "pending_invitations", name: "Invitations", w: 110},
+		{field: "copilot_seats", name: "Copilot seats", w: 120},
+		{field: "copilot_active", name: "Copilot used", w: 120},
 		{field: "two_factor_required", name: "Two-factor", w: 100},
 		{field: "plan", name: "Plan", w: 90, text: true},
 	}
 	machinery := []orgColumn{
-		{field: "public_repos", name: "Public repositories", w: 120},
-		{field: "private_repos", name: "Private repositories", w: 120},
+		{field: "public_repos", name: "Public repositories", w: 160},
+		{field: "private_repos", name: "Private repositories", w: 165},
 		{field: "runners", name: "Runners", w: 90},
 		{field: "secrets", name: "Secrets", w: 90},
 		{field: "variables", name: "Variables", w: 90},
 		{field: "hooks", name: "Webhooks", w: 100},
 		{field: "installations", name: "Apps", w: 80},
 		{field: "projects", name: "Projects", w: 90},
-		{field: "actions_cache_bytes", name: "Actions cache", w: 120},
+		{field: "actions_cache_bytes", name: "Actions cache", w: 130},
 	}
 	return []Panel{
 		orgTable(b, "Organizations: people", 0, people,
@@ -71,14 +71,14 @@ func orgTables(b *builder) []Panel {
 				"two-factor answer an owner alone, and are empty for an organization the "+
 				"account is only a member of.",
 			[]any{onOff("Two-factor", 100)}),
-		orgTable(b, "Organizations: machinery", 6, machinery,
+		orgTable(b, "Organizations: machinery", 5, machinery,
 			"What the organization's owners set up, newest row in the range: its "+
 				"repositories, its self-hosted runners, the Actions secrets and variables "+
 				"shared by its repositories, its webhooks, the GitHub Apps installed on it, "+
 				"its projects, and what all its repositories hold in the Actions cache "+
 				"together. Each repository's own are in their sections. Every column but "+
 				"the repositories and the projects answers an owner alone.",
-			[]any{unitOf("Actions cache", "bytes", 120)}),
+			[]any{unitOf("Actions cache", "bytes", 130)}),
 	}
 }
 
@@ -135,7 +135,7 @@ func orgTable(b *builder, title string, y int, cols []orgColumn, desc string, ov
 		promDesc = append(promDesc, "The exporter carries numbers alone, so there is no "+
 			strings.Join(promText, " or ")+" column.")
 	}
-	return panel("table", title, box{W: 24, H: 6, X: 0, Y: y}, []Target{sqlT(query.String())}, &P{
+	return panel("table", title, box{W: 24, H: 5, X: 0, Y: y}, []Target{sqlT(query.String())}, &P{
 		Prom:     prom,
 		PromTF:   merged(rename, nil),
 		PromDesc: strings.Join(promDesc, " "),
@@ -187,7 +187,7 @@ func orgSpend(b *builder) []Panel {
 		[]string{"NOT repo.keyword:" + noneElasticsearch})
 
 	return []Panel{
-		statGroup("Organization spend in range", box{W: 24, H: 4, X: 0, Y: 12}, []Target{sqlT(
+		statGroup("Organization spend in range", box{W: 24, H: 4, X: 0, Y: 10}, []Target{sqlT(
 			`SELECT SUM(gross) AS "Gross", SUM(discount) AS "Covered by the plan",` +
 				` SUM(net) AS "Actually billed",` +
 				` SUM(CASE WHEN unit = 'Minutes' THEN quantity ELSE 0 END) AS "Actions minutes"` +
@@ -227,7 +227,7 @@ func orgSpend(b *builder) []Panel {
 				noValueOf(costBilled, costNoUsage), noValueOf(costActionsMinutes, costNoUsage),
 			},
 		}),
-		panel("timeseries", "Organization cost over time", box{W: 12, H: 8, X: 0, Y: 16},
+		panel("timeseries", "Organization cost over time", box{W: 12, H: 8, X: 0, Y: 14},
 			[]Target{sqlTS(perDay)}, &P{
 				Prom: []Target{promq("sum by (org) (github_org_billing_usage_gross)",
 					legend("{{org}}"))},
@@ -239,7 +239,7 @@ func orgSpend(b *builder) []Panel {
 				GR:       []Target{grq(perBucket(gp(ob, "gross"), gn(ob, "org")))},
 				ES:       []Target{b.esDaily(ob, b.mSum("gross"), "org", "", nil, "")},
 			}),
-		panel("timeseries", "Organization Actions minutes", box{W: 12, H: 8, X: 12, Y: 16},
+		panel("timeseries", "Organization Actions minutes", box{W: 12, H: 8, X: 12, Y: 14},
 			[]Target{sqlTS(minutes)}, &P{
 				Prom: []Target{promq(`sum by (org) (github_org_billing_usage_quantity{unit="Minutes"})`,
 					legend("{{org}}"))},
@@ -252,7 +252,7 @@ func orgSpend(b *builder) []Panel {
 				ES: []Target{b.esDaily(ob, b.mSum("quantity"), "org", "",
 					[]string{"unit:Minutes"}, "")},
 			}),
-		panel("table", "Organization usage by repo", box{W: 24, H: 9, X: 0, Y: 24}, []Target{sqlT(byRepo)}, &P{
+		panel("table", "Organization usage by repo", box{W: 24, H: 9, X: 0, Y: 22}, []Target{sqlT(byRepo)}, &P{
 			Prom: []Target{
 				promTbl(orgPromByRepo("quantity", "sum"), "A"),
 				promTbl(orgPromByRepo("price_per_unit", "max"), "B"),
