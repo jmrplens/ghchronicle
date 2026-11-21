@@ -214,7 +214,7 @@ func TestRedBranchCommitsAreNewestFirst(t *testing.T) {
 // `/rules/{id}`, which gh_ruleset_version already carries and gh_ruleset
 // should; until it does its link says owner only.
 var ownerOnlyURL = map[string]bool{
-	"gh_repo_policy": true, "gh_key": true, "gh_billing_usage": true,
+	"gh_repo_policy": true, "gh_key": true, "gh_billing_usage": true, "gh_org_billing_usage": true,
 	"gh_branch_protection": true, "gh_traffic": true,
 	"gh_dependabot_alert": true, "gh_dependabot_alert_item": true,
 	"gh_code_scanning_alert": true, "gh_code_scanning_alert_item": true,

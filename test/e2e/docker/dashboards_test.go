@@ -802,12 +802,12 @@ var dashboardMissing = map[string]map[int]string{
 		95:  "gh_release_asset.url",
 		96:  "gh_release_asset.url",
 		103: "gh_code_scanning_alert_item.seconds_to_resolve",
-		132: "gh_package.url",
-		133: "gh_gist.url",
-		136: "gh_key",
-		137: "gh_dependency_license",
-		142: "gh_dependency",
-		143: "gh_dependency_change",
+		138: "gh_package.url",
+		139: "gh_gist.url",
+		142: "gh_key",
+		143: "gh_dependency_license",
+		148: "gh_dependency",
+		149: "gh_dependency_change",
 	},
 	"postgres": {
 		7:   "gh_repo_created",
@@ -816,10 +816,10 @@ var dashboardMissing = map[string]map[int]string{
 		31:  "gh_contribution_day_repo",
 		75:  "gh_issue_event",
 		103: "gh_code_scanning_alert_item.seconds_to_resolve",
-		136: "gh_key",
-		137: "gh_dependency_license",
-		142: "gh_dependency",
-		143: "gh_dependency_change",
+		142: "gh_key",
+		143: "gh_dependency_license",
+		148: "gh_dependency",
+		149: "gh_dependency_change",
 	},
 }
 
@@ -980,40 +980,40 @@ var dashboardKnownEmpty = map[string]map[int]string{
 	"influxdb": {
 		55:  keepsFailingEmpty,
 		104: "the Dependabot alert inside the range is open, so it has no seconds_to_resolve",
-		139: "one sweep is one snapshot, and the panel counts the values that changed between two",
+		145: "one sweep is one snapshot, and the panel counts the values that changed between two",
 		// The good case, and the one the panel is built to draw rather than
 		// be refused for: the family rows of gh_collector_family are written
 		// every sweep whether or not anything failed, so the measurement and
 		// every column of it exist, and a sweep that lost no repository draws
 		// an empty list instead of a planner error.
-		155: "nothing failed in the sweep, and this panel lists the repositories a collector could not collect",
+		161: "nothing failed in the sweep, and this panel lists the repositories a collector could not collect",
 	},
 	"postgres": {
 		55:  keepsFailingEmpty,
 		68:  "no commit in the fixture shares a sha with a failed run",
 		96:  "one sweep is one snapshot, and the panel is the difference between two download counts",
 		104: "the Dependabot alert inside the range is open, so it has no seconds_to_resolve",
-		139: "one sweep is one snapshot, and the panel counts the values that changed between two",
-		155: "nothing failed in the sweep, and this panel lists the repositories a collector could not collect",
+		145: "one sweep is one snapshot, and the panel counts the values that changed between two",
+		161: "nothing failed in the sweep, and this panel lists the repositories a collector could not collect",
 	},
 	"graphite": {
 		55:  keepsFailingEmpty,
 		96:  "one sweep is one snapshot, and the panel is the difference between two download counts",
 		103: "every code scanning alert here is open, so no seconds_to_resolve was ever written",
 		104: "the Dependabot alert inside the range is open, so it has no seconds_to_resolve",
-		155: "nothing failed in the sweep, and this panel lists the repositories a collector could not collect",
+		161: "nothing failed in the sweep, and this panel lists the repositories a collector could not collect",
 	},
 	// Prometheus lists only the panels that ask for something the exporter
 	// publishes right now and still get nothing. Everything else this dashboard
 	// leaves empty is derived by promNeedsHistory below, because the reason is
 	// the same for all of them and it is a property of the harness.
 	"prometheus": {
-		155: "nothing failed in the sweep, and this panel lists the repositories a collector could not collect",
+		161: "nothing failed in the sweep, and this panel lists the repositories a collector could not collect",
 	},
 	"elasticsearch": {
 		103: "every code scanning alert here is open, so no seconds_to_resolve was ever written",
 		104: "the Dependabot alert inside the range is open, so it has no seconds_to_resolve",
-		155: "nothing failed in the sweep, and this panel lists the repositories a collector could not collect",
+		161: "nothing failed in the sweep, and this panel lists the repositories a collector could not collect",
 	},
 }
 

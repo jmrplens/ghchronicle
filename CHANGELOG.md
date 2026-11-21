@@ -15,16 +15,32 @@ release stopped at the containerised suite, and its changes shipped in 2.6.3.
 
 ## 2.8.0 - 2026-11-21
 
-- **An organisation in `targets.orgs` brings its bill.** A repository an
+- **A section of the dashboard for organisations.** Listing an organisation in
+  `targets.orgs` collected its repositories and nothing it says about itself.
+  A new `orgs` family writes `gh_org`, one row per organisation stamped at the
+  sweep: its members and how many own it, teams, outside collaborators,
+  invitations, Copilot seats against the ones used this cycle, whether it
+  requires two-factor authentication, its plan, its repositories, self-hosted
+  runners, Actions secrets and variables, webhooks, installed apps, projects,
+  custom properties and what its repositories hold in the Actions cache. Most of
+  it answers an owner alone: measured on conda-forge on 2026-11-21, where this
+  account is a member, nine of the parts were refused, and a refused part
+  leaves its fields out rather than writing a zero. Every part answered 304 to
+  `If-None-Match` on kleidos-dev, so the family runs hourly at no cost while
+  nothing moves. The new Organizations section, after Cost, draws two tables of
+  it in every store but Graphite.
+- **An organisation's bill, apart from the account's.** A repository an
   organisation owns is billed to the organisation, and the account's usage
   report never names it: on 2026-11-21 kleidos-dev had burned 1,866 Actions
   minutes that month, none of them in the account's report. The `billing`
   family now reads `/organizations/ORG/settings/billing/usage` for each listed
-  organisation beside the account's own report, into the same
-  `gh_billing_usage`, with `owner` the organisation, `user` the bill the row is
-  on and `url` that bill's page, so the cost panels count it with nothing
-  changed in them. Only an organisation's owners may read its report, and to
-  anyone else it is a month with nothing in it, not a failure.
+  organisation into `gh_org_billing_usage`, a measurement of its own because it
+  is another bill that somebody else pays, and the Cost panels add up
+  `gh_billing_usage` alone. The Organizations section draws it the way Cost
+  draws the account's: spend in range, cost and Actions minutes over time by
+  organisation, and usage by repository linked to the bill. Only an
+  organisation's owners may read it, and to anyone else it is a month with
+  nothing in it, not a failure.
 - **What the configuration collects is no longer work elsewhere.** The
   searches behind `gh_external_contribution`, `gh_upstream_repo` and the three
   `_elsewhere` totals left out the account's own repositories alone, so a pull
@@ -37,14 +53,16 @@ release stopped at the containerised suite, and its changes shipped in 2.6.3.
   elsewhere, and the tag `own` keeps meaning the account owns the repository,
   since it is part of each row's identity. Rows written before this release
   stay where they are: the merged items of a collected organisation already
-  stored as work elsewhere keep their rows, and the open ones stop being
-  rewritten the day this release runs.
-- Verified against GitHub: a run of `billing`, `outbound` and `totals` with
-  kleidos-dev listed and conda-forge/phonometry-feedstock named wrote 48 daily
-  rows of kleidos-dev's bill and no work elsewhere in kleidos-dev.
-  Not verified: an organisation with a Copilot seat of its own, whose row
-  names no repository and is kept apart from the account's seat by `user`
-  alone; kleidos-dev has none.
+  stored as work elsewhere keep their rows until the two tables are dropped and
+  read again.
+- Verified against GitHub: kleidos-dev listed and
+  conda-forge/phonometry-feedstock named wrote a `gh_org` row with every count,
+  48 daily rows of kleidos-dev's bill in `gh_org_billing_usage` and none in
+  `gh_billing_usage`, and no work elsewhere in kleidos-dev.
+  Not verified: an organisation with a Copilot seat of its own, and the
+  Organizations tables on a configuration whose every organisation the account
+  is only a member of, where InfluxDB and PostgreSQL refuse the columns no row
+  has written; kleidos-dev has no seat, and this account owns it.
 
 ## 2.7.3 - 2026-11-21
 

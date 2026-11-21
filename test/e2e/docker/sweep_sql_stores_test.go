@@ -219,6 +219,7 @@ func sqlStoresConfig(sweep *sqlStoresSweep, s *Stack, githubURL string) (string,
   timeout: 30s
 targets:
   user: %s
+  orgs: [octo-org]
 sinks:
   influxdb:
     url: %s

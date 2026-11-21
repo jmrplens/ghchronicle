@@ -70,12 +70,17 @@ its own each time the list is rebuilt.
 
 `orgs` collects every repository the organisation's listing returns to the
 token, private ones included where the account can see them, under the same
-three switches as the account's own. Two more things follow from listing one:
+three switches as the account's own. Three more things follow from listing one:
 
-- **Its bill.** The `billing` family reads the organisation's usage report
-  beside the account's, since an organisation's repositories are billed to it
-  and never to the account. Only its owners may read it; for a member it is
-  nothing to write.
+- **What it says about itself.** The `orgs` family writes a row of `gh_org` for
+  each: its members and owners, teams, outside collaborators, invitations,
+  Copilot seats, runners, secrets, variables, webhooks, apps, projects and
+  Actions cache, which the dashboard's Organizations section draws. Most of it
+  answers an owner alone, and a member's row leaves those counts out.
+- **Its bill.** The `billing` family reads the organisation's usage report into
+  `gh_org_billing_usage`, apart from the account's, since an organisation's
+  repositories are billed to it and somebody else pays it. Only its owners may
+  read it; for a member it is nothing to write.
 - **Its work is not work elsewhere.** The pull requests, issues and comment
   counts of `gh_external_contribution` and the `_elsewhere` totals leave out
   every listed organisation and every named repository, which the repository
@@ -86,8 +91,8 @@ Listing is the wrong tool for an organisation the account only works in. One
 that hosts thousands of repositories (conda-forge held 30,214 on 2026-11-21)
 would put every one in the sweep, so name the few the account maintains in
 `repos` instead. A named repository is left out of work elsewhere the same way,
-but brings no bill: the organisation's report covers all of its repositories,
-and only its owners may read it.
+but brings no bill and no `gh_org` row: the organisation's report covers all of
+its repositories, and only its owners may read it.
 
 The tag `own` on the comment and contribution rows is narrower: it says the
 account itself owns the repository, and a listed organisation does not change

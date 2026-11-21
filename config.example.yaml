@@ -37,10 +37,11 @@ targets:
   # The account to collect. Its repositories are discovered automatically.
   user: your-github-login
 
-  # Organisations to include as well: every repository each one lists, and its
-  # bill when the account is one of its owners. Their work no longer counts as
-  # work elsewhere. For an organisation the account only works in, name its few
-  # repositories under repos instead of listing thousands here.
+  # Organisations to include as well: every repository each one lists, a row of
+  # what it says about itself (members, teams, seats, runners) and its bill,
+  # both fuller when the account is one of its owners. Their work no longer
+  # counts as work elsewhere. For an organisation the account only works in,
+  # name its few repositories under repos instead of listing thousands here.
   orgs: []
 
   # Repositories to collect whatever the filters below say. Naming one is the
@@ -288,6 +289,7 @@ every:
   #   events: 15m       # one request a pass; the feed keeps the last 300 events, none older than 30 days
   #   notifs: 15m       # one request a pass, and a thread shows only its latest move
   #   billing: 1h       # the month in progress moves while continuous integration runs
+  #   orgs: 1h          # members, teams and seats, edited by hand; unmoved parts answer 304
   #   profile: 12h      # packages, gists, social accounts, all of them edited by hand
   #   outbound: 1h      # stars given, work in other people's repositories, answers accepted there
   #   settings: 6h      # webhooks and their deliveries, rulesets, environments, keys: changed by hand

@@ -454,6 +454,12 @@ func (r *Runner) accountFamilies(ctx context.Context, now time.Time) {
 		// month's rows to be complete before they stop changing.
 		return collect.Billing{Login: user, Orgs: r.Cfg.Targets.Orgs, Months: 2}.Collect(ctx, r.API, now)
 	})
+	// What each organization in targets.orgs says about itself: its people,
+	// its plan and its machinery, which no repository family sees. Nothing
+	// to do without one; its bill is the billing family's.
+	r.family(ctx, "orgs", now, func() ([]sink.Point, error) {
+		return collect.Orgs{Orgs: r.Cfg.Targets.Orgs}.Collect(ctx, r.API, now)
+	})
 	r.family(ctx, "profile", now, func() ([]sink.Point, error) {
 		return collect.Profile{Login: user, Walk: r.walk()}.Collect(ctx, r.API, now)
 	})

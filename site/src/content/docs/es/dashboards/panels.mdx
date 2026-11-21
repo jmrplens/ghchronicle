@@ -1,13 +1,13 @@
 ---
 title: Qué muestran
-description: Las diecisiete secciones y sus ciento cincuenta y seis paneles, una captura de cada una, y qué cambia cuando el almacén no puede responder.
+description: Las diecisiete secciones y sus ciento sesenta y dos paneles, una captura de cada una, y qué cambia cuando el almacén no puede responder.
 searchTitle: Qué muestran los dashboards de métricas de GitHub
 ---
 
 import { Aside } from "@astrojs/starlight/components";
 
 Un dashboard, renderizado una vez por almacén. Diecisiete secciones, ciento
-cincuenta y seis paneles, en los mismos sitios y con los mismos títulos sea cual
+sesenta y dos paneles, en los mismos sitios y con los mismos títulos sea cual
 sea la base de datos elegida. Abajo hay una captura por sección, en el orden en
 que el dashboard las coloca.
 
@@ -710,6 +710,37 @@ exportador la descarta un día después o, empujada por OTLP, hasta que el
 proceso se reinicia.
 
 Lee `gh_billing_usage`, `gh_actions_cache` y `gh_actions_cache_entry`.
+
+## Organizations
+
+Dos tablas de cada organización de `targets.orgs`, su gente y su maquinaria, y
+después su propia factura: a cuánto ascendió, el coste y los minutos de Actions
+a lo largo del tiempo por organización, y el uso por repositorio.
+
+La gente son los miembros y cuántos de ellos son propietarios de la
+organización, sus equipos, los colaboradores externos con acceso a algún
+repositorio, las invitaciones que nadie ha respondido, los asientos de Copilot
+que paga frente a los usados en este ciclo, y si exige la autenticación en dos
+pasos. La maquinaria son sus repositorios, sus runners propios, los secretos y
+variables de Actions que comparten sus repositorios, sus webhooks, las GitHub
+Apps instaladas en ella, sus proyectos y lo que sus repositorios guardan juntos
+en la caché de Actions. Cada fila es la más reciente de la organización en el
+rango, porque un recuento baja cuando alguien se va. Casi todos estos recuentos
+responden solo a un propietario, y una organización de la que la cuenta solo es
+miembro los tiene vacíos; en InfluxDB y PostgreSQL una columna que ninguna fila
+ha escrito se rechaza, así que las dos tablas responden en cuanto una
+organización de la configuración es de la cuenta. Graphite no dibuja ninguna de
+las dos: reduce una serie a una fila, y una organización es una serie por
+recuento.
+
+La factura va aparte de Cost a propósito. Un repositorio de una organización se
+factura a la organización y no a la cuenta, y la paga otro, así que sumarla al
+gasto de la cuenta falsearía las dos. Los paneles son los de la sección Cost,
+dibujados sobre las facturas de las organizaciones y separados por organización,
+y cada fila de la tabla de uso enlaza con la factura de la que se leyó, que solo
+pueden abrir los propietarios de la organización.
+
+Lee `gh_org` y `gh_org_billing_usage`.
 
 ## Activity
 

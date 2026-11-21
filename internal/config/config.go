@@ -670,6 +670,10 @@ var defaultEvery = map[string]family{
 		every: 1 * time.Hour, group: "account",
 		why: "the month in progress moves while continuous integration runs: it had changed at every one of 46 six-hourly reads measured, and a pass is two requests, that month and the one before, of which only the first is charged",
 	},
+	"orgs": {
+		every: 1 * time.Hour, group: "account",
+		why: "members, teams, invitations and seats are edited by hand, and every part of an organization that has not moved answers 304 at no cost",
+	},
 	"profile": {
 		every: 12 * time.Hour, group: "account",
 		why: "packages, gists and social accounts, all of them edited by hand",

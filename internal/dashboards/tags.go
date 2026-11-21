@@ -52,6 +52,8 @@ var tags = map[string][]string{
 	"gh_artifact":                 {"artifact", "full_name", "owner", "repo"},
 	"gh_artifact_total":           {"full_name", "owner", "repo"},
 	"gh_billing_usage":            {"full_name", "owner", "product", "repo", "sku", "unit", "user"},
+	"gh_org":                      {"org"},
+	"gh_org_billing_usage":        {"full_name", "org", "owner", "product", "repo", "sku", "unit"},
 	"gh_branch":                   {"branch", "full_name", "is_default", "owner", "repo"},
 	"gh_branch_protection":        {"full_name", "owner", "pattern", "repo"},
 	"gh_code_scanning_alert":      {"full_name", "owner", "repo", "severity", "tool"},

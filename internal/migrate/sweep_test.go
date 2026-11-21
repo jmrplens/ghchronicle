@@ -76,7 +76,7 @@ func sweepFake(t *testing.T, families []string) map[string][]string {
 	}
 	cfg := &config.Config{
 		GitHub:       config.GitHub{Token: "test-token"},
-		Targets:      config.Targets{User: fakegh.Login},
+		Targets:      config.Targets{User: fakegh.Login, Orgs: []string{fakegh.Org}},
 		Every:        every,
 		AllowNoSinks: true,
 	}

@@ -104,6 +104,11 @@ var conditionalColumns = []conditionalColumn{
 	{"url", "gh_sponsors_tier", "account.go", "the listing has a page"},
 	{"url", "gh_sponsorship", "account.go", "the sponsorship is not private"},
 	{"user_url", "gh_star", "stars.go", "the stargazer has a page"},
+	{"copilot_active", "gh_org", "orgs.go", "the token is one of the organization's owners and it has Copilot"},
+	{"copilot_seats", "gh_org", "orgs.go", "the token is one of the organization's owners and it has Copilot"},
+	{"plan", "gh_org", "orgs.go", "the token belongs to the organization"},
+	{"private_repos", "gh_org", "orgs.go", "the token belongs to the organization"},
+	{"two_factor_required", "gh_org", "orgs.go", "the token is one of the organization's owners"},
 }
 
 // TestEveryColumnAnAccountMightNotHaveIsOnTheList: the list above is the whole

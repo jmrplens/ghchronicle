@@ -70,12 +70,18 @@ no está en `orgs`, se lee aparte cada vez que se reconstruye la lista.
 
 `orgs` recoge todos los repositorios que el listado de la organización devuelve
 al token, privados incluidos donde la cuenta los ve, con los mismos tres
-interruptores que los de la cuenta. Listar una trae dos cosas más:
+interruptores que los de la cuenta. Listar una trae tres cosas más:
 
+- **Lo que dice de sí misma.** La familia `orgs` escribe una fila de `gh_org`
+  por cada una: sus miembros y propietarios, equipos, colaboradores externos,
+  invitaciones, asientos de Copilot, runners, secretos, variables, webhooks,
+  apps, proyectos y caché de Actions, que dibuja la sección Organizations del
+  dashboard. Casi todo responde solo a un propietario, y la fila de un miembro
+  deja fuera esos recuentos.
 - **Su factura.** La familia `billing` lee el informe de uso de la organización
-  junto al de la cuenta, porque los repositorios de una organización se le
-  facturan a ella y nunca a la cuenta. Solo sus propietarios pueden leerlo;
-  para un miembro no hay nada que escribir.
+  en `gh_org_billing_usage`, aparte del de la cuenta, porque los repositorios de
+  una organización se le facturan a ella y la paga otro. Solo sus propietarios
+  pueden leerlo; para un miembro no hay nada que escribir.
 - **Su trabajo no es trabajo fuera.** Las pull requests, issues y recuentos de
   comentarios de `gh_external_contribution` y los totales `_elsewhere` dejan
   fuera cada organización listada y cada repositorio nombrado, que ya escriben
@@ -86,8 +92,8 @@ Listar es la herramienta equivocada para una organización en la que la cuenta
 solo trabaja. Una que aloja miles de repositorios (conda-forge tenía 30.214 el
 2026-11-21) metería cada uno en la pasada, así que nombra en `repos` los pocos
 que la cuenta mantiene. Un repositorio nombrado queda fuera del trabajo fuera
-igual, pero no trae factura: el informe de la organización cubre todos sus
-repositorios, y solo sus propietarios pueden leerlo.
+igual, pero no trae factura ni fila de `gh_org`: el informe de la organización
+cubre todos sus repositorios, y solo sus propietarios pueden leerlo.
 
 La etiqueta `own` de las filas de comentarios y contribuciones es más estrecha:
 dice que el repositorio es de la propia cuenta, y una organización listada no la

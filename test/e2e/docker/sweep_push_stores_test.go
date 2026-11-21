@@ -147,6 +147,7 @@ func pushSweepConfig(sweep *pushSweep, s *Stack, githubURL string) (string, erro
   timeout: 30s
 targets:
   user: %s
+  orgs: [octo-org]
 sinks:
   elasticsearch:
     url: %s
@@ -357,6 +358,7 @@ func exporterConfig(dir, githubURL string, port int) (string, error) {
   timeout: 30s
 targets:
   user: %s
+  orgs: [octo-org]
 sinks:
   prometheus:
     listen: 0.0.0.0:%d

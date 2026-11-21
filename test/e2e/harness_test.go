@@ -59,6 +59,7 @@ func writeSinkConfigAt(t *testing.T, dir, base, sinks string, cadences map[strin
   timeout: 20s
 targets:
   user: %s
+  orgs: [octo-org]
 sinks:
 %s
 every:

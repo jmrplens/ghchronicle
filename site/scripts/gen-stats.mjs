@@ -124,10 +124,13 @@ const NUMBER_WORDS = {
 		11: "eleven",
 		34: "thirty-four",
 		36: "thirty-six",
+		37: "thirty-seven",
 		95: "ninety-five",
 		97: "ninety-seven",
+		99: "ninety-nine",
 		154: "one hundred and fifty four",
 		156: "one hundred and fifty six",
+		162: "one hundred and sixty two",
 	},
 	es: {
 		5: "cinco",
@@ -135,10 +138,13 @@ const NUMBER_WORDS = {
 		11: "once",
 		34: "treinta y cuatro",
 		36: "treinta y seis",
+		37: "treinta y siete",
 		95: "noventa y cinco",
 		97: "noventa y siete",
+		99: "noventa y nueve",
 		154: "ciento cincuenta y cuatro",
 		156: "ciento cincuenta y seis",
+		162: "ciento sesenta y dos",
 	},
 };
 

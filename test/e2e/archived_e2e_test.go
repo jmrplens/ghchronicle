@@ -86,6 +86,7 @@ func archivedSweep(t *testing.T, dir, name, points, overlay string) [2]time.Time
   timeout: 20s
 targets:
   user: %s
+  orgs: [octo-org]
 sinks:
   file:
     path: %s

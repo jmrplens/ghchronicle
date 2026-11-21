@@ -23428,7 +23428,1624 @@
         "x": 0,
         "y": 565
       },
-      "id": 142,
+      "id": 139,
+      "panels": [
+        {
+          "datasource": "${DS_ELASTICSEARCH}",
+          "description": "Who is in each organization, newest row in the range: its members and how many of them own it, its teams, the outside collaborators given a repository, the invitations not yet answered, and the Copilot seats it pays for against the ones used this cycle. Two-factor says whether the organization requires it of its members. The outside collaborators, the invitations, Copilot and two-factor answer an owner alone, and are empty for an organization the account is only a member of. Elasticsearch reads the newest document of each organization in the range.",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "filterable": false,
+                "minWidth": 90
+              },
+              "fieldMinMax": true
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Two-factor"
+                },
+                "properties": [
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-text"
+                    }
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "0": {
+                            "color": "text",
+                            "index": 1,
+                            "text": "off"
+                          },
+                          "1": {
+                            "color": "green",
+                            "index": 0,
+                            "text": "on"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "off"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "on"
+                          }
+                        },
+                        "type": "value"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 100
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Members"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 100
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Owners"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Teams"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 80
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Outside collaborators"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 110
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Invitations"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 100
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Copilot seats"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 110
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Copilot used"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 110
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Plan"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Organization"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "targetBlank": true,
+                        "title": "Open on GitHub",
+                        "url": "${__data.fields.Link}"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Link"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hidden",
+                    "value": true
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 24,
+            "x": 0,
+            "y": 566
+          },
+          "id": 133,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "reducer": [
+                "sum"
+              ],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": [
+              {
+                "desc": true,
+                "displayName": "Organization"
+              }
+            ]
+          },
+          "targets": [
+            {
+              "bucketAggs": [
+                {
+                  "field": "org.keyword",
+                  "id": "557",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_count",
+                    "size": "50"
+                  },
+                  "type": "terms"
+                },
+                {
+                  "field": "@timestamp",
+                  "id": "558",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_key",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                },
+                {
+                  "field": "plan.keyword",
+                  "id": "567",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "missing": "",
+                    "order": "desc",
+                    "orderBy": "_count",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                },
+                {
+                  "field": "url.keyword",
+                  "id": "568",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "missing": "",
+                    "order": "desc",
+                    "orderBy": "_count",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                }
+              ],
+              "datasource": "${DS_ELASTICSEARCH}",
+              "metrics": [
+                {
+                  "field": "members",
+                  "id": "559",
+                  "type": "max"
+                },
+                {
+                  "field": "admins",
+                  "id": "560",
+                  "type": "max"
+                },
+                {
+                  "field": "teams",
+                  "id": "561",
+                  "type": "max"
+                },
+                {
+                  "field": "outside_collaborators",
+                  "id": "562",
+                  "type": "max"
+                },
+                {
+                  "field": "pending_invitations",
+                  "id": "563",
+                  "type": "max"
+                },
+                {
+                  "field": "copilot_seats",
+                  "id": "564",
+                  "type": "max"
+                },
+                {
+                  "field": "copilot_active",
+                  "id": "565",
+                  "type": "max"
+                },
+                {
+                  "field": "two_factor_required",
+                  "id": "566",
+                  "type": "max"
+                }
+              ],
+              "query": "_index:ghchronicle-gh_org",
+              "refId": "A",
+              "timeField": "@timestamp"
+            }
+          ],
+          "title": "Organizations: people",
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {},
+                "renameByName": {
+                  "Max admins": "Owners",
+                  "Max copilot_active": "Copilot used",
+                  "Max copilot_seats": "Copilot seats",
+                  "Max members": "Members",
+                  "Max outside_collaborators": "Outside collaborators",
+                  "Max pending_invitations": "Invitations",
+                  "Max teams": "Teams",
+                  "Max two_factor_required": "Two-factor",
+                  "org.keyword": "Organization",
+                  "plan.keyword": "Plan",
+                  "url.keyword": "Link"
+                }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "@timestamp": true
+                },
+                "indexByName": {},
+                "renameByName": {}
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Copilot seats": 6,
+                  "Copilot used": 7,
+                  "Invitations": 5,
+                  "Link": 10,
+                  "Members": 1,
+                  "Organization": 0,
+                  "Outside collaborators": 4,
+                  "Owners": 2,
+                  "Plan": 9,
+                  "Teams": 3,
+                  "Two-factor": 8
+                },
+                "renameByName": {}
+              }
+            }
+          ],
+          "type": "table"
+        },
+        {
+          "datasource": "${DS_ELASTICSEARCH}",
+          "description": "What the organization's owners set up, newest row in the range: its repositories, its self-hosted runners, the Actions secrets and variables shared by its repositories, its webhooks, the GitHub Apps installed on it, its projects, and what all its repositories hold in the Actions cache together. Each repository's own are in their sections. Every column but the repositories and the projects answers an owner alone. Elasticsearch reads the newest document of each organization in the range.",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "filterable": false,
+                "minWidth": 90
+              },
+              "fieldMinMax": true
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Actions cache"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "bytes"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 120
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Public repositories"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 120
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Private repositories"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 120
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Runners"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Secrets"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Variables"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Webhooks"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 100
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Apps"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 80
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Projects"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Actions cache"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 120
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Organization"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "targetBlank": true,
+                        "title": "Open on GitHub",
+                        "url": "${__data.fields.Link}"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Link"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hidden",
+                    "value": true
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 24,
+            "x": 0,
+            "y": 572
+          },
+          "id": 134,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "reducer": [
+                "sum"
+              ],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": [
+              {
+                "desc": true,
+                "displayName": "Organization"
+              }
+            ]
+          },
+          "targets": [
+            {
+              "bucketAggs": [
+                {
+                  "field": "org.keyword",
+                  "id": "569",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_count",
+                    "size": "50"
+                  },
+                  "type": "terms"
+                },
+                {
+                  "field": "@timestamp",
+                  "id": "570",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_key",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                },
+                {
+                  "field": "url.keyword",
+                  "id": "580",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "missing": "",
+                    "order": "desc",
+                    "orderBy": "_count",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                }
+              ],
+              "datasource": "${DS_ELASTICSEARCH}",
+              "metrics": [
+                {
+                  "field": "public_repos",
+                  "id": "571",
+                  "type": "max"
+                },
+                {
+                  "field": "private_repos",
+                  "id": "572",
+                  "type": "max"
+                },
+                {
+                  "field": "runners",
+                  "id": "573",
+                  "type": "max"
+                },
+                {
+                  "field": "secrets",
+                  "id": "574",
+                  "type": "max"
+                },
+                {
+                  "field": "variables",
+                  "id": "575",
+                  "type": "max"
+                },
+                {
+                  "field": "hooks",
+                  "id": "576",
+                  "type": "max"
+                },
+                {
+                  "field": "installations",
+                  "id": "577",
+                  "type": "max"
+                },
+                {
+                  "field": "projects",
+                  "id": "578",
+                  "type": "max"
+                },
+                {
+                  "field": "actions_cache_bytes",
+                  "id": "579",
+                  "type": "max"
+                }
+              ],
+              "query": "_index:ghchronicle-gh_org",
+              "refId": "A",
+              "timeField": "@timestamp"
+            }
+          ],
+          "title": "Organizations: machinery",
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {},
+                "renameByName": {
+                  "Max actions_cache_bytes": "Actions cache",
+                  "Max hooks": "Webhooks",
+                  "Max installations": "Apps",
+                  "Max private_repos": "Private repositories",
+                  "Max projects": "Projects",
+                  "Max public_repos": "Public repositories",
+                  "Max runners": "Runners",
+                  "Max secrets": "Secrets",
+                  "Max variables": "Variables",
+                  "org.keyword": "Organization",
+                  "url.keyword": "Link"
+                }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "@timestamp": true
+                },
+                "indexByName": {},
+                "renameByName": {}
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Actions cache": 9,
+                  "Apps": 7,
+                  "Link": 10,
+                  "Organization": 0,
+                  "Private repositories": 2,
+                  "Projects": 8,
+                  "Public repositories": 1,
+                  "Runners": 3,
+                  "Secrets": 4,
+                  "Variables": 5,
+                  "Webhooks": 6
+                },
+                "renameByName": {}
+              }
+            }
+          ],
+          "type": "table"
+        },
+        {
+          "datasource": "${DS_ELASTICSEARCH}",
+          "description": "The organizations' own bills, apart from the account's in Cost: a repository an organization owns is billed to it. What the usage would have cost at list price, what each plan covered, what was billed, and the runner minutes behind it. Only an organization's owners may read its bill.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "fixedColor": "text",
+                "mode": "fixed"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "currencyUSD"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "A"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Gross"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "B"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Covered by the plan"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "C"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Actually billed"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "D"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Actions minutes"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Actions minutes"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Gross"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no usage"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Covered by the plan"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no usage"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Actually billed"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no usage"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Actions minutes"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no usage"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 24,
+            "x": 0,
+            "y": 578
+          },
+          "id": 135,
+          "options": {
+            "colorMode": "none",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value_and_name"
+          },
+          "targets": [
+            {
+              "bucketAggs": [
+                {
+                  "field": "@timestamp",
+                  "id": "584",
+                  "settings": {
+                    "interval": "36500d",
+                    "min_doc_count": "0",
+                    "trimEdges": "0"
+                  },
+                  "type": "date_histogram"
+                }
+              ],
+              "datasource": "${DS_ELASTICSEARCH}",
+              "metrics": [
+                {
+                  "field": "gross",
+                  "hide": true,
+                  "id": "581",
+                  "type": "sum"
+                },
+                {
+                  "hide": true,
+                  "id": "582",
+                  "type": "count"
+                },
+                {
+                  "id": "583",
+                  "pipelineVariables": [
+                    {
+                      "name": "s",
+                      "pipelineAgg": "581"
+                    },
+                    {
+                      "name": "n",
+                      "pipelineAgg": "582"
+                    }
+                  ],
+                  "settings": {
+                    "script": "params.n \u003e 0 ? params.s : null"
+                  },
+                  "type": "bucket_script"
+                }
+              ],
+              "query": "_index:ghchronicle-gh_org_billing_usage",
+              "refId": "A",
+              "timeField": "@timestamp"
+            },
+            {
+              "bucketAggs": [
+                {
+                  "field": "@timestamp",
+                  "id": "588",
+                  "settings": {
+                    "interval": "36500d",
+                    "min_doc_count": "0",
+                    "trimEdges": "0"
+                  },
+                  "type": "date_histogram"
+                }
+              ],
+              "datasource": "${DS_ELASTICSEARCH}",
+              "metrics": [
+                {
+                  "field": "discount",
+                  "hide": true,
+                  "id": "585",
+                  "type": "sum"
+                },
+                {
+                  "hide": true,
+                  "id": "586",
+                  "type": "count"
+                },
+                {
+                  "id": "587",
+                  "pipelineVariables": [
+                    {
+                      "name": "s",
+                      "pipelineAgg": "585"
+                    },
+                    {
+                      "name": "n",
+                      "pipelineAgg": "586"
+                    }
+                  ],
+                  "settings": {
+                    "script": "params.n \u003e 0 ? params.s : null"
+                  },
+                  "type": "bucket_script"
+                }
+              ],
+              "query": "_index:ghchronicle-gh_org_billing_usage",
+              "refId": "B",
+              "timeField": "@timestamp"
+            },
+            {
+              "bucketAggs": [
+                {
+                  "field": "@timestamp",
+                  "id": "592",
+                  "settings": {
+                    "interval": "36500d",
+                    "min_doc_count": "0",
+                    "trimEdges": "0"
+                  },
+                  "type": "date_histogram"
+                }
+              ],
+              "datasource": "${DS_ELASTICSEARCH}",
+              "metrics": [
+                {
+                  "field": "net",
+                  "hide": true,
+                  "id": "589",
+                  "type": "sum"
+                },
+                {
+                  "hide": true,
+                  "id": "590",
+                  "type": "count"
+                },
+                {
+                  "id": "591",
+                  "pipelineVariables": [
+                    {
+                      "name": "s",
+                      "pipelineAgg": "589"
+                    },
+                    {
+                      "name": "n",
+                      "pipelineAgg": "590"
+                    }
+                  ],
+                  "settings": {
+                    "script": "params.n \u003e 0 ? params.s : null"
+                  },
+                  "type": "bucket_script"
+                }
+              ],
+              "query": "_index:ghchronicle-gh_org_billing_usage",
+              "refId": "C",
+              "timeField": "@timestamp"
+            },
+            {
+              "bucketAggs": [
+                {
+                  "field": "@timestamp",
+                  "id": "596",
+                  "settings": {
+                    "interval": "36500d",
+                    "min_doc_count": "0",
+                    "trimEdges": "0"
+                  },
+                  "type": "date_histogram"
+                }
+              ],
+              "datasource": "${DS_ELASTICSEARCH}",
+              "metrics": [
+                {
+                  "field": "quantity",
+                  "hide": true,
+                  "id": "593",
+                  "type": "sum"
+                },
+                {
+                  "hide": true,
+                  "id": "594",
+                  "type": "count"
+                },
+                {
+                  "id": "595",
+                  "pipelineVariables": [
+                    {
+                      "name": "s",
+                      "pipelineAgg": "593"
+                    },
+                    {
+                      "name": "n",
+                      "pipelineAgg": "594"
+                    }
+                  ],
+                  "settings": {
+                    "script": "params.n \u003e 0 ? params.s : null"
+                  },
+                  "type": "bucket_script"
+                }
+              ],
+              "query": "_index:ghchronicle-gh_org_billing_usage AND unit:Minutes",
+              "refId": "D",
+              "timeField": "@timestamp"
+            }
+          ],
+          "title": "Organization spend in range",
+          "type": "stat"
+        },
+        {
+          "datasource": "${DS_ELASTICSEARCH}",
+          "description": "Gross cost per day, by organization. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisSoftMin": 0,
+                "drawStyle": "bars",
+                "fillOpacity": 50,
+                "gradientMode": "none",
+                "lineWidth": 1,
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                }
+              },
+              "unit": "currencyUSD"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 582
+          },
+          "id": 136,
+          "interval": "1d",
+          "maxDataPoints": 100,
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "max"
+              ],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "alias": "{{term org.keyword}}",
+              "bucketAggs": [
+                {
+                  "field": "org.keyword",
+                  "id": "598",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_count",
+                    "size": "50"
+                  },
+                  "type": "terms"
+                },
+                {
+                  "field": "@timestamp",
+                  "id": "599",
+                  "settings": {
+                    "interval": "auto",
+                    "min_doc_count": "0",
+                    "trimEdges": "0"
+                  },
+                  "type": "date_histogram"
+                }
+              ],
+              "datasource": "${DS_ELASTICSEARCH}",
+              "metrics": [
+                {
+                  "field": "gross",
+                  "id": "597",
+                  "type": "sum"
+                }
+              ],
+              "query": "_index:ghchronicle-gh_org_billing_usage",
+              "refId": "A",
+              "timeField": "@timestamp"
+            }
+          ],
+          "title": "Organization cost over time",
+          "type": "timeseries"
+        },
+        {
+          "datasource": "${DS_ELASTICSEARCH}",
+          "description": "Runner minutes per day, by organization. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisSoftMin": 0,
+                "drawStyle": "bars",
+                "fillOpacity": 50,
+                "gradientMode": "none",
+                "lineWidth": 1,
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                }
+              },
+              "decimals": 0,
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 582
+          },
+          "id": 137,
+          "interval": "1d",
+          "maxDataPoints": 100,
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "max"
+              ],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "alias": "{{term org.keyword}}",
+              "bucketAggs": [
+                {
+                  "field": "org.keyword",
+                  "id": "601",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_count",
+                    "size": "50"
+                  },
+                  "type": "terms"
+                },
+                {
+                  "field": "@timestamp",
+                  "id": "602",
+                  "settings": {
+                    "interval": "auto",
+                    "min_doc_count": "0",
+                    "trimEdges": "0"
+                  },
+                  "type": "date_histogram"
+                }
+              ],
+              "datasource": "${DS_ELASTICSEARCH}",
+              "metrics": [
+                {
+                  "field": "quantity",
+                  "id": "600",
+                  "type": "sum"
+                }
+              ],
+              "query": "_index:ghchronicle-gh_org_billing_usage AND unit:Minutes",
+              "refId": "A",
+              "timeField": "@timestamp"
+            }
+          ],
+          "title": "Organization Actions minutes",
+          "type": "timeseries"
+        },
+        {
+          "datasource": "${DS_ELASTICSEARCH}",
+          "description": "Each organization repository's charges in the range, by SKU, read off the organization's own bill, which each row links to. A charge that belongs to no repository, a Copilot seat, is in the totals above and not here.",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "filterable": false,
+                "minWidth": 90
+              },
+              "fieldMinMax": true
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Repository"
+                },
+                "properties": [
+                  {
+                    "id": "custom.minWidth",
+                    "value": 160
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Gross"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "currencyUSD"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 110
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Net"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "currencyUSD"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 110
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Price"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "currencyUSD"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 100
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "SKU"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 160
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Unit"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Quantity"
+                },
+                "properties": [
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "mode": "gradient",
+                      "type": "gauge"
+                    }
+                  },
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  },
+                  {
+                    "id": "min",
+                    "value": 0
+                  },
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "green",
+                          "value": null
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 120
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Repository"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "targetBlank": true,
+                        "title": "Open the bill (owner only)",
+                        "url": "${__data.fields.Link}"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Link"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hidden",
+                    "value": true
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 24,
+            "x": 0,
+            "y": 590
+          },
+          "id": 138,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "reducer": [
+                "sum"
+              ],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": [
+              {
+                "desc": true,
+                "displayName": "Gross"
+              }
+            ]
+          },
+          "targets": [
+            {
+              "bucketAggs": [
+                {
+                  "field": "full_name.keyword",
+                  "id": "603",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_count",
+                    "size": "40"
+                  },
+                  "type": "terms"
+                },
+                {
+                  "field": "sku.keyword",
+                  "id": "604",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_count",
+                    "size": "50"
+                  },
+                  "type": "terms"
+                },
+                {
+                  "field": "unit.keyword",
+                  "id": "605",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_count",
+                    "size": "5"
+                  },
+                  "type": "terms"
+                },
+                {
+                  "field": "url.keyword",
+                  "id": "606",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "missing": "",
+                    "order": "desc",
+                    "orderBy": "_count",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                }
+              ],
+              "datasource": "${DS_ELASTICSEARCH}",
+              "metrics": [
+                {
+                  "field": "quantity",
+                  "id": "607",
+                  "type": "sum"
+                },
+                {
+                  "field": "price_per_unit",
+                  "id": "608",
+                  "type": "max"
+                },
+                {
+                  "field": "gross",
+                  "id": "609",
+                  "type": "sum"
+                },
+                {
+                  "field": "net",
+                  "id": "610",
+                  "type": "sum"
+                }
+              ],
+              "query": "_index:ghchronicle-gh_org_billing_usage AND NOT repo.keyword:\"(none)\"",
+              "refId": "A",
+              "timeField": "@timestamp"
+            }
+          ],
+          "title": "Organization usage by repo",
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {},
+                "renameByName": {
+                  "Max": "Price",
+                  "Sum gross": "Gross",
+                  "Sum net": "Net",
+                  "Sum quantity": "Quantity",
+                  "full_name.keyword": "Repository",
+                  "sku.keyword": "SKU",
+                  "unit.keyword": "Unit",
+                  "url.keyword": "Link"
+                }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Gross": 1,
+                  "Link": 7,
+                  "Net": 6,
+                  "Price": 5,
+                  "Quantity": 3,
+                  "Repository": 0,
+                  "SKU": 2,
+                  "Unit": 4
+                },
+                "renameByName": {}
+              }
+            }
+          ],
+          "type": "table"
+        }
+      ],
+      "title": "Organizations",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 600
+      },
+      "id": 149,
       "panels": [
         {
           "datasource": "${DS_ELASTICSEARCH}",
@@ -23460,9 +25077,9 @@
             "h": 8,
             "w": 16,
             "x": 0,
-            "y": 566
+            "y": 601
           },
-          "id": 133,
+          "id": 140,
           "interval": "1h",
           "maxDataPoints": 100,
           "options": {
@@ -23486,7 +25103,7 @@
               "bucketAggs": [
                 {
                   "field": "type.keyword",
-                  "id": "558",
+                  "id": "612",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -23497,7 +25114,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "559",
+                  "id": "613",
                   "settings": {
                     "interval": "auto",
                     "min_doc_count": "0",
@@ -23510,7 +25127,7 @@
               "metrics": [
                 {
                   "field": "events",
-                  "id": "557",
+                  "id": "611",
                   "type": "sum"
                 }
               ],
@@ -23545,9 +25162,9 @@
             "h": 16,
             "w": 8,
             "x": 16,
-            "y": 566
+            "y": 601
           },
-          "id": 134,
+          "id": 141,
           "options": {
             "displayLabels": [],
             "legend": {
@@ -23576,11 +25193,11 @@
               "bucketAggs": [
                 {
                   "field": "type.keyword",
-                  "id": "561",
+                  "id": "615",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
-                    "orderBy": "560",
+                    "orderBy": "614",
                     "size": "30"
                   },
                   "type": "terms"
@@ -23590,7 +25207,7 @@
               "metrics": [
                 {
                   "field": "events",
-                  "id": "560",
+                  "id": "614",
                   "type": "sum"
                 }
               ],
@@ -23653,9 +25270,9 @@
             "h": 8,
             "w": 8,
             "x": 0,
-            "y": 574
+            "y": 609
           },
-          "id": 135,
+          "id": 142,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -23678,11 +25295,11 @@
               "bucketAggs": [
                 {
                   "field": "full_name.keyword",
-                  "id": "563",
+                  "id": "617",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
-                    "orderBy": "562",
+                    "orderBy": "616",
                     "size": "10"
                   },
                   "type": "terms"
@@ -23692,7 +25309,7 @@
               "metrics": [
                 {
                   "field": "events",
-                  "id": "562",
+                  "id": "616",
                   "type": "sum"
                 }
               ],
@@ -23778,9 +25395,9 @@
             "h": 8,
             "w": 8,
             "x": 8,
-            "y": 574
+            "y": 609
           },
-          "id": 136,
+          "id": 143,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -23803,18 +25420,18 @@
               "bucketAggs": [
                 {
                   "field": "reason.keyword",
-                  "id": "565",
+                  "id": "619",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
-                    "orderBy": "564",
+                    "orderBy": "618",
                     "size": "25"
                   },
                   "type": "terms"
                 },
                 {
                   "field": "subject_type.keyword",
-                  "id": "566",
+                  "id": "620",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -23828,7 +25445,7 @@
               "metrics": [
                 {
                   "field": "notifications",
-                  "id": "564",
+                  "id": "618",
                   "type": "sum"
                 }
               ],
@@ -23896,9 +25513,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 582
+            "y": 617
           },
-          "id": 137,
+          "id": 144,
           "interval": "1d",
           "maxDataPoints": 100,
           "options": {
@@ -23922,7 +25539,7 @@
               "bucketAggs": [
                 {
                   "field": "reason.keyword",
-                  "id": "568",
+                  "id": "622",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -23933,7 +25550,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "569",
+                  "id": "623",
                   "settings": {
                     "interval": "auto",
                     "min_doc_count": "0",
@@ -23946,7 +25563,7 @@
               "metrics": [
                 {
                   "field": "notifications",
-                  "id": "567",
+                  "id": "621",
                   "type": "sum"
                 }
               ],
@@ -24086,9 +25703,9 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 590
+            "y": 625
           },
-          "id": 138,
+          "id": 145,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -24107,7 +25724,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "570",
+                  "id": "624",
                   "settings": {
                     "order": "desc",
                     "size": "25",
@@ -24323,9 +25940,9 @@
             "h": 9,
             "w": 24,
             "x": 0,
-            "y": 597
+            "y": 632
           },
-          "id": 139,
+          "id": 146,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -24348,7 +25965,7 @@
               "bucketAggs": [
                 {
                   "field": "full_name.keyword",
-                  "id": "571",
+                  "id": "625",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -24359,7 +25976,7 @@
                 },
                 {
                   "field": "kind.keyword",
-                  "id": "572",
+                  "id": "626",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -24370,7 +25987,7 @@
                 },
                 {
                   "field": "number.keyword",
-                  "id": "573",
+                  "id": "627",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -24381,7 +25998,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "574",
+                  "id": "628",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -24392,7 +26009,7 @@
                 },
                 {
                   "field": "state.keyword",
-                  "id": "575",
+                  "id": "629",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -24403,7 +26020,7 @@
                 },
                 {
                   "field": "title.keyword",
-                  "id": "576",
+                  "id": "630",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -24415,7 +26032,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "577",
+                  "id": "631",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -24430,12 +26047,12 @@
               "metrics": [
                 {
                   "field": "@timestamp",
-                  "id": "578",
+                  "id": "632",
                   "type": "max"
                 },
                 {
                   "field": "comments",
-                  "id": "579",
+                  "id": "633",
                   "type": "max"
                 }
               ],
@@ -24515,9 +26132,9 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 606
+            "y": 641
           },
-          "id": 140,
+          "id": 147,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -24540,7 +26157,7 @@
               "bucketAggs": [
                 {
                   "field": "language.keyword",
-                  "id": "580",
+                  "id": "634",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -24553,7 +26170,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "581",
+                  "id": "635",
                   "type": "count"
                 }
               ],
@@ -24709,9 +26326,9 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 606
+            "y": 641
           },
-          "id": 141,
+          "id": 148,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -24730,7 +26347,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "582",
+                  "id": "636",
                   "settings": {
                     "order": "desc",
                     "size": "25",
@@ -24800,9 +26417,9 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 615
+        "y": 650
       },
-      "id": 159,
+      "id": 166,
       "panels": [
         {
           "datasource": "${DS_ELASTICSEARCH}",
@@ -24826,9 +26443,9 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 616
+            "y": 651
           },
-          "id": 143,
+          "id": 150,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -24851,7 +26468,7 @@
               "bucketAggs": [
                 {
                   "field": "language.keyword",
-                  "id": "583",
+                  "id": "637",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -24862,7 +26479,7 @@
                 },
                 {
                   "field": "full_name.keyword",
-                  "id": "584",
+                  "id": "638",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -24875,7 +26492,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "585",
+                  "id": "639",
                   "settings": {
                     "metrics": [
                       "bytes"
@@ -25326,9 +26943,9 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 616
+            "y": 651
           },
-          "id": 144,
+          "id": 151,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -25351,7 +26968,7 @@
               "bucketAggs": [
                 {
                   "field": "full_name.keyword",
-                  "id": "593",
+                  "id": "647",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -25362,7 +26979,7 @@
                 },
                 {
                   "field": "repo.keyword",
-                  "id": "594",
+                  "id": "648",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -25373,7 +26990,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "595",
+                  "id": "649",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -25384,7 +27001,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "596",
+                  "id": "650",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -25399,37 +27016,37 @@
               "metrics": [
                 {
                   "field": "health_percentage",
-                  "id": "586",
+                  "id": "640",
                   "type": "max"
                 },
                 {
                   "field": "has_readme",
-                  "id": "587",
+                  "id": "641",
                   "type": "max"
                 },
                 {
                   "field": "has_license",
-                  "id": "588",
+                  "id": "642",
                   "type": "max"
                 },
                 {
                   "field": "has_contributing",
-                  "id": "589",
+                  "id": "643",
                   "type": "max"
                 },
                 {
                   "field": "has_code_of_conduct",
-                  "id": "590",
+                  "id": "644",
                   "type": "max"
                 },
                 {
                   "field": "has_issue_template",
-                  "id": "591",
+                  "id": "645",
                   "type": "max"
                 },
                 {
                   "field": "has_pull_request_template",
-                  "id": "592",
+                  "id": "646",
                   "type": "max"
                 }
               ],
@@ -25726,9 +27343,9 @@
             "h": 11,
             "w": 24,
             "x": 0,
-            "y": 624
+            "y": 659
           },
-          "id": 145,
+          "id": 152,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -25751,7 +27368,7 @@
               "bucketAggs": [
                 {
                   "field": "full_name.keyword",
-                  "id": "597",
+                  "id": "651",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -25762,7 +27379,7 @@
                 },
                 {
                   "field": "repo.keyword",
-                  "id": "598",
+                  "id": "652",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -25773,7 +27390,7 @@
                 },
                 {
                   "field": "language.keyword",
-                  "id": "599",
+                  "id": "653",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -25784,7 +27401,7 @@
                 },
                 {
                   "field": "visibility.keyword",
-                  "id": "600",
+                  "id": "654",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -25795,7 +27412,7 @@
                 },
                 {
                   "field": "license.keyword",
-                  "id": "601",
+                  "id": "655",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -25806,7 +27423,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "602",
+                  "id": "656",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -25820,7 +27437,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "603",
+                  "id": "657",
                   "settings": {
                     "metrics": [
                       "stars",
@@ -25966,9 +27583,9 @@
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 635
+            "y": 670
           },
-          "id": 146,
+          "id": 153,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -25991,18 +27608,18 @@
               "bucketAggs": [
                 {
                   "field": "topic.keyword",
-                  "id": "605",
+                  "id": "659",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
-                    "orderBy": "604",
+                    "orderBy": "658",
                     "size": "30"
                   },
                   "type": "terms"
                 },
                 {
                   "field": "url.keyword",
-                  "id": "606",
+                  "id": "660",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -26017,7 +27634,7 @@
               "metrics": [
                 {
                   "field": "full_name.keyword",
-                  "id": "604",
+                  "id": "658",
                   "type": "cardinality"
                 }
               ],
@@ -26173,9 +27790,9 @@
             "h": 8,
             "w": 9,
             "x": 6,
-            "y": 635
+            "y": 670
           },
-          "id": 147,
+          "id": 154,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -26198,7 +27815,7 @@
               "bucketAggs": [
                 {
                   "field": "package.keyword",
-                  "id": "607",
+                  "id": "661",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -26209,7 +27826,7 @@
                 },
                 {
                   "field": "type.keyword",
-                  "id": "608",
+                  "id": "662",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -26220,7 +27837,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "609",
+                  "id": "663",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -26234,7 +27851,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "610",
+                  "id": "664",
                   "settings": {
                     "metrics": [
                       "versions",
@@ -26445,9 +28062,9 @@
             "h": 8,
             "w": 9,
             "x": 15,
-            "y": 635
+            "y": 670
           },
-          "id": 148,
+          "id": 155,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -26465,7 +28082,7 @@
               "bucketAggs": [
                 {
                   "field": "gist.keyword",
-                  "id": "611",
+                  "id": "665",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -26476,7 +28093,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "612",
+                  "id": "666",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -26490,7 +28107,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "613",
+                  "id": "667",
                   "settings": {
                     "metrics": [
                       "files",
@@ -26624,9 +28241,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 643
+            "y": 678
           },
-          "id": 149,
+          "id": 156,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -26645,7 +28262,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "614",
+                  "id": "668",
                   "settings": {
                     "order": "desc",
                     "size": "30",
@@ -26897,9 +28514,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 651
+            "y": 686
           },
-          "id": 150,
+          "id": 157,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -26917,7 +28534,7 @@
               "bucketAggs": [
                 {
                   "field": "full_name.keyword",
-                  "id": "615",
+                  "id": "669",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -26928,7 +28545,7 @@
                 },
                 {
                   "field": "repo.keyword",
-                  "id": "616",
+                  "id": "670",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -26939,7 +28556,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "617",
+                  "id": "671",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -26950,7 +28567,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "618",
+                  "id": "672",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -26965,32 +28582,32 @@
               "metrics": [
                 {
                   "field": "security_policy",
-                  "id": "619",
+                  "id": "673",
                   "type": "max"
                 },
                 {
                   "field": "delete_branch_on_merge",
-                  "id": "620",
+                  "id": "674",
                   "type": "max"
                 },
                 {
                   "field": "auto_merge",
-                  "id": "621",
+                  "id": "675",
                   "type": "max"
                 },
                 {
                   "field": "branch_protection_rules",
-                  "id": "622",
+                  "id": "676",
                   "type": "max"
                 },
                 {
                   "field": "issue_templates",
-                  "id": "623",
+                  "id": "677",
                   "type": "max"
                 },
                 {
                   "field": "codeowners_errors",
-                  "id": "624",
+                  "id": "678",
                   "type": "max"
                 }
               ],
@@ -27101,9 +28718,9 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 659
+            "y": 694
           },
-          "id": 151,
+          "id": 158,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -27121,7 +28738,7 @@
               "bucketAggs": [
                 {
                   "field": "key.keyword",
-                  "id": "625",
+                  "id": "679",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27132,7 +28749,7 @@
                 },
                 {
                   "field": "kind.keyword",
-                  "id": "626",
+                  "id": "680",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27143,7 +28760,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "627",
+                  "id": "681",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27154,7 +28771,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "628",
+                  "id": "682",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -27169,17 +28786,17 @@
               "metrics": [
                 {
                   "field": "days_since_use",
-                  "id": "629",
+                  "id": "683",
                   "type": "max"
                 },
                 {
                   "field": "never_used",
-                  "id": "630",
+                  "id": "684",
                   "type": "max"
                 },
                 {
                   "field": "days_to_expiry",
-                  "id": "631",
+                  "id": "685",
                   "type": "max"
                 }
               ],
@@ -27256,9 +28873,9 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 659
+            "y": 694
           },
-          "id": 152,
+          "id": 159,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -27281,7 +28898,7 @@
               "bucketAggs": [
                 {
                   "field": "license.keyword",
-                  "id": "632",
+                  "id": "686",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27292,7 +28909,7 @@
                 },
                 {
                   "field": "full_name.keyword",
-                  "id": "633",
+                  "id": "687",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27305,7 +28922,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "634",
+                  "id": "688",
                   "settings": {
                     "metrics": [
                       "packages"
@@ -27417,9 +29034,9 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 666
+            "y": 701
           },
-          "id": 153,
+          "id": 160,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -27437,7 +29054,7 @@
               "bucketAggs": [
                 {
                   "field": "provider.keyword",
-                  "id": "635",
+                  "id": "689",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27448,7 +29065,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "636",
+                  "id": "690",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27462,7 +29079,7 @@
               "metrics": [
                 {
                   "field": "present",
-                  "id": "637",
+                  "id": "691",
                   "type": "max"
                 }
               ],
@@ -27509,9 +29126,9 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 666
+            "y": 701
           },
-          "id": 154,
+          "id": 161,
           "options": {
             "content": "**Not available from Elasticsearch.** In the InfluxDB dashboard this panel shows the repositories whose configuration changed inside the range.\n\nA cardinality aggregation counts distinct values of one field; six of them per repository, with a filter on the result, is beyond what the datasource builds.\n\nEach row of it links to the item on GitHub.",
             "mode": "markdown"
@@ -27668,9 +29285,9 @@
             "h": 12,
             "w": 12,
             "x": 0,
-            "y": 673
+            "y": 708
           },
-          "id": 155,
+          "id": 162,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -27688,7 +29305,7 @@
               "bucketAggs": [
                 {
                   "field": "full_name.keyword",
-                  "id": "638",
+                  "id": "692",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27699,7 +29316,7 @@
                 },
                 {
                   "field": "repo.keyword",
-                  "id": "639",
+                  "id": "693",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27710,7 +29327,7 @@
                 },
                 {
                   "field": "file.keyword",
-                  "id": "640",
+                  "id": "694",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27721,7 +29338,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "641",
+                  "id": "695",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27732,7 +29349,7 @@
                 },
                 {
                   "field": "path.keyword",
-                  "id": "642",
+                  "id": "696",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27743,7 +29360,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "643",
+                  "id": "697",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -27758,12 +29375,12 @@
               "metrics": [
                 {
                   "field": "present",
-                  "id": "644",
+                  "id": "698",
                   "type": "max"
                 },
                 {
                   "field": "changes",
-                  "id": "645",
+                  "id": "699",
                   "type": "max"
                 }
               ],
@@ -27915,9 +29532,9 @@
             "h": 12,
             "w": 12,
             "x": 12,
-            "y": 673
+            "y": 708
           },
-          "id": 156,
+          "id": 163,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -27940,7 +29557,7 @@
               "bucketAggs": [
                 {
                   "field": "full_name.keyword",
-                  "id": "646",
+                  "id": "700",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27951,7 +29568,7 @@
                 },
                 {
                   "field": "repo.keyword",
-                  "id": "647",
+                  "id": "701",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27962,7 +29579,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "648",
+                  "id": "702",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27973,7 +29590,7 @@
                 },
                 {
                   "field": "ecosystem.keyword",
-                  "id": "649",
+                  "id": "703",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27984,7 +29601,7 @@
                 },
                 {
                   "field": "interval.keyword",
-                  "id": "650",
+                  "id": "704",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27998,7 +29615,7 @@
               "metrics": [
                 {
                   "field": "blocks",
-                  "id": "651",
+                  "id": "705",
                   "type": "max"
                 }
               ],
@@ -28072,9 +29689,9 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 685
+            "y": 720
           },
-          "id": 157,
+          "id": 164,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -28097,7 +29714,7 @@
               "bucketAggs": [
                 {
                   "field": "ecosystem.keyword",
-                  "id": "652",
+                  "id": "706",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -28108,7 +29725,7 @@
                 },
                 {
                   "field": "full_name.keyword",
-                  "id": "653",
+                  "id": "707",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -28121,7 +29738,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "654",
+                  "id": "708",
                   "settings": {
                     "metrics": [
                       "packages"
@@ -28239,9 +29856,9 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 685
+            "y": 720
           },
-          "id": 158,
+          "id": 165,
           "interval": "1d",
           "maxDataPoints": 100,
           "options": {
@@ -28265,7 +29882,7 @@
               "bucketAggs": [
                 {
                   "field": "change.keyword",
-                  "id": "656",
+                  "id": "710",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -28276,7 +29893,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "657",
+                  "id": "711",
                   "settings": {
                     "interval": "auto",
                     "min_doc_count": "0",
@@ -28289,7 +29906,7 @@
               "metrics": [
                 {
                   "field": "packages",
-                  "id": "655",
+                  "id": "709",
                   "type": "sum"
                 }
               ],
@@ -28302,7 +29919,7 @@
               "bucketAggs": [
                 {
                   "field": "@timestamp",
-                  "id": "659",
+                  "id": "713",
                   "settings": {
                     "interval": "auto",
                     "min_doc_count": "0",
@@ -28315,7 +29932,7 @@
               "metrics": [
                 {
                   "field": "vulnerable",
-                  "id": "658",
+                  "id": "712",
                   "type": "sum"
                 }
               ],
@@ -28337,9 +29954,9 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 693
+        "y": 728
       },
-      "id": 168,
+      "id": 175,
       "panels": [
         {
           "datasource": "${DS_ELASTICSEARCH}",
@@ -28465,9 +30082,9 @@
             "h": 4,
             "w": 24,
             "x": 0,
-            "y": 694
+            "y": 729
           },
-          "id": 160,
+          "id": 167,
           "options": {
             "colorMode": "none",
             "graphMode": "none",
@@ -28487,7 +30104,7 @@
               "bucketAggs": [
                 {
                   "field": "@timestamp",
-                  "id": "660",
+                  "id": "714",
                   "settings": {
                     "interval": "36500d",
                     "min_doc_count": "1",
@@ -28499,7 +30116,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "661",
+                  "id": "715",
                   "settings": {
                     "metrics": [
                       "lifetime_received_cents",
@@ -28777,9 +30394,9 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 698
+            "y": 733
           },
-          "id": 161,
+          "id": 168,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -28798,7 +30415,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "662",
+                  "id": "716",
                   "settings": {
                     "order": "desc",
                     "size": "200",
@@ -29064,9 +30681,9 @@
             "h": 10,
             "w": 12,
             "x": 12,
-            "y": 698
+            "y": 733
           },
-          "id": 162,
+          "id": 169,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -29089,7 +30706,7 @@
               "bucketAggs": [
                 {
                   "field": "tier.keyword",
-                  "id": "663",
+                  "id": "717",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -29100,7 +30717,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "664",
+                  "id": "718",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -29111,7 +30728,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "665",
+                  "id": "719",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -29124,7 +30741,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "666",
+                  "id": "720",
                   "settings": {
                     "metrics": [
                       "price_cents"
@@ -29136,17 +30753,17 @@
                 },
                 {
                   "field": "one_time",
-                  "id": "667",
+                  "id": "721",
                   "type": "max"
                 },
                 {
                   "field": "retired",
-                  "id": "668",
+                  "id": "722",
                   "type": "max"
                 },
                 {
                   "field": "age_days",
-                  "id": "669",
+                  "id": "723",
                   "type": "max"
                 }
               ],
@@ -29318,9 +30935,9 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 708
+            "y": 743
           },
-          "id": 163,
+          "id": 170,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -29338,7 +30955,7 @@
               "bucketAggs": [
                 {
                   "field": "full_name.keyword",
-                  "id": "670",
+                  "id": "724",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -29349,7 +30966,7 @@
                 },
                 {
                   "field": "repo.keyword",
-                  "id": "671",
+                  "id": "725",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -29360,7 +30977,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "672",
+                  "id": "726",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -29371,7 +30988,7 @@
                 },
                 {
                   "field": "kind.keyword",
-                  "id": "673",
+                  "id": "727",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -29382,7 +30999,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "674",
+                  "id": "728",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -29395,7 +31012,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "675",
+                  "id": "729",
                   "settings": {
                     "metrics": [
                       "position"
@@ -29407,12 +31024,12 @@
                 },
                 {
                   "field": "stars",
-                  "id": "676",
+                  "id": "730",
                   "type": "max"
                 },
                 {
                   "field": "days_since_push",
-                  "id": "677",
+                  "id": "731",
                   "type": "max"
                 }
               ],
@@ -29591,9 +31208,9 @@
             "h": 10,
             "w": 12,
             "x": 12,
-            "y": 708
+            "y": 743
           },
-          "id": 164,
+          "id": 171,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -29611,7 +31228,7 @@
               "bucketAggs": [
                 {
                   "field": "flag.keyword",
-                  "id": "678",
+                  "id": "732",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "asc",
@@ -29622,7 +31239,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "679",
+                  "id": "733",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -29633,7 +31250,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "680",
+                  "id": "734",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -29648,7 +31265,7 @@
               "metrics": [
                 {
                   "field": "enabled",
-                  "id": "681",
+                  "id": "735",
                   "type": "max"
                 }
               ],
@@ -29868,9 +31485,9 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 718
+            "y": 753
           },
-          "id": 165,
+          "id": 172,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -29893,7 +31510,7 @@
               "bucketAggs": [
                 {
                   "field": "list.keyword",
-                  "id": "682",
+                  "id": "736",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -29904,7 +31521,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "683",
+                  "id": "737",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -29915,7 +31532,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "684",
+                  "id": "738",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -29928,7 +31545,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "685",
+                  "id": "739",
                   "settings": {
                     "metrics": [
                       "items"
@@ -29940,12 +31557,12 @@
                 },
                 {
                   "field": "age_days",
-                  "id": "686",
+                  "id": "740",
                   "type": "max"
                 },
                 {
                   "field": "days_since_add",
-                  "id": "687",
+                  "id": "741",
                   "type": "max"
                 }
               ],
@@ -30073,9 +31690,9 @@
             "h": 10,
             "w": 24,
             "x": 0,
-            "y": 725
+            "y": 760
           },
-          "id": 166,
+          "id": 173,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -30098,7 +31715,7 @@
               "bucketAggs": [
                 {
                   "field": "achievement.keyword",
-                  "id": "688",
+                  "id": "742",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "asc",
@@ -30109,7 +31726,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "689",
+                  "id": "743",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -30123,7 +31740,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "690",
+                  "id": "744",
                   "settings": {
                     "metrics": [
                       "tier_number"
@@ -30443,9 +32060,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 735
+            "y": 770
           },
-          "id": 167,
+          "id": 174,
           "options": {
             "cellHeight": "lg",
             "footer": {
@@ -30463,7 +32080,7 @@
               "bucketAggs": [
                 {
                   "field": "achievement.keyword",
-                  "id": "691",
+                  "id": "745",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "asc",
@@ -30474,7 +32091,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "692",
+                  "id": "746",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -30485,7 +32102,7 @@
                 },
                 {
                   "field": "image.keyword",
-                  "id": "693",
+                  "id": "747",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -30497,7 +32114,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "694",
+                  "id": "748",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -30512,27 +32129,27 @@
               "metrics": [
                 {
                   "field": "percent",
-                  "id": "695",
+                  "id": "749",
                   "type": "max"
                 },
                 {
                   "field": "count",
-                  "id": "696",
+                  "id": "750",
                   "type": "max"
                 },
                 {
                   "field": "next_threshold",
-                  "id": "697",
+                  "id": "751",
                   "type": "max"
                 },
                 {
                   "field": "tier_number",
-                  "id": "698",
+                  "id": "752",
                   "type": "max"
                 },
                 {
                   "field": "agrees",
-                  "id": "699",
+                  "id": "753",
                   "type": "max"
                 }
               ],
@@ -30600,9 +32217,9 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 744
+        "y": 779
       },
-      "id": 173,
+      "id": 180,
       "panels": [
         {
           "datasource": "${DS_ELASTICSEARCH}",
@@ -30633,9 +32250,9 @@
             "h": 11,
             "w": 12,
             "x": 0,
-            "y": 745
+            "y": 780
           },
-          "id": 169,
+          "id": 176,
           "interval": "5m",
           "maxDataPoints": 100,
           "options": {
@@ -30659,7 +32276,7 @@
               "bucketAggs": [
                 {
                   "field": "resource.keyword",
-                  "id": "701",
+                  "id": "755",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -30670,7 +32287,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "702",
+                  "id": "756",
                   "settings": {
                     "interval": "auto",
                     "min_doc_count": "0",
@@ -30683,7 +32300,7 @@
               "metrics": [
                 {
                   "field": "used_ratio",
-                  "id": "700",
+                  "id": "754",
                   "type": "max"
                 }
               ],
@@ -30716,9 +32333,9 @@
             "h": 11,
             "w": 12,
             "x": 12,
-            "y": 745
+            "y": 780
           },
-          "id": 170,
+          "id": 177,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -30741,7 +32358,7 @@
               "bucketAggs": [
                 {
                   "field": "resource.keyword",
-                  "id": "703",
+                  "id": "757",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -30755,17 +32372,17 @@
               "metrics": [
                 {
                   "field": "limit",
-                  "id": "704",
+                  "id": "758",
                   "type": "max"
                 },
                 {
                   "field": "remaining",
-                  "id": "705",
+                  "id": "759",
                   "type": "min"
                 },
                 {
                   "field": "used",
-                  "id": "706",
+                  "id": "760",
                   "type": "max"
                 }
               ],
@@ -30902,9 +32519,9 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 756
+            "y": 791
           },
-          "id": 171,
+          "id": 178,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -30927,7 +32544,7 @@
               "bucketAggs": [
                 {
                   "field": "family.keyword",
-                  "id": "707",
+                  "id": "761",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -30938,7 +32555,7 @@
                 },
                 {
                   "field": "reason.keyword",
-                  "id": "708",
+                  "id": "762",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -30952,16 +32569,16 @@
               "metrics": [
                 {
                   "field": "failed",
-                  "id": "709",
+                  "id": "763",
                   "type": "sum"
                 },
                 {
-                  "id": "710",
+                  "id": "764",
                   "type": "count"
                 },
                 {
                   "field": "repos",
-                  "id": "711",
+                  "id": "765",
                   "type": "max"
                 }
               ],
@@ -31065,9 +32682,9 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 756
+            "y": 791
           },
-          "id": 172,
+          "id": 179,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -31086,7 +32703,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "712",
+                  "id": "766",
                   "settings": {
                     "order": "desc",
                     "size": "100",

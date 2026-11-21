@@ -39,6 +39,7 @@ func TestAnOutboundSearchPastGitHubsCapIsSaid(t *testing.T) {
   timeout: 20s
 targets:
   user: %s
+  orgs: [octo-org]
 sinks:
   file:
     path: %s

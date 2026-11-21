@@ -23,12 +23,14 @@ import (
 type Billing struct {
 	Login string
 	// Orgs are the organizations whose own report is read beside the
-	// account's. A repository an organization owns is billed to that
-	// organization and never appears in the account's report: on 2026-11-21
-	// kleidos-dev had burned 1,866 Actions minutes that month, and the
-	// account's report named none of its repositories. The organization form
-	// answers its owners alone; to anyone else it is a 404, read as a month
-	// with nothing in it.
+	// account's, into gh_org_billing_usage. A repository an organization owns
+	// is billed to that organization and never appears in the account's
+	// report: on 2026-11-21 kleidos-dev had burned 1,866 Actions minutes that
+	// month, and the account's report named none of its repositories. It is a
+	// measurement of its own because it is another bill, paid by somebody
+	// else, and the account's cost panels add up gh_billing_usage. The
+	// organization form answers its owners alone; to anyone else it is a 404,
+	// read as a month with nothing in it.
 	Orgs []string
 	// Months is how far back to walk, counting the current one.
 	Months int
@@ -38,20 +40,32 @@ type Billing struct {
 	Walk Walk
 }
 
-// billingReport is one usage report: whose bill it is, which is the `user`
-// tag of its rows, the path that answers it, and the page it is read on.
+// billingReport is one usage report: whose bill it is, whether that is an
+// organization's, the path that answers it, and the page it is read on.
 type billingReport struct {
 	who, path, page string
+	org             bool
+}
+
+// point is one row of the report: gh_billing_usage tagged with the account
+// as `user`, or gh_org_billing_usage tagged with the organization as `org`.
+func (r billingReport) point(tags map[string]string, fields map[string]any, day time.Time) sink.Point {
+	if r.org {
+		return sink.Point{Measurement: "gh_org_billing_usage", Tags: merge(tags, map[string]string{"org": r.who}), Fields: fields, Time: day}
+	}
+	return sink.Point{Measurement: "gh_billing_usage", Tags: merge(tags, map[string]string{"user": r.who}), Fields: fields, Time: day}
 }
 
 func (b Billing) Collect(ctx context.Context, c *ghapi.Client, now time.Time) ([]sink.Point, error) {
 	reports := []billingReport{{
-		who: b.Login, path: "/users/" + b.Login + "/settings/billing/usage",
+		who:  b.Login,
+		path: "/users/" + b.Login + "/settings/billing/usage",
 		page: "https://github.com/settings/billing/summary",
 	}}
 	for _, org := range b.Orgs {
 		reports = append(reports, billingReport{
-			who: org, path: "/organizations/" + org + "/settings/billing/usage",
+			who: org, org: true,
+			path: "/organizations/" + org + "/settings/billing/usage",
 			page: "https://github.com/organizations/" + org + "/settings/billing/summary",
 		})
 	}
@@ -67,11 +81,6 @@ func (b Billing) Collect(ctx context.Context, c *ghapi.Client, now time.Time) ([
 }
 
 // report walks one report back month by month.
-//
-// Each report's rows say whose bill they are in `user`. The tags that name a
-// repository keep two reports apart wherever there is one, but a charge that
-// belongs to none, a Copilot seat, names none, and an organization's seat of
-// the same day and SKU as the account's would otherwise have been one row.
 func (b Billing) report(ctx context.Context, c *ghapi.Client, r billingReport, now time.Time) ([]sink.Point, error) {
 	months := b.Months
 	if months <= 0 {
@@ -143,22 +152,19 @@ func (b Billing) report(ctx context.Context, c *ghapi.Client, r billingReport, n
 			// SKU, one day, so it is stamped at the day, and a re-read
 			// rewrites it whatever minute GitHub reports next time.
 			day = day.UTC().Truncate(24 * time.Hour)
-			points = append(points, sink.Point{
-				Measurement: "gh_billing_usage",
-				Tags: merge(billingRepoTags(r.who, u.OrgName, u.RepositoryName),
-					map[string]string{
-						"user": r.who, "product": u.Product, "sku": u.SKU,
-						"unit": u.UnitType,
-					}),
-				Fields: map[string]any{
+			points = append(points, r.point(
+				merge(billingRepoTags(r.who, u.OrgName, u.RepositoryName), map[string]string{
+					"product": u.Product, "sku": u.SKU, "unit": u.UnitType,
+				}),
+				map[string]any{
 					"quantity": u.Quantity, "price_per_unit": u.PricePerUnit,
 					"gross": u.GrossAmount, "discount": u.DiscountAmount, "net": u.NetAmount,
 					// The bill itself, which is the only page any of this can
 					// be checked against.
 					"url": r.page,
 				},
-				Time: day,
-			})
+				day,
+			))
 		}
 	}
 	return points, nil

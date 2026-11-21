@@ -80,6 +80,7 @@ cambie de coste sin que esta tabla la siga rompe la compilación.
 | `account`   | `billing`      | `1h`        | el mes en curso se mueve mientras corre la integración continua: había cambiado en cada una de las 46 lecturas cada seis horas medidas, y una pasada son dos peticiones, ese mes y el anterior, de las que solo se cobra la primera                                                                                                                                                                      |
 | `account`   | `history`      | `0`         | apagada hasta que se la nombre: recorre cada año pasado y lo que va de este, y las filas son idempotentes                                                                                                                                                                                                                                                                                                |
 | `account`   | `keys`         | `24h`       | una clave SSH o GPG cambia cuando alguien la cambia, y lo que importa es su fecha de caducidad, no la hora en que se vio                                                                                                                                                                                                                                                                                 |
+| `account`   | `orgs`         | `1h`        | los miembros, los equipos, las invitaciones y los asientos se editan a mano, y cada parte de una organización que no se ha movido responde 304 sin coste                                                                                                                                                                                                                                                 |
 | `account`   | `outbound`     | `1h`        | las estrellas dadas, el trabajo en repositorios ajenos y las respuestas aceptadas allí, por unos nueve puntos de GraphQL por pasada, así que la hora no cuesta nada que se note y una respuesta aceptada esta tarde está en el panel esta tarde                                                                                                                                                          |
 | `account`   | `profile`      | `12h`       | paquetes, gists y cuentas sociales, todo ello editado a mano                                                                                                                                                                                                                                                                                                                                             |
 | `account`   | `totals`       | `1h`        | los números de toda la vida se mueven con cada estrella, fork, fusión y push, y una pasada es un punto de GraphQL por la cuenta, uno por cada diez repositorios y uno por cada veinticinco archivados que se dejan fuera, y una petición del presupuesto de búsqueda                                                                                                                                     |
@@ -167,7 +168,7 @@ medidas no se escriben nunca. `ghchronicle -groups` imprime la lista, que es:
 | Grupo       | Familias                                                                                 |
 | ----------- | ---------------------------------------------------------------------------------------- |
 | `audience`  | `forks`, `stars`, `traffic`                                                              |
-| `account`   | `account`, `achievements`, `billing`, `history`, `keys`, `outbound`, `profile`, `totals` |
+| `account`   | `account`, `achievements`, `billing`, `history`, `keys`, `orgs`, `outbound`, `profile`, `totals` |
 | `repos`     | `branches`, `deps`, `inventory`, `policyfiles`, `repo`, `rulesets`, `settings`           |
 | `work`      | `commits`, `discussions`, `issueevents`, `issues`, `planning`, `stats`                   |
 | `ci`        | `actions`, `artifacts`, `deployments`, `joblogs`                                         |
@@ -354,8 +355,8 @@ level=INFO msg="slow families due together take turns" starting=planning
 Una por pasada vale mientras puede cumplir todas las cadencias, y una
 configuración con un tic más largo puede tener más familias lentas que eso.
 `every.default: 6h` late cada hora, porque nada en ella corre más a menudo, con
-treinta y tres familias a seis horas, y una por pasada arrancaría cada una cada
-treinta y tres horas. Ahí una pasada arranca las menos que caben, seis, y ninguna
+treinta y cuatro familias a seis horas, y una por pasada arrancaría cada una cada
+treinta y cuatro horas. Ahí una pasada arranca las menos que caben, seis, y ninguna
 familia espera tanto como su cadencia.
 
 Solo el servicio se turna. `-once` corre todas las familias que tocan, porque no

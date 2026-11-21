@@ -162,9 +162,10 @@ func TestABillingChargeIsOwnedByTheOrganizationWhenThereIsOne(t *testing.T) {
 
 // TestAnOrganizationsBillIsReadBesideTheAccounts: a repository an
 // organization owns is billed to the organization, so its minutes are read
-// from the organization's own report, owned by it and said to be its bill,
-// and an organization whose report the token may not read is nothing to
-// write rather than a failure.
+// from the organization's own report, into a measurement of their own that
+// the account's cost panels do not add up, owned by the organization and
+// linked to its bill; an organization whose report the token may not read is
+// nothing to write rather than a failure.
 func TestAnOrganizationsBillIsReadBesideTheAccounts(t *testing.T) {
 	t.Parallel()
 	f := newFixtureServer(t)
@@ -179,26 +180,23 @@ func TestAnOrganizationsBillIsReadBesideTheAccounts(t *testing.T) {
 		t.Fatalf("an organization whose bill is not ours to read is not an error: %v", err)
 	}
 	checkPoints(t, points)
-	if len(points) != 4 {
-		t.Fatalf("got %d points, want the account's 2 and the organization's 2", len(points))
+	if mine, theirs := len(only(t, points, "gh_billing_usage")), len(only(t, points, "gh_org_billing_usage")); mine != 2 || theirs != 2 {
+		t.Fatalf("got %d rows of the account's bill and %d of the organization's, want 2 and 2", mine, theirs)
 	}
-	minutes := find(t, points, "gh_billing_usage", map[string]string{"full_name": "acme/agents"})
-	if minutes.Tags["owner"] != "acme" || minutes.Tags["user"] != "acme" {
+	for _, p := range only(t, points, "gh_billing_usage") {
+		if p.Tags["owner"] == "acme" {
+			t.Errorf("the organization's charge %v is on the account's bill", p.Tags)
+		}
+	}
+	minutes := find(t, points, "gh_org_billing_usage", map[string]string{"full_name": "acme/agents"})
+	if minutes.Tags["owner"] != "acme" || minutes.Tags["org"] != "acme" {
 		t.Errorf("tags = %v, want the organization as the owner and as whose bill it is", minutes.Tags)
+	}
+	if _, has := minutes.Tags["user"]; has {
+		t.Errorf("an organization's row names no user: %v", minutes.Tags)
 	}
 	if want := "https://github.com/organizations/acme/settings/billing/summary"; minutes.Fields["url"] != want {
 		t.Errorf("url = %v, want the organization's bill %s", minutes.Fields["url"], want)
-	}
-	// Both seats name no repository and fall on the same day and SKU, so
-	// whose bill each is, is what keeps them two rows.
-	seats := map[string]bool{}
-	for _, p := range points {
-		if p.Tags["repo"] == noneTag {
-			seats[p.Tags["user"]] = true
-		}
-	}
-	if !seats["octocat"] || !seats["acme"] || len(seats) != 2 {
-		t.Errorf("seats by bill = %v, want one on octocat's and one on acme's", seats)
 	}
 	if n := len(f.calls("/organizations/strangers/settings/billing/usage")); n != 1 {
 		t.Errorf("asked the refused report %d times, want once for the one month", n)

@@ -24,6 +24,7 @@ var Sections = []Section{
 	{"Releases", true, releases},
 	{"Security", true, security},
 	{"Cost", true, cost},
+	{"Organizations", true, organizations},
 	{"Activity", true, activity},
 	{"Inventory", true, inventory},
 	{"Profile and sponsorship", true, profileSection},

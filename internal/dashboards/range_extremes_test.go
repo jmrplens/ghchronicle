@@ -41,6 +41,8 @@ var rangeExtremes = map[string]string{
 		"results those analyses found and the runs they were: analyses are events.",
 	"Usage by repository": "the unit price of the usage summed beside it over the same " +
 		"range: usage rows are dated charges, not readings.",
+	"Organization usage by repo": "the unit price of the usage summed beside it over the " +
+		"same range, as in Usage by repository: usage rows are dated charges, not readings.",
 	"Downloads gained": "the newest count less the oldest is what a counter gained " +
 		"over the range.",
 	"Cache entries by key": "the least days since use over the entries of one key in the " +

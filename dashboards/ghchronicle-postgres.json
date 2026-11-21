@@ -14054,7 +14054,954 @@
         "x": 0,
         "y": 565
       },
-      "id": 142,
+      "id": 139,
+      "panels": [
+        {
+          "datasource": "${DS_POSTGRES}",
+          "description": "Who is in each organization, newest row in the range: its members and how many of them own it, its teams, the outside collaborators given a repository, the invitations not yet answered, and the Copilot seats it pays for against the ones used this cycle. Two-factor says whether the organization requires it of its members. The outside collaborators, the invitations, Copilot and two-factor answer an owner alone, and are empty for an organization the account is only a member of.",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "filterable": false,
+                "minWidth": 90
+              },
+              "fieldMinMax": true
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Two-factor"
+                },
+                "properties": [
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-text"
+                    }
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "0": {
+                            "color": "text",
+                            "index": 1,
+                            "text": "off"
+                          },
+                          "1": {
+                            "color": "green",
+                            "index": 0,
+                            "text": "on"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "off"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "on"
+                          }
+                        },
+                        "type": "value"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 100
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Members"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 100
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Owners"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Teams"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 80
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Outside collaborators"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 110
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Invitations"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 100
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Copilot seats"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 110
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Copilot used"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 110
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Plan"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Organization"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "targetBlank": true,
+                        "title": "Open on GitHub",
+                        "url": "${__data.fields.Link}"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Link"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hidden",
+                    "value": true
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 24,
+            "x": 0,
+            "y": 566
+          },
+          "id": 133,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "reducer": [
+                "sum"
+              ],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": [
+              {
+                "desc": true,
+                "displayName": "Organization"
+              }
+            ]
+          },
+          "targets": [
+            {
+              "datasource": "${DS_POSTGRES}",
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT org AS \"Organization\", members AS \"Members\", admins AS \"Owners\", teams AS \"Teams\", outside_collaborators AS \"Outside collaborators\", pending_invitations AS \"Invitations\", copilot_seats AS \"Copilot seats\", copilot_active AS \"Copilot used\", two_factor_required AS \"Two-factor\", plan AS \"Plan\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY org ORDER BY time DESC) AS rn FROM gh_org WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY org COLLATE \"C\"",
+              "refId": "A"
+            }
+          ],
+          "title": "Organizations: people",
+          "type": "table"
+        },
+        {
+          "datasource": "${DS_POSTGRES}",
+          "description": "What the organization's owners set up, newest row in the range: its repositories, its self-hosted runners, the Actions secrets and variables shared by its repositories, its webhooks, the GitHub Apps installed on it, its projects, and what all its repositories hold in the Actions cache together. Each repository's own are in their sections. Every column but the repositories and the projects answers an owner alone.",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "filterable": false,
+                "minWidth": 90
+              },
+              "fieldMinMax": true
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Actions cache"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "bytes"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 120
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Public repositories"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 120
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Private repositories"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 120
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Runners"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Secrets"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Variables"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Webhooks"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 100
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Apps"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 80
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Projects"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Actions cache"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 120
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Organization"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "targetBlank": true,
+                        "title": "Open on GitHub",
+                        "url": "${__data.fields.Link}"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Link"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hidden",
+                    "value": true
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 24,
+            "x": 0,
+            "y": 572
+          },
+          "id": 134,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "reducer": [
+                "sum"
+              ],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": [
+              {
+                "desc": true,
+                "displayName": "Organization"
+              }
+            ]
+          },
+          "targets": [
+            {
+              "datasource": "${DS_POSTGRES}",
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT org AS \"Organization\", public_repos AS \"Public repositories\", private_repos AS \"Private repositories\", runners AS \"Runners\", secrets AS \"Secrets\", variables AS \"Variables\", hooks AS \"Webhooks\", installations AS \"Apps\", projects AS \"Projects\", actions_cache_bytes AS \"Actions cache\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY org ORDER BY time DESC) AS rn FROM gh_org WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY org COLLATE \"C\"",
+              "refId": "A"
+            }
+          ],
+          "title": "Organizations: machinery",
+          "type": "table"
+        },
+        {
+          "datasource": "${DS_POSTGRES}",
+          "description": "The organizations' own bills, apart from the account's in Cost: a repository an organization owns is billed to it. What the usage would have cost at list price, what each plan covered, what was billed, and the runner minutes behind it. Only an organization's owners may read its bill.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "fixedColor": "text",
+                "mode": "fixed"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "currencyUSD"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Actions minutes"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Gross"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no usage"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Covered by the plan"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no usage"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Actually billed"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no usage"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Actions minutes"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no usage"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 24,
+            "x": 0,
+            "y": 578
+          },
+          "id": 135,
+          "options": {
+            "colorMode": "none",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value_and_name"
+          },
+          "targets": [
+            {
+              "datasource": "${DS_POSTGRES}",
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT SUM(gross) AS \"Gross\", SUM(discount) AS \"Covered by the plan\", SUM(net) AS \"Actually billed\", SUM(CASE WHEN unit = 'Minutes' THEN quantity ELSE 0 END) AS \"Actions minutes\" FROM gh_org_billing_usage WHERE $__timeFilter(time)",
+              "refId": "A"
+            }
+          ],
+          "title": "Organization spend in range",
+          "type": "stat"
+        },
+        {
+          "datasource": "${DS_POSTGRES}",
+          "description": "Gross cost per day, by organization. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisSoftMin": 0,
+                "drawStyle": "bars",
+                "fillOpacity": 50,
+                "gradientMode": "none",
+                "lineWidth": 1,
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                }
+              },
+              "displayName": "${__field.labels.metric}",
+              "unit": "currencyUSD"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 582
+          },
+          "id": 136,
+          "interval": "1d",
+          "maxDataPoints": 100,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": "${DS_POSTGRES}",
+              "editorMode": "code",
+              "format": "time_series",
+              "rawQuery": true,
+              "rawSql": "SELECT $__timeGroupAlias(time, $__interval), org AS metric, SUM(gross) AS cost FROM gh_org_billing_usage WHERE $__timeFilter(time) GROUP BY 1, 2 ORDER BY 1",
+              "refId": "A"
+            }
+          ],
+          "title": "Organization cost over time",
+          "type": "timeseries"
+        },
+        {
+          "datasource": "${DS_POSTGRES}",
+          "description": "Runner minutes per day, by organization. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisSoftMin": 0,
+                "drawStyle": "bars",
+                "fillOpacity": 50,
+                "gradientMode": "none",
+                "lineWidth": 1,
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                }
+              },
+              "decimals": 0,
+              "displayName": "${__field.labels.metric}",
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 582
+          },
+          "id": 137,
+          "interval": "1d",
+          "maxDataPoints": 100,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": "${DS_POSTGRES}",
+              "editorMode": "code",
+              "format": "time_series",
+              "rawQuery": true,
+              "rawSql": "SELECT $__timeGroupAlias(time, $__interval), org AS metric, SUM(quantity) AS quantity FROM gh_org_billing_usage WHERE $__timeFilter(time) AND unit = 'Minutes' GROUP BY 1, 2 ORDER BY 1",
+              "refId": "A"
+            }
+          ],
+          "title": "Organization Actions minutes",
+          "type": "timeseries"
+        },
+        {
+          "datasource": "${DS_POSTGRES}",
+          "description": "Each organization repository's charges in the range, by SKU, read off the organization's own bill, which each row links to. A charge that belongs to no repository, a Copilot seat, is in the totals above and not here.",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "filterable": false,
+                "minWidth": 90
+              },
+              "fieldMinMax": true
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Repository"
+                },
+                "properties": [
+                  {
+                    "id": "custom.minWidth",
+                    "value": 160
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Gross"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "currencyUSD"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 110
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Net"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "currencyUSD"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 110
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Price"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "currencyUSD"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 100
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "SKU"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 160
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Unit"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Quantity"
+                },
+                "properties": [
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "mode": "gradient",
+                      "type": "gauge"
+                    }
+                  },
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  },
+                  {
+                    "id": "min",
+                    "value": 0
+                  },
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "green",
+                          "value": null
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 120
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Repository"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "targetBlank": true,
+                        "title": "Open the bill (owner only)",
+                        "url": "${__data.fields.Link}"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Link"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hidden",
+                    "value": true
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 24,
+            "x": 0,
+            "y": 590
+          },
+          "id": 138,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "reducer": [
+                "sum"
+              ],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": [
+              {
+                "desc": true,
+                "displayName": "Gross"
+              }
+            ]
+          },
+          "targets": [
+            {
+              "datasource": "${DS_POSTGRES}",
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT full_name COLLATE \"C\" AS \"Repository\", SUM(gross) AS \"Gross\", sku COLLATE \"C\" AS \"SKU\", SUM(quantity) AS \"Quantity\", MAX(unit COLLATE \"C\") AS \"Unit\", MAX(price_per_unit) AS \"Price\", SUM(net) AS \"Net\", MAX(url COLLATE \"C\") AS \"Link\" FROM gh_org_billing_usage WHERE $__timeFilter(time) AND repo \u003c\u003e '(none)' GROUP BY 1, 3 ORDER BY 2 DESC, 1, 3 LIMIT 40",
+              "refId": "A"
+            }
+          ],
+          "title": "Organization usage by repo",
+          "type": "table"
+        }
+      ],
+      "title": "Organizations",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 600
+      },
+      "id": 149,
       "panels": [
         {
           "datasource": "${DS_POSTGRES}",
@@ -14087,9 +15034,9 @@
             "h": 8,
             "w": 16,
             "x": 0,
-            "y": 566
+            "y": 601
           },
-          "id": 133,
+          "id": 140,
           "interval": "1h",
           "maxDataPoints": 100,
           "options": {
@@ -14140,9 +15087,9 @@
             "h": 16,
             "w": 8,
             "x": 16,
-            "y": 566
+            "y": 601
           },
-          "id": 134,
+          "id": 141,
           "options": {
             "displayLabels": [],
             "legend": {
@@ -14219,9 +15166,9 @@
             "h": 8,
             "w": 8,
             "x": 0,
-            "y": 574
+            "y": 609
           },
-          "id": 135,
+          "id": 142,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -14313,9 +15260,9 @@
             "h": 8,
             "w": 8,
             "x": 8,
-            "y": 574
+            "y": 609
           },
-          "id": 136,
+          "id": 143,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -14377,9 +15324,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 582
+            "y": 617
           },
-          "id": 137,
+          "id": 144,
           "interval": "1d",
           "maxDataPoints": 100,
           "options": {
@@ -14535,9 +15482,9 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 590
+            "y": 625
           },
-          "id": 138,
+          "id": 145,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -14711,9 +15658,9 @@
             "h": 9,
             "w": 24,
             "x": 0,
-            "y": 597
+            "y": 632
           },
-          "id": 139,
+          "id": 146,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -14762,9 +15709,9 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 606
+            "y": 641
           },
-          "id": 140,
+          "id": 147,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -14926,9 +15873,9 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 606
+            "y": 641
           },
-          "id": 141,
+          "id": 148,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -14964,9 +15911,9 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 615
+        "y": 650
       },
-      "id": 159,
+      "id": 166,
       "panels": [
         {
           "datasource": "${DS_POSTGRES}",
@@ -14990,9 +15937,9 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 616
+            "y": 651
           },
-          "id": 143,
+          "id": 150,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -15414,9 +16361,9 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 616
+            "y": 651
           },
-          "id": 144,
+          "id": 151,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -15683,9 +16630,9 @@
             "h": 11,
             "w": 24,
             "x": 0,
-            "y": 624
+            "y": 659
           },
-          "id": 145,
+          "id": 152,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -15780,9 +16727,9 @@
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 635
+            "y": 670
           },
-          "id": 146,
+          "id": 153,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -15931,9 +16878,9 @@
             "h": 8,
             "w": 9,
             "x": 6,
-            "y": 635
+            "y": 670
           },
-          "id": 147,
+          "id": 154,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -16110,9 +17057,9 @@
             "h": 8,
             "w": 9,
             "x": 15,
-            "y": 635
+            "y": 670
           },
-          "id": 148,
+          "id": 155,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -16218,9 +17165,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 643
+            "y": 678
           },
-          "id": 149,
+          "id": 156,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -16442,9 +17389,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 651
+            "y": 686
           },
-          "id": 150,
+          "id": 157,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -16522,9 +17469,9 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 659
+            "y": 694
           },
-          "id": 151,
+          "id": 158,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -16573,9 +17520,9 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 659
+            "y": 694
           },
-          "id": 152,
+          "id": 159,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -16658,9 +17605,9 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 666
+            "y": 701
           },
-          "id": 153,
+          "id": 160,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -16750,9 +17697,9 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 666
+            "y": 701
           },
-          "id": 154,
+          "id": 161,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -16926,9 +17873,9 @@
             "h": 12,
             "w": 12,
             "x": 0,
-            "y": 673
+            "y": 708
           },
-          "id": 155,
+          "id": 162,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -17051,9 +17998,9 @@
             "h": 12,
             "w": 12,
             "x": 12,
-            "y": 673
+            "y": 708
           },
-          "id": 156,
+          "id": 163,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -17107,9 +18054,9 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 685
+            "y": 720
           },
-          "id": 157,
+          "id": 164,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -17199,9 +18146,9 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 685
+            "y": 720
           },
-          "id": 158,
+          "id": 165,
           "interval": "1d",
           "maxDataPoints": 100,
           "options": {
@@ -17239,9 +18186,9 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 693
+        "y": 728
       },
-      "id": 168,
+      "id": 175,
       "panels": [
         {
           "datasource": "${DS_POSTGRES}",
@@ -17367,9 +18314,9 @@
             "h": 4,
             "w": 24,
             "x": 0,
-            "y": 694
+            "y": 729
           },
-          "id": 160,
+          "id": 167,
           "options": {
             "colorMode": "none",
             "graphMode": "none",
@@ -17577,9 +18524,9 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 698
+            "y": 733
           },
-          "id": 161,
+          "id": 168,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -17799,9 +18746,9 @@
             "h": 10,
             "w": 12,
             "x": 12,
-            "y": 698
+            "y": 733
           },
-          "id": 162,
+          "id": 169,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -17950,9 +18897,9 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 708
+            "y": 743
           },
-          "id": 163,
+          "id": 170,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -18090,9 +19037,9 @@
             "h": 10,
             "w": 12,
             "x": 12,
-            "y": 708
+            "y": 743
           },
-          "id": 164,
+          "id": 171,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -18290,9 +19237,9 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 718
+            "y": 753
           },
-          "id": 165,
+          "id": 172,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -18399,9 +19346,9 @@
             "h": 10,
             "w": 24,
             "x": 0,
-            "y": 725
+            "y": 760
           },
-          "id": 166,
+          "id": 173,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -18707,9 +19654,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 735
+            "y": 770
           },
-          "id": 167,
+          "id": 174,
           "options": {
             "cellHeight": "lg",
             "footer": {
@@ -18745,9 +19692,9 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 744
+        "y": 779
       },
-      "id": 173,
+      "id": 180,
       "panels": [
         {
           "datasource": "${DS_POSTGRES}",
@@ -18779,9 +19726,9 @@
             "h": 11,
             "w": 12,
             "x": 0,
-            "y": 745
+            "y": 780
           },
-          "id": 169,
+          "id": 176,
           "interval": "5m",
           "maxDataPoints": 100,
           "options": {
@@ -18830,9 +19777,9 @@
             "h": 11,
             "w": 12,
             "x": 12,
-            "y": 745
+            "y": 780
           },
-          "id": 170,
+          "id": 177,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -18960,9 +19907,9 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 756
+            "y": 791
           },
-          "id": 171,
+          "id": 178,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -19055,9 +20002,9 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 756
+            "y": 791
           },
-          "id": 172,
+          "id": 179,
           "options": {
             "cellHeight": "sm",
             "footer": {

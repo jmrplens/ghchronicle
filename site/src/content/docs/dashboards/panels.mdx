@@ -1,13 +1,13 @@
 ---
 title: What they show
-description: The seventeen sections and their one hundred and fifty six panels, one capture each, and what changes when the store cannot answer.
+description: The seventeen sections and their one hundred and sixty two panels, one capture each, and what changes when the store cannot answer.
 searchTitle: What the GitHub metrics dashboards show
 ---
 
 import { Aside } from "@astrojs/starlight/components";
 
 One dashboard, rendered once per store. Seventeen sections, one hundred and
-fifty six panels, in the same places with the same titles whichever database
+sixty two panels, in the same places with the same titles whichever database
 you chose. One capture per section below, in the order the dashboard puts them.
 
 Every section but the Overview opens collapsed. Open, the first seven were
@@ -659,6 +659,35 @@ exporter drops it a day later, or, pushed over OTLP, until the process
 restarts.
 
 Reads `gh_billing_usage`, `gh_actions_cache` and `gh_actions_cache_entry`.
+
+## Organizations
+
+Two tables of each organisation in `targets.orgs`, its people and its
+machinery, then its own bill: what it came to, cost and Actions minutes over
+time by organisation, and usage by repository.
+
+The people are the members and how many of them own the organisation, its
+teams, the outside collaborators given a repository, the invitations nobody has
+answered, the Copilot seats it pays for against the ones used this cycle, and
+whether it requires two-factor authentication. The machinery is its
+repositories, its self-hosted runners, the Actions secrets and variables its
+repositories share, its webhooks, the GitHub Apps installed on it, its projects
+and what its repositories hold in the Actions cache together. Each row is the
+organisation's newest in the range, since a count goes down when someone
+leaves. Most of these counts answer an owner alone, and an organisation the
+account is only a member of has them empty; in InfluxDB and PostgreSQL a column
+no row has written is refused, so the two tables answer once one organisation
+of the configuration is the account's to own. Graphite draws neither table: it
+reduces one series to one row, and an organisation is a series per count.
+
+The bill is apart from Cost on purpose. A repository an organisation owns is
+billed to the organisation and not to the account, and somebody else pays it,
+so adding it to the account's spending would misstate both. The panels are the
+Cost section's, drawn over the organisations' bills and split by organisation,
+and each row of the usage table links to the bill it was read from, which only
+the organisation's owners can open.
+
+Reads `gh_org` and `gh_org_billing_usage`.
 
 ## Activity
 

@@ -284,6 +284,7 @@ func fileInfluxConfig(dir, githubURL, path string) (string, error) {
   timeout: 30s
 targets:
   user: %s
+  orgs: [octo-org]
 sinks:
   file:
     path: %s

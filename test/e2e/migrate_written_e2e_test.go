@@ -216,8 +216,8 @@ func planned(t *testing.T, u *upgraded) {
 		t.Errorf("a dry run changed the files beside it:\nbefore %v\nafter  %v", fileNames(before), fileNames(after))
 	}
 	for _, r := range u.gh.Requests() {
-		if r.Method != http.MethodGet || r.Path != "/user/repos" {
-			t.Errorf("a dry run asked GitHub %s %s, want the repository list alone", r.Method, r.Path)
+		if r.Method != http.MethodGet || r.Path != "/user/repos" && r.Path != "/orgs/"+fakegh.Org+"/repos" {
+			t.Errorf("a dry run asked GitHub %s %s, want the repository lists alone", r.Method, r.Path)
 		}
 	}
 }

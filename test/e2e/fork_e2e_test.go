@@ -44,6 +44,7 @@ func TestANamedForkIsNotAskedWhatIsAlreadyKnown(t *testing.T) {
   timeout: 20s
 targets:
   user: %s
+  orgs: [octo-org]
   repos:
     - %s
 sinks:
