@@ -28,6 +28,10 @@ func organizations(b *builder) []Panel {
 const orgNewest = "(SELECT *, ROW_NUMBER() OVER (PARTITION BY org ORDER BY time DESC) AS rn" +
 	" FROM gh_org WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY org"
 
+// orgTwoFactor is the heading of the column drawn as on or off rather than at
+// the width of a count.
+const orgTwoFactor = "Two-factor"
+
 // orgColumn is one column of a gh_org table: the field, its heading, the
 // width it is drawn in, and whether it is text, which Prometheus does not
 // carry and Elasticsearch buckets on rather than measures.
@@ -47,7 +51,7 @@ func orgTables(b *builder) []Panel {
 		{field: "pending_invitations", name: "Invitations", w: 110},
 		{field: "copilot_seats", name: "Copilot seats", w: 120},
 		{field: "copilot_active", name: "Copilot used", w: 120},
-		{field: "two_factor_required", name: "Two-factor", w: 100},
+		{field: "two_factor_required", name: orgTwoFactor, w: 100},
 		{field: "plan", name: "Plan", w: 90, text: true},
 	}
 	machinery := []orgColumn{
@@ -70,7 +74,7 @@ func orgTables(b *builder) []Panel {
 				"of its members. The outside collaborators, the invitations, Copilot and "+
 				"two-factor answer an owner alone, and are empty for an organization the "+
 				"account is only a member of.",
-			[]any{onOff("Two-factor", 100)}),
+			[]any{onOff(orgTwoFactor, 100)}),
 		orgTable(b, "Organizations: machinery", 5, machinery,
 			"What the organization's owners set up, newest row in the range: its "+
 				"repositories, its self-hosted runners, the Actions secrets and variables "+
@@ -113,7 +117,7 @@ func orgTable(b *builder, title string, y int, cols []orgColumn, desc string, ov
 		if !c.text {
 			metrics = append(metrics, b.mMax(c.field))
 		}
-		if c.name != "Two-factor" {
+		if c.name != orgTwoFactor {
 			overrides = append(overrides, width(c.name, c.w))
 		}
 	}

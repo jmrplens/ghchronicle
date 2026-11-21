@@ -28,6 +28,9 @@ type Orgs struct {
 	Orgs []string
 }
 
+// orgsPath opens every path of an organization's.
+const orgsPath = "/orgs/"
+
 // orgProfile is the organization as GET /orgs/{org} returns it.
 type orgProfile struct {
 	Login             string `json:"login"`
@@ -57,7 +60,7 @@ type orgCount struct {
 // orgCounts are the counts every organization is asked for, in the order the
 // fields are documented.
 func orgCounts(org string) []orgCount {
-	base := "/orgs/" + org
+	base := orgsPath + org
 	return []orgCount{
 		{field: "members", path: base + "/members"},
 		{field: "admins", path: base + "/members?role=admin"},
@@ -93,7 +96,7 @@ func (o Orgs) Collect(ctx context.Context, c *ghapi.Client, now time.Time) ([]si
 // at all.
 func orgPoint(ctx context.Context, c *ghapi.Client, org string, now time.Time) (sink.Point, bool, error) {
 	var prof orgProfile
-	if _, _, err := c.GetJSON(ctx, "/orgs/"+org, &prof, ""); err != nil {
+	if _, _, err := c.GetJSON(ctx, orgsPath+org, &prof, ""); err != nil {
 		if isSkippable(err) {
 			return sink.Point{}, false, nil
 		}
@@ -184,7 +187,7 @@ func orgCopilot(ctx context.Context, c *ghapi.Client, org string, fields map[str
 			PendingInvitation int `json:"pending_invitation"`
 		} `json:"seat_breakdown"`
 	}
-	if _, _, err := c.GetJSON(ctx, "/orgs/"+org+"/copilot/billing", &res, ""); err != nil {
+	if _, _, err := c.GetJSON(ctx, orgsPath+org+"/copilot/billing", &res, ""); err != nil {
 		if isSkippable(err) {
 			return nil
 		}
@@ -204,7 +207,7 @@ func orgCache(ctx context.Context, c *ghapi.Client, org string, fields map[strin
 		Count int64 `json:"total_active_caches_count"`
 		Bytes int64 `json:"total_active_caches_size_in_bytes"`
 	}
-	if _, _, err := c.GetJSON(ctx, "/orgs/"+org+"/actions/cache/usage", &res, ""); err != nil {
+	if _, _, err := c.GetJSON(ctx, orgsPath+org+"/actions/cache/usage", &res, ""); err != nil {
 		if isSkippable(err) {
 			return nil
 		}
